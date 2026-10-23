@@ -28,7 +28,7 @@ export function accentFor(id) {
 const rand = (arr) => arr[Math.floor(Math.random() * arr.length)];
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-export function createChat({ byId, api, getConfig, getGameState, onExchange, onOpened, onTokens, wall, menu, buildFrame }) {
+export function createChat({ byId, api, getConfig, getGameState, onExchange, onOpened, onTokens, wall, menu, buildFrame, limitModal = null }) {
   const panel = document.getElementById('chat');
   const backdrop = document.getElementById('chat-backdrop');
   const log = document.getElementById('chat-log');
@@ -330,8 +330,9 @@ export function createChat({ byId, api, getConfig, getGameState, onExchange, onO
 
   function updateBusy() {
     const b = current && busy.has(current.id);
-    sendBtn.disabled = Boolean(b);
+    sendBtn.disabled = Boolean(b); // ლიმიტის დაბლოკვა — aria-disabled (limitModal.applyInput), რომ დაჭერამ ფანჯარა გახსნას
     panel.classList.toggle('busy', Boolean(b));
+    limitModal?.applyInput();
   }
 
   // ---------- გაგზავნა + სტრიმინგი ----------
@@ -339,6 +340,8 @@ export function createChat({ byId, api, getConfig, getGameState, onExchange, onO
   async function send(text) {
     const id = current?.id;
     if (!id || busy.has(id)) return;
+    // ლიმიტი/ბიუჯეტი ამოწურულია → ფანჯარა ისევ იხსნება, გაგზავნა არ ხდება
+    if (limitModal?.isBlocked()) { limitModal.open(); return; }
     const c = byId[id];
     const cfg = getConfig();
     const max = cfg.chat.max_message_chars;
@@ -385,7 +388,13 @@ export function createChat({ byId, api, getConfig, getGameState, onExchange, onO
       const res = await api('/api/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
       if (!res.ok || !res.body) {
         const j = await res.json().catch(() => ({}));
-        throw new Error(j.error || MSG_API_ERROR);
+        // ბრაუზერის ლიმიტი ან გლობალური ბიუჯეტი → ოფიციალური ფანჯარა (არა ნედლი შეცდომა ჩატში)
+        if (res.status === 429 && (j.error === 'client_limit' || j.error === 'global_budget') && limitModal) {
+          const err = new Error('__limit__');
+          err.limit = j;
+          throw err;
+        }
+        throw new Error(typeof j.error === 'string' && !/^[a-z_]+$/.test(j.error) ? j.error : (j.message || MSG_API_ERROR));
       }
       const reader = res.body.getReader();
       const dec = new TextDecoder();
@@ -418,6 +427,14 @@ export function createChat({ byId, api, getConfig, getGameState, onExchange, onO
       }
       if (!done && !error) error = MSG_API_ERROR;
     } catch (e) {
+      if (e.limit) {
+        // მომხმარებლის შეტყობინება არ იკარგება — ისტორიაში რჩება, პასუხი არ მოვიდა
+        row.remove();
+        busy.delete(id);
+        updateBusy();
+        limitModal.block(e.limit.error, e.limit.resets_at ?? null);
+        return;
+      }
       error = e.message || MSG_API_ERROR;
     }
 
@@ -438,9 +455,11 @@ export function createChat({ byId, api, getConfig, getGameState, onExchange, onO
     row.querySelector('.who').replaceWith(whoNode(id, done.spoken_by));
     if (m.redirect) { const b = redirectButton(m.redirect); if (b) row.append(b); }
     if (live()) { setSpeaker(id, done.spoken_by); scrollDown(); }
-    if (done.remaining) onTokens(done.remaining);
+    // მთვლელი, თარიღი და (საჭიროებისას) ინტერტიტრი — ერთად, პასუხის დასრულებისთანავე (Round 2 §1, §5)
+    if (done.remaining) onTokens({ remaining: done.remaining, limits: done.limits, period: done.period, resets_at: done.resets_at });
     busy.delete(id);
     updateBusy();
+    if (done.exhausted && limitModal) limitModal.block('client_limit', done.resets_at ?? null);
     await onExchange(id);
   }
 
@@ -448,6 +467,7 @@ export function createChat({ byId, api, getConfig, getGameState, onExchange, onO
 
   form.addEventListener('submit', (e) => {
     e.preventDefault();
+    if (limitModal?.isBlocked()) { limitModal.open(); return; } // გაგზავნის მცდელობა → ფანჯარა ისევ
     const text = input.value.trim();
     if (!text) return;
     input.value = '';
