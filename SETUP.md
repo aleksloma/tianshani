@@ -25,6 +25,8 @@ npm start
 
 გახსენით http://localhost:3000 — კედელი, ჩარჩოები, ჩატი. ადმინი: http://localhost:3000/admin
 
+> **Windows PowerShell:** თუ `npm start` წერს „running scripts is disabled on this system“, გამოიყენეთ `npm.cmd start` (ან `node src/server.js`). Execution Policy-ის შეცვლა საჭირო არ არის.
+
 პირველ გაშვებაზე, თუ `settings.json` არ არსებობს, სერვერი თავად ქმნის მას `settings.example.json`-დან და **შემთხვევით ადმინის პაროლს** აგენერირებს (კონსოლში დაიბეჭდება). `settings.json` git-ში არ მიდის.
 
 ### Gemini-ს გასაღები
