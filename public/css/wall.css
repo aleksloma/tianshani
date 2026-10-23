@@ -1,0 +1,416 @@
+/* კედელი, ზედა ზოლი, ჩარჩოები, ბზარი, სეზონები, ჩამონგრევა */
+:root {
+  --plaster: #bfc8c5;
+  --plaster-2: #aeb8b6;
+  --sky: #7c9db0;
+  --cream: #efe6cf;
+  --paper: #f5eedb;
+  --ink: #2a2622;
+  --ink-soft: #5a5148;
+  --wood: #6e4527;
+  --wood-dark: #3a2313;
+  --brass-1: #d9bf7a;
+  --brass-2: #a8873f;
+  --red: #c0392b;
+  --lamp: rgba(255, 210, 130, 0.16);
+  --season-tint: rgba(196, 140, 60, 0.10);
+  --font: 'Noto Sans Georgian', 'Sylfaen', 'DejaVu Sans', sans-serif;
+  --font-title: 'Noto Serif Georgian', 'Sylfaen', serif;
+}
+body[data-season='autumn'] { --season-tint: rgba(196, 140, 60, 0.12); }
+body[data-season='winter'] { --season-tint: rgba(70, 120, 200, 0.20); }
+body[data-season='spring'] { --season-tint: rgba(225, 205, 80, 0.16); }
+body[data-season='summer'] { --season-tint: rgba(255, 225, 160, 0.14); }
+
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body {
+  font-family: var(--font);
+  color: var(--ink);
+  background: #9aa4a3;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+button { font: inherit; color: inherit; }
+
+#page { position: relative; min-height: 100vh; }
+
+/* ---------- კედელი: პროცედურული ბათქაში (+ wall.jpg, თუ არის) ---------- */
+#wall {
+  position: relative;
+  min-height: 100vh;
+  overflow: hidden;
+  background-color: var(--plaster);
+  background-image:
+    /* ხმაური / ბათქაშის მარცვალი */
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='260' height='260'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .25  0 0 0 0 .24  0 0 0 0 .2  0 0 0 .55 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"),
+    /* დიდი ლაქები */
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='900' height='700'%3E%3Cfilter id='b'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.006' numOctaves='4' seed='7'/%3E%3CfeColorMatrix values='0 0 0 0 .45  0 0 0 0 .40  0 0 0 0 .30  0 0 0 .5 -.12'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23b)'/%3E%3C/svg%3E"),
+    var(--wall-photo, none),
+    /* ჩამოფცქვნილი ადგილები (ოქერი) */
+    radial-gradient(ellipse 140px 90px at 12% 38%, rgba(176, 128, 72, 0.35), transparent 70%),
+    radial-gradient(ellipse 90px 60px at 86% 22%, rgba(176, 128, 72, 0.30), transparent 70%),
+    radial-gradient(ellipse 120px 70px at 64% 82%, rgba(160, 112, 64, 0.28), transparent 70%),
+    /* ქვედა ზეთის საღებავი (საბჭოური ოფისის პანელი) */
+    linear-gradient(180deg, transparent 0 66%, rgba(40, 52, 50, 0.55) 66%, rgba(40, 52, 50, 0.55) calc(66% + 3px), rgba(92, 120, 128, 0.42) calc(66% + 3px), rgba(80, 104, 112, 0.48) 100%),
+    linear-gradient(180deg, #c8d0cc 0%, #bbc5c3 55%, #aab4b2 100%);
+  background-size: 260px 260px, 900px 700px, cover, auto, auto, auto, auto, auto;
+  background-blend-mode: multiply, multiply, multiply, normal, normal, normal, normal, normal;
+}
+/* სეზონის ტონი */
+#wall::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: var(--season-tint);
+  mix-blend-mode: multiply;
+  transition: background 1.2s ease;
+  pointer-events: none;
+  z-index: 0;
+}
+/* ნათურის მოყვითალო შუქი */
+#wall-bg {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 4;
+  background:
+    radial-gradient(ellipse 70% 55% at 50% 0%, var(--lamp), transparent 70%),
+    radial-gradient(ellipse 120% 100% at 50% 40%, transparent 55%, rgba(30, 24, 16, 0.28) 100%);
+  mix-blend-mode: soft-light;
+}
+
+/* ---------- ზედა ზოლი — ბლანკის სტილი ---------- */
+#topbar {
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  z-index: 6;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 20px;
+  padding: 12px 22px 12px;
+  background:
+    repeating-linear-gradient(180deg, transparent 0 23px, rgba(80, 100, 140, 0.10) 23px 24px),
+    var(--cream);
+  border-bottom: 3px double rgba(42, 38, 34, 0.55);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
+}
+.title {
+  margin: 0;
+  font-family: var(--font-title);
+  font-stretch: 70%;
+  font-weight: 800;
+  font-size: clamp(24px, 3.4vw, 38px);
+  letter-spacing: 0.04em;
+  color: #1e2a3a;
+  text-shadow: 0.6px 0.4px 0 rgba(30, 42, 58, 0.45), -0.3px 0 0 rgba(30, 42, 58, 0.25); /* „მელნის“ გაშლა */
+}
+.subtitle {
+  margin: 2px 0 0;
+  font-size: 13px;
+  color: var(--ink-soft);
+  letter-spacing: 0.02em;
+}
+.status {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 14px;
+  font-size: 13px;
+}
+.stat { position: relative; white-space: nowrap; display: inline-flex; align-items: center; gap: 4px; }
+.stat .ico { font-size: 15px; line-height: 1; }
+.crack-ico { width: 15px; height: 15px; color: #4a3f35; }
+.stat.tokens { font-size: 11px; color: var(--ink-soft); }
+#stat-copies { cursor: help; border-bottom: 1px dotted var(--ink-soft); }
+.tooltip {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 20;
+  width: max-content;
+  max-width: 260px;
+  white-space: normal;
+  padding: 7px 10px;
+  font-size: 12px;
+  background: #2a2622;
+  color: #f4ecd8;
+  border-radius: 3px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s;
+}
+#stat-copies:hover .tooltip, #stat-copies:focus .tooltip { opacity: 1; }
+.banner {
+  flex-basis: 100%;
+  font-size: 12px;
+  color: var(--red);
+  border: 1px dashed rgba(192, 57, 43, 0.6);
+  padding: 3px 8px;
+  width: fit-content;
+}
+.banner[hidden] { display: none; }
+
+/* ---------- ბზარი ---------- */
+#crack {
+  position: absolute;
+  top: 0; left: 0;
+  z-index: 1;
+  pointer-events: none;
+  overflow: visible;
+}
+#crack path { fill: none; stroke-linecap: round; stroke-linejoin: round; transition: stroke-dashoffset 2.4s cubic-bezier(.3,.6,.3,1); }
+#crack.no-anim path { transition: none; }
+#crack .crack-dark { stroke: #2f2922; }
+#crack .crack-light { stroke: rgba(255, 252, 240, 0.45); }
+#crack .crack-dark.trunk { stroke-width: 2.6; }
+#crack .crack-light.trunk { stroke-width: 1.3; }
+#crack .crack-dark.branch { stroke-width: 1.4; }
+#crack .crack-light.branch { stroke-width: 0.8; }
+
+/* ---------- ჩარჩოები ---------- */
+#frames { position: absolute; inset: 0; z-index: 2; }
+.frame {
+  --rot: 0deg;
+  --extra: 0deg;
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  padding: 9px 9px 0;
+  margin: 0;
+  border: 0;
+  border-radius: 2px;
+  cursor: pointer;
+  background:
+    repeating-linear-gradient(90deg, rgba(0,0,0,0.06) 0 2px, transparent 2px 7px),
+    linear-gradient(135deg, #8a5a33, var(--wood) 40%, #5a361d 70%, #7a4c2a);
+  box-shadow:
+    inset 0 0 0 2px var(--wood-dark),
+    inset 0 0 0 4px rgba(214, 170, 120, 0.35),
+    inset 0 0 12px rgba(0, 0, 0, 0.45),
+    6px 12px 18px rgba(20, 14, 8, 0.38),
+    1px 2px 3px rgba(20, 14, 8, 0.4);
+  transform: rotate(calc(var(--rot) + var(--extra)));
+  transform-origin: 50% 50%; /* layout.js-ის collision check ცენტრის გარშემო მობრუნებას ითვლის */
+  transition: transform 0.9s cubic-bezier(.3,.7,.3,1.4), visibility 0s;
+}
+.frame.tilted { --extra: calc(var(--tilt-dir, 1) * 3deg); }
+.frame:hover:not(.portrait), .frame:focus-visible:not(.portrait) { animation: wobble 0.7s ease-in-out; }
+.frame:focus-visible { outline: 3px solid #f0d27a; outline-offset: 3px; }
+.frame.lifted { visibility: hidden; }
+@keyframes wobble {
+  0%, 100% { rotate: 0deg; }
+  25% { rotate: 1.8deg; }
+  55% { rotate: -1.3deg; }
+  80% { rotate: 0.6deg; }
+}
+.photo {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  padding: 6px;
+  background: #e9e1cc;
+  box-shadow: inset 0 0 0 1px rgba(0,0,0,0.25), inset 0 0 8px rgba(80, 60, 30, 0.3);
+  overflow: hidden;
+}
+.photo img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: 50% 22%;
+  filter: sepia(0.3) contrast(0.9);
+}
+.photo.silhouette img { object-fit: contain; object-position: 50% 100%; filter: sepia(0.15); background: #e6e0cf; }
+.plate {
+  margin: 6px 3px 8px;
+  padding: 3px 5px 4px;
+  text-align: center;
+  line-height: 1.2;
+  color: #2b2112;
+  background: linear-gradient(180deg, var(--brass-1), #c4a45c 45%, var(--brass-2));
+  border-radius: 2px;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.5), inset 0 -1px 0 rgba(0,0,0,0.25), 0 1px 2px rgba(0,0,0,0.4);
+  text-shadow: 0 1px 0 rgba(255, 240, 200, 0.5);
+  overflow: hidden;
+}
+.plate-name, .plate-role { display: block; overflow: hidden; }
+.plate-name {
+  font-weight: 700;
+  font-size: 12.5px;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow-wrap: anywhere;
+}
+.plate-role { font-size: 10.5px; color: #3d301a; white-space: nowrap; text-overflow: ellipsis; }
+.frame[data-tier='0'] .plate-name { font-size: 13.5px; }
+.frame.small .plate-name { font-size: 11px; }
+.frame.small .plate-role { font-size: 9.5px; }
+
+/* ---------- დაფა და „ესაუბრე სხვას“ ---------- */
+.pinned-note, .door-note {
+  position: absolute;
+  z-index: 3;
+  background: linear-gradient(180deg, #f8f1dc, #efe4c4);
+  box-shadow: 2px 6px 12px rgba(30, 20, 10, 0.35);
+  color: var(--ink);
+}
+.pin {
+  position: absolute;
+  top: -6px; left: 50%;
+  width: 14px; height: 14px;
+  margin-left: -7px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%, #ff8a7a, var(--red) 55%, #6e1b12);
+  box-shadow: 1px 2px 3px rgba(0,0,0,0.45);
+}
+#noticeboard {
+  left: 18px; bottom: 18px;
+  width: 232px;
+  padding: 14px 14px 10px;
+  transform: rotate(-1.8deg);
+  font-size: 12px;
+}
+#noticeboard h2 {
+  margin: 0 0 6px;
+  font-family: var(--font-title);
+  font-stretch: 75%;
+  font-size: 14px;
+  letter-spacing: 0.03em;
+  text-align: center;
+  border-bottom: 1px solid rgba(42, 38, 34, 0.35);
+  padding-bottom: 4px;
+}
+#rollcall { margin: 0; padding: 0; list-style: none; }
+#rollcall li { padding: 1px 0; }
+#rollcall li::before { content: '— '; color: var(--ink-soft); }
+#others {
+  right: 18px; bottom: 18px;
+  padding: 12px 14px 10px;
+  transform: rotate(2.2deg);
+}
+#others-btn {
+  border: 0;
+  background: none;
+  cursor: pointer;
+  font-family: var(--font-title);
+  font-stretch: 75%;
+  font-weight: 700;
+  font-size: 17px;
+  letter-spacing: 0.02em;
+  padding: 4px 6px;
+  border-bottom: 2px solid rgba(42, 38, 34, 0.6);
+}
+#others-btn:hover, #others-btn:focus-visible { color: #1e3a5a; outline: none; border-bottom-color: #1e3a5a; }
+
+/* ---------- მენიუ ---------- */
+.menu {
+  position: fixed;
+  z-index: 70;
+  overflow: auto;
+  padding: 6px 0;
+  background: var(--paper);
+  border: 1px solid rgba(42, 38, 34, 0.35);
+  box-shadow: 0 12px 28px rgba(0,0,0,0.35);
+}
+.menu[hidden] { display: none; }
+.menu-section {
+  padding: 8px 14px 4px;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  color: var(--ink-soft);
+  border-top: 1px dashed rgba(42, 38, 34, 0.25);
+}
+.menu-section:first-child { border-top: 0; }
+.menu-item {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  padding: 6px 14px;
+  border: 0;
+  background: none;
+  text-align: left;
+  cursor: pointer;
+}
+.menu-item:hover, .menu-item:focus-visible { background: rgba(124, 157, 176, 0.25); outline: none; }
+.mi-name { font-weight: 600; font-size: 14px; }
+.mi-role { font-size: 11.5px; color: var(--ink-soft); }
+.menu-item.invisible .mi-name { font-style: italic; color: #4a4038; }
+.menu-item.invisible .mi-name::after { content: ' 🔒'; font-style: normal; font-size: 11px; }
+
+/* ---------- ინტერტიტრი ---------- */
+#intertitle {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: grid;
+  place-items: center;
+  background: #050505;
+  color: #f2efe6;
+  opacity: 0;
+  transition: opacity 0.35s ease;
+}
+#intertitle[hidden] { display: none; }
+#intertitle.in { opacity: 1; }
+#intertitle.out { opacity: 0; }
+#intertitle p {
+  margin: 0;
+  padding: 0 24px;
+  text-align: center;
+  font-family: var(--font-title);
+  font-weight: 600;
+  font-size: clamp(30px, 6vw, 68px);
+  letter-spacing: 0.04em;
+  animation: flicker 0.18s steps(2) infinite;
+}
+@keyframes flicker { 50% { opacity: 0.93; } }
+
+/* ---------- ჩამონგრევა ---------- */
+body.shaking #wall, body.shaking #topbar { animation: shake 0.11s linear infinite; }
+@keyframes shake {
+  0% { translate: 0 0; } 25% { translate: -5px 3px; } 50% { translate: 4px -3px; } 75% { translate: -3px -2px; } 100% { translate: 0 0; }
+}
+body.collapsing .frame:not(.portrait) {
+  transition: transform 1.5s cubic-bezier(.55,0,1,.45);
+  transform: translateY(115vh) rotate(calc(var(--rot) * 5));
+}
+body.collapsing .frame:nth-child(3n) { transition-delay: 0.15s; }
+body.collapsing .frame:nth-child(3n+1) { transition-delay: 0.35s; }
+body.collapsing #noticeboard, body.collapsing #others { transition: transform 1.6s ease-in 0.5s; transform: translateY(80vh) rotate(-25deg); }
+#debris { position: fixed; inset: 0; pointer-events: none; z-index: 90; overflow: hidden; }
+#debris i {
+  position: absolute;
+  top: -20px;
+  background: linear-gradient(135deg, #e3ddcd, #b9b29f);
+  border-radius: 2px;
+  box-shadow: 0 1px 1px rgba(0,0,0,0.3);
+  animation-name: fall;
+  animation-timing-function: cubic-bezier(.4,0,1,1);
+  animation-fill-mode: forwards;
+}
+@keyframes fall { to { transform: translate(var(--drift), 110vh) rotate(var(--spin)); } }
+
+/* ---------- მობილური ---------- */
+@media (max-width: 699px) {
+  #topbar { padding: 8px 10px; gap: 4px 10px; }
+  .subtitle { font-size: 11px; }
+  .status { font-size: 11.5px; gap: 3px 10px; }
+  #noticeboard { left: 10px; bottom: 10px; width: 150px; padding: 10px 9px 6px; font-size: 10px; }
+  #noticeboard h2 { font-size: 11.5px; }
+  #others { right: 10px; bottom: 10px; padding: 9px 9px 7px; }
+  #others-btn { font-size: 14px; }
+  .plate { margin: 4px 2px 6px; padding: 2px 3px 3px; }
+  .plate-name { font-size: 10.5px; }
+  .plate-role { font-size: 9px; }
+  .frame { padding: 6px 6px 0; }
+  .photo { padding: 4px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .frame:hover:not(.portrait) { animation: none; }
+  #crack path { transition: none; }
+  body.shaking #wall, body.shaking #topbar { animation: none; }
+}

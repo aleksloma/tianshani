@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="ka">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>დაბეჭდე ტიანშანი</title>
+  <meta name="description" content="ესაუბრე ფილმ „ცისფერი მთები ანუ დაუჯერებელი ამბავის“ გამომცემლობის თანამშრომლებს. ხელნაწერს არავინ წაიკითხავს.">
+  <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Georgian:wght@400;500;700&family=Noto+Serif+Georgian:wdth,wght@62.5..100,400..900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/wall.css">
+  <link rel="stylesheet" href="css/chat.css">
+</head>
+<body data-season="autumn">
+  <div id="page">
+    <div id="wall-bg" aria-hidden="true"></div>
+
+    <header id="topbar">
+      <div class="title-block">
+        <h1 class="title">დაბეჭდე ტიანშანი</h1>
+        <p class="subtitle">ცისფერი მთები ანუ დაუჯერებელი ამბავი — გამომცემლობა</p>
+      </div>
+      <div class="status" aria-live="polite">
+        <span class="stat" id="stat-season" title="სეზონი"><span class="ico" id="season-ico">🍂</span> <span id="season-name">შემოდგომა</span></span>
+        <span class="stat" id="stat-crack" title="ბზარი კედელში"><svg class="ico crack-ico" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1 L7 4 L9 6 L6 9 L8 11 L7 15" fill="none" stroke="currentColor" stroke-width="1.6"/></svg> <span id="crack-val">1/5</span></span>
+        <span class="stat" id="stat-copies" tabindex="0"><span class="ico">📄</span> ეგზემპლარი: <span id="copies-val">3/3</span>
+          <span class="tooltip" id="copies-tip" role="tooltip"></span>
+        </span>
+        <span class="stat" id="stat-cycle">შენობა №<span id="cycle-val">1</span></span>
+        <span class="stat tokens" id="stat-tokens" title="ტოკენების დარჩენილი ბალანსი ამ ბრაუზერისთვის">ბალანსი: <span id="tokens-val">…</span></span>
+      </div>
+      <div id="mock-banner" class="banner" hidden></div>
+      <div id="storage-banner" class="banner" hidden>ბრაუზერის მეხსიერება მიუწვდომელია — საუბრები გვერდის გადატვირთვამდე შეინახება.</div>
+    </header>
+
+    <main id="wall" aria-label="გამომცემლობის კედელი">
+      <svg id="crack" aria-hidden="true"></svg>
+      <div id="frames"></div>
+
+      <aside id="noticeboard" class="pinned-note" aria-label="განცხადებების დაფა">
+        <div class="pin" aria-hidden="true"></div>
+        <h2>განცხადებების დაფა</h2>
+        <ul id="rollcall"></ul>
+      </aside>
+
+      <div id="others" class="door-note">
+        <div class="pin" aria-hidden="true"></div>
+        <button id="others-btn" type="button" aria-haspopup="listbox" aria-expanded="false">ესაუბრე სხვას ▾</button>
+      </div>
+    </main>
+  </div>
+
+  <!-- „ესაუბრე სხვას“ სია -->
+  <div id="others-menu" class="menu" role="listbox" hidden></div>
+
+  <!-- ჩატი -->
+  <div id="chat-backdrop" hidden></div>
+  <section id="chat" class="chat" hidden aria-modal="true" role="dialog" aria-labelledby="chat-name">
+    <header class="chat-head">
+      <div>
+        <h2 id="chat-name"></h2>
+        <p id="chat-role"></p>
+      </div>
+      <button type="button" class="close" id="chat-close" aria-label="დახურვა">✕</button>
+    </header>
+    <div class="chat-log" id="chat-log" aria-live="polite"></div>
+    <form class="chat-form" id="chat-form" autocomplete="off">
+      <textarea id="chat-input" rows="2" placeholder="დაწერეთ…" aria-label="შეტყობინება"></textarea>
+      <button type="submit" id="chat-send">გაგზავნა</button>
+    </form>
+    <footer class="chat-foot">
+      <button type="button" id="chat-clear">ისტორიის გასუფთავება</button>
+      <button type="button" id="chat-others" aria-haspopup="listbox">ესაუბრე სხვას ▾</button>
+    </footer>
+  </section>
+
+  <!-- ინტერტიტრი (შავი ეკრანი, თეთრი ტექსტი) -->
+  <div id="intertitle" hidden><p></p></div>
+  <div id="debris" aria-hidden="true"></div>
+
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>

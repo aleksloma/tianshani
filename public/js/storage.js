@@ -1,0 +1,75 @@
+// localStorage — ყველა read/write try/catch-ში. მიუწვდომლობისას მეხსიერებაში მუშაობს.
+const memory = new Map();
+let available = true;
+
+try {
+  const k = '__tianshani_probe__';
+  window.localStorage.setItem(k, '1');
+  window.localStorage.removeItem(k);
+} catch {
+  available = false;
+}
+
+export const KEYS = { chats: 'tianshani.chats', game: 'tianshani.game', client: 'tianshani.client_id' };
+
+export function storageAvailable() { return available; }
+
+export function getJSON(key, fallback) {
+  try {
+    const raw = available ? window.localStorage.getItem(key) : memory.get(key);
+    return raw == null ? fallback : JSON.parse(raw);
+  } catch {
+    return fallback;
+  }
+}
+
+export function setJSON(key, value) {
+  const raw = JSON.stringify(value);
+  try {
+    if (available) window.localStorage.setItem(key, raw);
+    else memory.set(key, raw);
+  } catch {
+    // ქვოტა ამოიწურა ან ბლოკია — მეხსიერებაში მაინც შევინახოთ
+    available = false;
+    memory.set(key, raw);
+  }
+}
+
+export function removeKey(key) {
+  try { if (available) window.localStorage.removeItem(key); } catch { /* ignore */ }
+  memory.delete(key);
+}
+
+/** ანონიმური ბრაუზერის ID (UUID). სერვერიც httpOnly cookie-ს აყენებს — cookie პრიორიტეტულია. */
+export function clientId() {
+  let id = getJSON(KEYS.client, null);
+  if (typeof id !== 'string' || !/^[0-9a-f-]{36}$/i.test(id)) {
+    id = window.crypto?.randomUUID ? window.crypto.randomUUID() : fallbackUuid();
+    setJSON(KEYS.client, id);
+  }
+  return id;
+}
+
+function fallbackUuid() {
+  const b = new Uint8Array(16);
+  window.crypto.getRandomValues(b);
+  b[6] = (b[6] & 0x0f) | 0x40;
+  b[8] = (b[8] & 0x3f) | 0x80;
+  const h = [...b].map((x) => x.toString(16).padStart(2, '0')).join('');
+  return `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20)}`;
+}
+
+// --- საუბრები: { [characterId]: [{role, content, ts, spoken_by?, redirect?}] } ---
+export function getChats() { return getJSON(KEYS.chats, {}) || {}; }
+export function getChat(id) { return getChats()[id] || []; }
+export function saveChat(id, messages) {
+  const all = getChats();
+  all[id] = messages;
+  setJSON(KEYS.chats, all);
+}
+export function clearChat(id) {
+  const all = getChats();
+  delete all[id];
+  setJSON(KEYS.chats, all);
+}
+export function clearAllChats() { setJSON(KEYS.chats, {}); }
