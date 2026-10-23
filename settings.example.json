@@ -1,0 +1,60 @@
+{
+  "_comment": "დააკოპირეთ ეს ფაილი settings.json-ად და შეავსეთ. settings.json არასდროს ჩადოთ git-ში (უკვე .gitignore-შია). ჰოსტინგზე იგივე მნიშვნელობები გარემოს ცვლადებით გადაიფარება: PORT, HOST, GEMINI_API_KEY, ADMIN_PASSWORD, DB_PATH.",
+
+  "server": {
+    "_comment": "port — რომელ პორტზე გაეშვას (env PORT გადაფარავს). host — 127.0.0.1 ლოკალურად; ჰოსტინგზე 0.0.0.0 (env HOST გადაფარავს; თუ PORT env არსებობს და host არ არის მითითებული — ავტომატურად 0.0.0.0).",
+    "port": 3000,
+    "host": "127.0.0.1"
+  },
+
+  "gemini": {
+    "_comment": "api_key — Google AI Studio-ს გასაღები (https://aistudio.google.com/apikey). თუ ცარიელია ან PASTE_YOUR_KEY — სერვერი mock რეჟიმში გაეშვება (პასუხები მონაცემთა ბაზიდან, LLM-ის გარეშე). model — მოდელის ID; თუ API-ში ვერ მოიძებნა, უახლოესი flash მოდელი აირჩევა და კონსოლში დაილოგება. thinking_budget — 0 = „ფიქრი“ გამორთულია (მოკლე, სწრაფი პასუხები, max_output_tokens არ იხარჯება ფიქრზე); null = მოდელის დეფოლტი. mock: true აიძულებს mock რეჟიმს გასაღების არსებობის მიუხედავად (ტესტებისთვის).",
+    "api_key": "PASTE_YOUR_KEY",
+    "model": "gemini-3.8-flash",
+    "temperature": 0.9,
+    "max_output_tokens": 400,
+    "request_timeout_ms": 60000,
+    "thinking_budget": 0,
+    "mock": false
+  },
+
+  "limits": {
+    "_comment": "ტოკენების ლიმიტი თითო ბრაუზერზე (client_id). period: monthly (YYYY-MM) ან lifetime. max_requests_per_minute — მარტივი rate limit ბოტებისგან. max_message_chars — ერთი შეტყობინების მაქსიმალური სიგრძე.",
+    "per_client_input_tokens": 2000000,
+    "per_client_output_tokens": 2000000,
+    "period": "monthly",
+    "max_requests_per_minute": 20,
+    "max_message_chars": 2000
+  },
+
+  "chat": {
+    "_comment": "history_window — რამდენი ბოლო შეტყობინება გაეგზავნოს მოდელს თითო მოთხოვნაზე.",
+    "history_window": 20
+  },
+
+  "game": {
+    "_comment": "exchanges_per_season — რამდენი შეტყობინება-პასუხის შემდეგ იცვლება სეზონი. seasons — სეზონების რიგი. crack_stages — ბზარის საფეხურების რაოდენობა (0..n-1). copies — ხელნაწერის ეგზემპლარების რაოდენობა ციკლის დასაწყისში.",
+    "exchanges_per_season": 8,
+    "seasons": ["autumn", "winter", "spring", "summer"],
+    "crack_stages": 5,
+    "copies": 3
+  },
+
+  "wall": {
+    "_comment": "characters_on_wall — რამდენი ჩარჩო ეკიდოს კედელზე (ტოპ N კონტენტის ქულით). layout_seed — განლაგების seed (seed + ციკლის ნომერი → დეტერმინისტული, მაგრამ არეული განლაგება).",
+    "characters_on_wall": 12,
+    "layout_seed": 1983
+  },
+
+  "admin": {
+    "_comment": "password — /admin გვერდის პაროლი (env ADMIN_PASSWORD გადაფარავს). CHANGE_ME-ზე სერვერი გაფრთხილებას დალოგავს. path — ადმინ-გვერდის მისამართი.",
+    "password": "CHANGE_ME",
+    "path": "/admin"
+  },
+
+  "logging": {
+    "_comment": "store_conversations — ჩაიწეროს თუ არა ყველა შეტყობინება SQLite-ში. db_path — ბაზის ფაილი (env DB_PATH გადაფარავს; ჰოსტინგზე persistent disk-ზე მიუთითეთ).",
+    "store_conversations": true,
+    "db_path": "data/tianshani.db"
+  }
+}

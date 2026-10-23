@@ -1,0 +1,24 @@
+# dependencies
+node_modules/
+
+# runtime data (SQLite database) — never commit (root only; src/data/ is source)
+/data/
+*.db
+*.db-wal
+*.db-shm
+
+# local secrets: Gemini key + admin password — never commit
+/settings.json
+
+# test artefacts
+test-results/
+playwright-report/
+.playwright/
+
+# local duplicate of the source data files (not part of the app)
+Claude outputs/
+
+# OS / editor noise
+.DS_Store
+Thumbs.db
+*.log

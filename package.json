@@ -1,0 +1,29 @@
+{
+  "name": "tianshani",
+  "version": "1.0.0",
+  "description": "„დაბეჭდე ტიანშანი“ — საუბარი ფილმ „ცისფერი მთების“ პერსონაჟებთან",
+  "type": "module",
+  "private": true,
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "nodemon --watch src --watch settings.json src/server.js",
+    "test": "node --test \"tests/unit/**/*.test.mjs\"",
+    "test:api": "node --test --test-concurrency=1 \"tests/api/**/*.test.mjs\"",
+    "test:e2e": "playwright test",
+    "test:all": "node scripts/run-all-tests.mjs",
+    "voice:extract": "node scripts/extract-voice-extras.mjs"
+  },
+  "dependencies": {
+    "@google/genai": "^1.0.0",
+    "better-sqlite3": "^12.0.0",
+    "cookie-parser": "^1.4.7",
+    "express": "^5.1.0"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.50.0",
+    "nodemon": "^3.1.9"
+  }
+}
