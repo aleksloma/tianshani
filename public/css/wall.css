@@ -135,6 +135,42 @@ button { font: inherit; color: inherit; }
 .stat .ico { font-size: 15px; line-height: 1; }
 .crack-ico { width: 15px; height: 15px; color: #4a3f35; }
 .stat.tokens { font-size: 11px; color: var(--ink-soft); }
+
+/* ---------- სეზონის ხე ---------- */
+.tree-btn {
+  position: relative;
+  padding: 0 2px;
+  border: 0;
+  background: none;
+  cursor: help;
+  line-height: 0;
+}
+.tree-btn:focus-visible { outline: 2px solid var(--sky); border-radius: 4px; }
+.tree { display: block; width: 40px; height: 48px; overflow: visible; }
+.tree g { transition: opacity 1.5s ease, fill 1.5s ease; }
+.tree .t-crown circle, .tree .t-snow ellipse, .tree .t-buds circle, .tree .t-blossom circle, .tree .t-fall ellipse, .tree .t-flakes circle { fill: inherit; }
+.tree .t-crown { fill: #b8b43a; opacity: 1; }
+.tree .t-snow { fill: #f4f7fb; opacity: 0; }
+.tree .t-buds { fill: #9ed36a; opacity: 0; }
+.tree .t-blossom { fill: #f0a6bd; opacity: 0; }
+.tree .t-fall { fill: #c9a227; opacity: 0; }
+.tree .t-flakes { fill: #fff; opacity: 0; }
+.tree .t-fall .leaf { animation: tree-fall 3.2s linear infinite; }
+.tree .t-flakes .flake { animation: tree-flake 3.6s linear infinite; }
+@keyframes tree-fall {
+  0% { transform: translate(0, 0) rotate(0deg); opacity: 1; }
+  100% { transform: translate(-5px, 26px) rotate(170deg); opacity: 0; }
+}
+@keyframes tree-flake {
+  0% { transform: translate(0, 0); opacity: 0; }
+  15% { opacity: 1; }
+  100% { transform: translate(3px, 40px); opacity: 0; }
+}
+/* .tree-btn-ს line-height: 0 აქვს (SVG-ისთვის) — tooltip-ს საკუთარი სჭირდება, თორემ ხაზები ერთმანეთზე ედება */
+.tree-tip { right: auto; left: 0; width: 260px; max-width: min(300px, calc(100vw - 24px)); line-height: 1.45; text-align: left; font-family: var(--font); }
+.tree-btn:hover .tooltip, .tree-btn:focus-visible .tooltip, .tree-btn.open .tooltip { opacity: 1; }
+.tree-btn:hover .tree, .tree-btn.open .tree { transform: scale(1.25); transform-origin: 50% 100%; }
+.tree-btn .tree { transition: transform 0.3s ease; }
 #stat-copies { cursor: help; border-bottom: 1px dotted var(--ink-soft); }
 .tooltip {
   position: absolute;
@@ -477,6 +513,7 @@ body.collapsing #noticeboard, body.collapsing #others { transition: transform 1.
 
 @media (prefers-reduced-motion: reduce) {
   .frame:hover:not(.portrait) { animation: none; }
+  .tree .leaf, .tree .flake { animation: none; }
   #crack path { transition: none; }
   body.shaking #wall, body.shaking #topbar { animation: none; }
 }

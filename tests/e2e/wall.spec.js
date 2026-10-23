@@ -61,9 +61,10 @@ test('„ესაუბრე სხვას“: დანარჩენე�
   await expect(menu).toBeHidden();
 });
 
-test('ზედა ზოლი: სეზონი, ბზარი, ეგზემპლარები (tooltip), შენობა №1, ბალანსი; დაფა roll call-ით', async ({ page }) => {
+test('ზედა ზოლი: სეზონის ხე (ტექსტის გარეშე), ბზარი, ეგზემპლარები (tooltip), შენობა №1, ბალანსი; დაფა roll call-ით', async ({ page }) => {
   await openWall(page);
-  await expect(page.locator('#season-name')).toHaveText('შემოდგომა');
+  await expect(page.locator('#season-tree')).toHaveAttribute('data-season', 'autumn');
+  await expect(page.locator('#season-name')).toHaveCount(0); // სეზონის ტექსტი ზოლში აღარ ჩანს — მხოლოდ ხე
   await expect(page.locator('#crack-val')).toHaveText('1/5');
   await expect(page.locator('#copies-val')).toHaveText('3/3');
   await expect(page.locator('#cycle-val')).toHaveText('1');

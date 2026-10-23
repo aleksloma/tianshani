@@ -22,7 +22,10 @@
         <p class="subtitle">ცისფერი მთები ანუ დაუჯერებელი ამბავი — გამომცემლობა</p>
       </div>
       <div class="status" aria-live="polite">
-        <span class="stat" id="stat-season" title="სეზონი"><span class="ico" id="season-ico">🍂</span> <span id="season-name">შემოდგომა</span></span>
+        <button type="button" class="stat tree-btn" id="stat-season" aria-label="სეზონი" aria-describedby="season-tip">
+          <span id="season-tree-slot"></span>
+          <span class="tooltip tree-tip" id="season-tip" role="tooltip"></span>
+        </button>
         <span class="stat" id="stat-crack" title="ბზარი კედელში"><svg class="ico crack-ico" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1 L7 4 L9 6 L6 9 L8 11 L7 15" fill="none" stroke="currentColor" stroke-width="1.6"/></svg> <span id="crack-val">1/5</span></span>
         <span class="stat" id="stat-copies" tabindex="0"><span class="ico">📄</span> ეგზემპლარი: <span id="copies-val">3/3</span>
           <span class="tooltip" id="copies-tip" role="tooltip"></span>
@@ -61,6 +64,7 @@
       <div>
         <h2 id="chat-name"></h2>
         <p id="chat-role"></p>
+        <p id="chat-sub" class="chat-sub" hidden></p>
       </div>
       <button type="button" class="close" id="chat-close" aria-label="დახურვა">✕</button>
     </header>

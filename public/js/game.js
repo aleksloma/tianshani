@@ -1,55 +1,73 @@
-// თამაშის მექანიკა: სეზონები, ბზარი, ეგზემპლარები, ჩამონგრევა. მდგომარეობა — localStorage (tianshani.game).
+// თამაშის მექანიკა: შიდა კალენდარი (დღეები), სეზონები, ბზარი, ეგზემპლარები, ჩამონგრევა.
+// მდგომარეობა localStorage-ში (tianshani.game): მხოლოდ { cycle, day, exchanges, lastCharacterId, visited }.
+// ყველაფერი, რაც დღიდან გამომდინარეობს (სეზონი, ბზარი, ეგზემპლარები), ხელახლა ითვლება; ჩარჩოების/ნახატის მდგომარეობა არასდროს ინახება.
 import { getJSON, setJSON, KEYS } from './storage.js';
+import { derive, advanceDays, withDefaults, clampDay, dayFromSeason } from './calendar.js';
 
-export const SEASON_ICON = { autumn: '🍂', winter: '❄', spring: '🌱', summer: '☀' };
 export const LOST_COPY_NOTES = ['ერთი თინას უჯრაშია სამი თვე', 'ერთი ბანკში დარჩა', 'ერთი ოთხად გაიყო'];
 export const COLLAPSE_TEXT = 'შენობა ჩამოინგრა. ახალი შენობა. ყველაფერი თავიდან.';
 
-export function initialState(cycle = 1, seasons = ['autumn']) {
-  return { cycle, season: seasons[0], exchanges: 0, crackStage: 0, lostCopies: 0, paintingFallen: false, visited: [] };
+export function initialState(cycle = 1) {
+  return { cycle, day: 0, exchanges: 0, lastCharacterId: null, visited: [], paintingFallen: false };
 }
 
-export function loadState(gameCfg) {
+/** მდგომარეობა + გამოთვლილი ველები (season, crackStage, lostCopies, dayInSeason, daysLeft, progress). */
+export function withDerived(state, cfgRaw) {
+  const d = derive(state.day, cfgRaw);
+  return { ...state, season: d.season, seasonIndex: d.seasonIndex, dayInSeason: d.dayInSeason, daysLeft: d.daysLeft, progress: d.progress, crackStage: d.crackStage, lostCopies: d.lostCopies };
+}
+
+export function loadState(cfgRaw) {
+  const cfg = withDefaults(cfgRaw);
   const s = getJSON(KEYS.game, null);
-  const base = initialState(1, gameCfg.seasons);
-  if (!s || typeof s !== 'object') return base;
-  return {
+  if (!s || typeof s !== 'object') return withDerived(initialState(1), cfg);
+  // ძველი ფორმატი (სეზონი დღეების გარეშე) → სეზონის პირველი დღე
+  const day = Number.isInteger(s.day) ? clampDay(s.day, cfg) : dayFromSeason(s.season, cfg);
+  return withDerived({
     cycle: Number.isInteger(s.cycle) && s.cycle > 0 ? s.cycle : 1,
-    season: gameCfg.seasons.includes(s.season) ? s.season : base.season,
+    day,
     exchanges: Number.isInteger(s.exchanges) && s.exchanges >= 0 ? s.exchanges : 0,
-    crackStage: Math.min(gameCfg.crack_stages - 1, Math.max(0, s.crackStage | 0)),
-    lostCopies: Math.min(gameCfg.copies, Math.max(0, s.lostCopies | 0)),
-    paintingFallen: s.paintingFallen === true,
+    lastCharacterId: typeof s.lastCharacterId === 'string' ? s.lastCharacterId : null,
     visited: Array.isArray(s.visited) ? s.visited.filter((x) => typeof x === 'string') : [],
-  };
+    paintingFallen: false, // დროებითი UI მდგომარეობა — გადატვირთვაზე სურათი ისევ ეკიდება
+  }, cfg);
 }
 
-export function saveState(state) { setJSON(KEYS.game, state); }
+/** ინახება მხოლოდ ის, რაც საჭიროა — არც ერთი ჩარჩოს/სურათის მდგომარეობა. */
+export function saveState(state) {
+  const { cycle, day, exchanges, lastCharacterId, visited } = state;
+  setJSON(KEYS.game, { cycle, day, exchanges, lastCharacterId, visited });
+}
+
+function toEvents(r) {
+  return [...r.seasons.map((season) => ({ type: 'season', season })), ...(r.collapse ? [{ type: 'collapse' }] : [])];
+}
 
 /**
- * ერთი შეტყობინება-პასუხი დასრულდა. აბრუნებს: { state, event: null | 'season' | 'collapse' }.
- * სუფთა ფუნქცია (DOM-ის გარეშე).
+ * ჩატი გაიხსნა. სხვა პერსონაჟთან გადასვლა = +days_per_character_switch დღე; იგივე პერსონაჟი — დრო არ მიდის.
+ * აბრუნებს { state, events: [{type:'season', season}…, {type:'collapse'}] }.
  */
-export function applyExchange(state, gameCfg, characterId) {
-  const s = { ...state, visited: state.visited.includes(characterId) ? state.visited : [...state.visited, characterId] };
-  s.exchanges += 1;
-  if (s.exchanges < gameCfg.exchanges_per_season) return { state: s, event: null };
-  s.exchanges = 0;
-  const idx = gameCfg.seasons.indexOf(s.season);
-  if (idx < gameCfg.seasons.length - 1) {
-    s.season = gameCfg.seasons[idx + 1];
-    s.crackStage = Math.min(gameCfg.crack_stages - 1, s.crackStage + 1);
-    s.lostCopies = Math.min(gameCfg.copies, s.lostCopies + 1);
-    return { state: s, event: 'season' };
-  }
-  // ზაფხული დასრულდა → ჩამონგრევა
-  s.crackStage = gameCfg.crack_stages - 1;
-  return { state: s, event: 'collapse' };
+export function applyCharacterOpen(state, cfgRaw, characterId) {
+  const cfg = withDefaults(cfgRaw);
+  const visited = state.visited.includes(characterId) ? state.visited : [...state.visited, characterId];
+  if (state.lastCharacterId === characterId) return { state: withDerived({ ...state, visited }, cfg), events: [] };
+  const r = advanceDays(state.day, cfg.days_per_character_switch, cfg);
+  return { state: withDerived({ ...state, visited, day: r.day, lastCharacterId: characterId }, cfg), events: toEvents(r) };
 }
 
-/** ჩამონგრევის შემდეგ: ახალი შენობა, ახალი ციკლი. */
-export function nextCycle(state, gameCfg) {
-  return { ...initialState(state.cycle + 1, gameCfg.seasons), visited: state.visited };
+/** შეტყობინება-პასუხი დასრულდა: exchanges++ (სტატისტიკა); days_per_exchange > 0 → დროც მიდის. */
+export function applyExchange(state, cfgRaw, characterId) {
+  const cfg = withDefaults(cfgRaw);
+  const visited = state.visited.includes(characterId) ? state.visited : [...state.visited, characterId];
+  const base = { ...state, visited, exchanges: state.exchanges + 1 };
+  if (cfg.days_per_exchange <= 0) return { state: withDerived(base, cfg), events: [] };
+  const r = advanceDays(state.day, cfg.days_per_exchange, cfg);
+  return { state: withDerived({ ...base, day: r.day }, cfg), events: toEvents(r) };
+}
+
+/** ჩამონგრევის შემდეგ: ახალი შენობა, ახალი ციკლი, დღე 0, სურათი ისევ ეკიდება. */
+export function nextCycle(state, cfgRaw) {
+  return withDerived({ ...initialState(state.cycle + 1), visited: state.visited }, cfgRaw);
 }
 
 // ---------- ეფექტები (DOM) ----------
@@ -62,8 +80,7 @@ export async function showIntertitle(text, ms = 1500) {
   el.querySelector('p').textContent = text;
   el.hidden = false;
   el.classList.remove('out');
-  // reflow → fade-in
-  void el.offsetWidth;
+  void el.offsetWidth; // reflow → fade-in
   el.classList.add('in');
   await sleep(ms);
   el.classList.remove('in');

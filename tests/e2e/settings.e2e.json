@@ -1,9 +1,9 @@
 {
-  "_comment": "E2E ტესტების კონფიგი (საიდუმლოებს არ შეიცავს). სეზონი იცვლება ყოველ 2 გაცვლაზე, რომ ჩამონგრევაც სწრაფად შემოწმდეს.",
+  "_comment": "E2E ტესტების კონფიგი (საიდუმლოებს არ შეიცავს). ყოველი პერსონაჟის გადასვლა 45 დღეა → სეზონი ყოველ 2 გადასვლაზე, ჩამონგრევა მე-8-ზე.",
   "server": { "port": 3999, "host": "127.0.0.1" },
   "gemini": { "api_key": "", "mock": true },
   "limits": { "max_requests_per_minute": 1000 },
-  "game": { "exchanges_per_season": 2 },
+  "game": { "days_per_character_switch": 45 },
   "admin": { "password": "e2e-admin-pass" },
   "logging": { "db_path": "test-results/e2e/e2e.db" }
 }

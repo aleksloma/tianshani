@@ -1,10 +1,12 @@
-// აპლიკაციის ჩატვირთვა: მონაცემები, კედელი, ჩატი, თამაში, ზედა ზოლი.
+// აპლიკაციის ჩატვირთვა: მონაცემები, კედელი, ჩატი, კალენდარი და ხე, ზედა ზოლი.
 import { clientId, storageAvailable, clearAllChats, setJSON, KEYS } from './storage.js';
 import { createWall, createOthersMenu, renderRollCall } from './wall.js';
 import { createChat } from './chat.js';
 import {
-  loadState, saveState, applyExchange, nextCycle, showIntertitle, collapseScene, SEASON_ICON, LOST_COPY_NOTES,
+  loadState, saveState, applyCharacterOpen, applyExchange, nextCycle, showIntertitle, collapseScene, LOST_COPY_NOTES,
 } from './game.js';
+import { withDefaults, dateFor, formatDateKa, SEASON_KA } from './calendar.js';
+import { treeMarkup, updateTree } from './tree.js';
 
 let cid = clientId();
 function syncClientId(id) { cid = id; setJSON(KEYS.client, id); }
@@ -23,20 +25,31 @@ async function main() {
     api('/api/state').then((r) => r.json()).catch(() => null),
   ]);
   const cfg = data.config;
+  const gameCfg = withDefaults(cfg.game);
   const byId = Object.fromEntries(data.characters.map((c) => [c.id, c]));
-  let game = loadState(cfg.game);
+  let game = loadState(gameCfg);
 
-  // --- ზედა ზოლი ---
+  // --- ზედა ზოლი: ხე + tooltip, ბზარი, ეგზემპლარები, შენობა ---
+  $('season-tree-slot').innerHTML = treeMarkup();
+  const tree = $('season-tree');
+  const treeBtn = $('stat-season');
+  treeBtn.addEventListener('click', () => treeBtn.classList.toggle('open')); // მობილურზე შეხებით
+  document.addEventListener('pointerdown', (e) => { if (!treeBtn.contains(e.target)) treeBtn.classList.remove('open'); });
+
   function renderStatus() {
     document.body.dataset.season = game.season;
-    $('season-ico').textContent = SEASON_ICON[game.season] || '';
-    $('season-name').textContent = cfg.seasons_ka[game.season] || game.season;
-    $('crack-val').textContent = `${game.crackStage + 1}/${cfg.game.crack_stages}`;
-    const left = cfg.game.copies - game.lostCopies;
-    $('copies-val').textContent = `${left}/${cfg.game.copies}`;
+    updateTree(tree, { season: game.season, progress: game.progress });
+    const date = formatDateKa(dateFor(gameCfg, game.day));
+    const crack = `${game.crackStage + 1}/${gameCfg.crack_stages}`;
+    const left = gameCfg.copies - game.lostCopies;
+    const copies = `${left}/${gameCfg.copies}`;
+    $('season-tip').textContent = `${SEASON_KA[game.season] || game.season} · ${date} · ${game.daysLeft} დღე შემდეგ სეზონამდე · ბზარი ${crack} · ეგზემპლარი ${copies}`;
+    treeBtn.setAttribute('aria-label', `სეზონი: ${SEASON_KA[game.season]}, ${date}`);
+    $('crack-val').textContent = crack;
+    $('copies-val').textContent = copies;
     const notes = LOST_COPY_NOTES.slice(0, game.lostCopies);
     $('copies-tip').textContent = notes.length ? notes.join(' · ') : 'ყველა ეგზემპლარი ჯერ ადგილზეა.';
-    $('stat-copies').setAttribute('aria-label', `ეგზემპლარი ${left}/${cfg.game.copies}. ${$('copies-tip').textContent}`);
+    $('stat-copies').setAttribute('aria-label', `ეგზემპლარი ${copies}. ${$('copies-tip').textContent}`);
     $('cycle-val').textContent = String(game.cycle);
   }
   function renderTokens(remaining) {
@@ -49,7 +62,7 @@ async function main() {
   renderStatus();
   renderTokens(state?.remaining);
   if (data.wall_image) {
-    const w = document.getElementById('wall');
+    const w = $('wall');
     w.style.setProperty('--wall-photo', `url("${new URL(data.wall_image, window.location.href).href}")`);
     w.classList.add('has-photo');
   }
@@ -65,12 +78,11 @@ async function main() {
     wallCfg: { ...cfg.wall, layout_seed: cfg.wall.layout_seed + game.cycle },
     onOpen: (id, node) => chat.open(id, node),
     wallPhoto: Boolean(data.wall_image),
-    // „გრენლანდია“ ჩამოვარდა — ამ შენობაში აღარ დაბრუნდება; პერსონაჟებმაც იციან
-    painting: { fallen: game.paintingFallen, onDrop: () => { game = { ...game, paintingFallen: true }; saveState(game); } },
+    // „გრენლანდია“ ჩამოვარდა — ამ სესიაში პერსონაჟებმა იციან; გადატვირთვაზე ისევ ეკიდება (არ ინახება)
+    painting: { fallen: false, onDrop: () => { game = { ...game, paintingFallen: true }; } },
   });
   // კედელზე არმყოფი პერსონაჟის პორტრეტი (შუაში მოსატანად)
   const buildFrame = (c) => {
-    const tmp = document.createElement('div');
     const n = document.createElement('div');
     n.className = 'frame';
     n.innerHTML = '<div class="photo"><img alt=""></div><div class="plate"><span class="plate-name"></span><span class="plate-role"></span></div>';
@@ -79,38 +91,53 @@ async function main() {
     if (!c.image) n.querySelector('.photo').classList.add('silhouette');
     n.querySelector('.plate-name').textContent = c.short_name_ka;
     n.querySelector('.plate-role').textContent = `(${c.role_short_ka})`;
-    tmp.append(n);
     return n;
   };
 
-  async function onExchange(id) {
-    const { state: s, event } = applyExchange(game, cfg.game, id);
-    game = s;
-    saveState(game);
-    if (event === 'season') {
-      wall.setStage(game.crackStage);
-      const p = showIntertitle(`${cfg.seasons_ka[game.season]}.`, 1500);
-      setTimeout(renderStatus, 300); // ფონის ტონი შავი ეკრანის მიღმა იცვლება
-      await p;
-    } else if (event === 'collapse') {
-      wall.setStage(game.crackStage);
-      renderStatus();
-      await chat.close({ instant: true });
-      await collapseScene();
-      game = nextCycle(game, cfg.game);
-      saveState(game);
-      clearAllChats();
-      wall.setPaintingFallen(false); // ახალ შენობაში სურათი ისევ ეკიდება
-      wall.setSeed(cfg.wall.layout_seed + game.cycle); // ახალი შენობა — სხვა არეულობა
-      wall.setStage(0);
-      renderStatus();
-    } else {
-      renderStatus();
+  /** სეზონის ცვლილება(ები) და/ან ჩამონგრევა — რაც კალენდარმა დააბრუნა. */
+  async function playEvents(events) {
+    for (const ev of events) {
+      if (ev.type === 'season') {
+        wall.setStage(game.crackStage);
+        const p = showIntertitle(`${SEASON_KA[ev.season]}.`, 1500);
+        setTimeout(renderStatus, 300); // ფონის ტონი და ხე შავი ეკრანის მიღმა იცვლება
+        await p;
+      } else if (ev.type === 'collapse') {
+        wall.setStage(gameCfg.crack_stages - 1);
+        await chat.close({ instant: true });
+        await collapseScene();
+        game = nextCycle(game, gameCfg);
+        saveState(game);
+        clearAllChats();
+        wall.setPaintingFallen(false); // ახალ შენობაში სურათი ისევ ეკიდება
+        wall.setSeed(cfg.wall.layout_seed + game.cycle); // ახალი შენობა — სხვა არეულობა
+        wall.setStage(0);
+        renderStatus();
+        return true;
+      }
     }
+    renderStatus();
+    return false;
+  }
+
+  /** ჩატი გაიხსნა — დრო მიდის (სხვა პერსონაჟი = +N დღე). */
+  async function onOpened(id) {
+    const { state: s, events } = applyCharacterOpen(game, gameCfg, id);
+    game = { ...s, paintingFallen: game.paintingFallen };
+    saveState(game);
+    await playEvents(events);
+  }
+
+  /** პასუხი დასრულდა — სტატისტიკა (+ დღეები, თუ days_per_exchange > 0). */
+  async function onExchange(id) {
+    const { state: s, events } = applyExchange(game, gameCfg, id);
+    game = { ...s, paintingFallen: game.paintingFallen };
+    saveState(game);
+    await playEvents(events);
   }
 
   chat = createChat({
-    byId, api, wall, menu, buildFrame, onExchange,
+    byId, api, wall, menu, buildFrame, onExchange, onOpened,
     getConfig: () => cfg,
     getGameState: () => game,
     onTokens: renderTokens,
