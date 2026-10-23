@@ -5,7 +5,8 @@ import { openWall, openFrame, frameRects, expectNoOverlaps, storage, settle, SHO
 test('კედლის ფოტო არის ფონი; ნახატი ეკიდება, ოდნავ გადახრილი, არაფერს ფარავს', async ({ page }) => {
   await openWall(page);
   await expect(page.locator('#wall')).toHaveClass(/has-photo/);
-  const bg = await page.locator('#wall').evaluate((el) => getComputedStyle(el).backgroundImage);
+  // Round 2 §7: ფოტო ცალკე ფენაზეა (.wall-photo.active), რომ ეტაპებს შორის cross-fade იყოს
+  const bg = await page.locator('.wall-photo.active').evaluate((el) => getComputedStyle(el).backgroundImage);
   expect(bg).toContain('assets/wall.jpg');
   const painting = page.locator('#painting');
   await expect(painting).toBeVisible();
@@ -60,7 +61,10 @@ test('ჩამონგრევის შემდეგ ახალ შე�
   await openWall(page);
   await page.locator('#painting').click();
   await expect(page.locator('#painting')).toBeHidden({ timeout: 5000 });
-  await page.locator('#frames .frame[data-id="tina"]').click(); // 340 + 45 → ჩამონგრევა
+  await page.locator('#frames .frame[data-id="tina"]').click();
+  await expect(page.locator('#chat.shown')).toHaveCount(1);
+  await page.locator('#chat-input').fill('სურათი ჩამოვარდა?');
+  await page.locator('#chat-input').press('Enter'); // ერთი გაცვლა: 340 + 20 → ჩამონგრევა (Round 2 §5)
   await expect(page.locator('#intertitle p')).toHaveText('შენობა ჩამოინგრა. ახალი შენობა. ყველაფერი თავიდან.', { timeout: 15_000 });
   await expect(page.locator('#intertitle')).toBeHidden({ timeout: 10_000 });
   await expect(page.locator('#painting')).toBeVisible();

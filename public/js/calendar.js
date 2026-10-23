@@ -8,8 +8,9 @@ export const SEASON_KA = { autumn: 'შემოდგომა', winter: 'ზ�
 const DEFAULTS = {
   seasons: ['autumn', 'winter', 'spring', 'summer'],
   days_per_season: 90,
-  days_per_character_switch: 20,
-  days_per_exchange: 0,
+  // Round 2 §5: დრო მიდის ყოველ დასრულებულ შეტყობინება-პასუხზე (20 დღე), პერსონაჟის გადართვაზე — არა
+  days_per_character_switch: 0,
+  days_per_exchange: 20,
   start_date: '1983-09-01',
   crack_stages: 5,
   copies: 3,

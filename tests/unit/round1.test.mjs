@@ -17,11 +17,11 @@ const CFG = { game: G };
 
 // ---------- §4 კალენდარი ----------
 
-test('დეფოლტები: 1983-09-01, 90 დღე სეზონი, 20 დღე გადასვლაზე, 0 შეტყობინებაზე, 360 დღე ციკლი', () => {
+test('დეფოლტები (Round 2 §5): 1983-09-01, 90 დღე სეზონი, 0 დღე გადასვლაზე, 20 დღე გაცვლაზე, 360 დღე ციკლი', () => {
   assert.equal(G.start_date, '1983-09-01');
   assert.equal(G.days_per_season, 90);
-  assert.equal(G.days_per_character_switch, 20);
-  assert.equal(G.days_per_exchange, 0);
+  assert.equal(G.days_per_character_switch, 0);
+  assert.equal(G.days_per_exchange, 20);
   assert.equal(totalDays(G), 360);
 });
 
@@ -74,21 +74,48 @@ test('თარიღი: start_date + day, ქართული და ინ�
 
 // ---------- §4 + §1 თამაშის მდგომარეობა ----------
 
-test('სხვა პერსონაჟის გახსნა = +20 დღე; იგივე პერსონაჟის ხელახლა გახსნა დროს არ ამატებს', () => {
+test('Round 2: პერსონაჟის გახსნა დროს აღარ ამატებს (switch 0), მაგრამ visited/lastCharacterId ითვლება', () => {
+  let r = applyCharacterOpen(withDerived(initialState(1), G), G, 'director');
+  r = applyCharacterOpen(r.state, G, 'vaso');
+  assert.equal(r.state.day, 0);
+  assert.deepEqual(r.events, []);
+  assert.equal(r.state.lastCharacterId, 'vaso');
+  assert.deepEqual(r.state.visited, ['director', 'vaso']);
+});
+
+test('Round 2: ყოველი გაცვლა = +20 დღე; 1 → 21 სექტემბერი, 5 → ზამთარი, 18 → ჩამონგრევა', () => {
   let s = withDerived(initialState(1), G);
-  let r = applyCharacterOpen(s, G, 'director');
+  const seen = [];
+  let collapseAt = null;
+  for (let i = 1; i <= 18; i++) {
+    const r = applyExchange(s, G, 'tina');
+    s = r.state;
+    for (const e of r.events) { if (e.type === 'season') seen.push([i, e.season]); else collapseAt = i; }
+    if (i === 1) assert.equal(formatDateKa(dateFor(G, s.day)), '21 სექტემბერი');
+    if (i === 4) assert.equal(s.season, 'autumn');
+    if (i === 5) { assert.equal(s.season, 'winter'); assert.equal(s.crackStage, 1); assert.equal(s.lostCopies, 1); }
+  }
+  assert.deepEqual(seen, [[5, 'winter'], [9, 'spring'], [14, 'summer']]);
+  assert.equal(collapseAt, 18);
+  assert.equal(s.exchanges, 18);
+});
+
+test('ძველი რეჟიმი კონფიგით: days_per_character_switch 20 → სხვა პერსონაჟის გახსნა = +20 დღე; იგივე — არა', () => {
+  const GS = withDefaults({ days_per_character_switch: 20, days_per_exchange: 0 });
+  let s = withDerived(initialState(1), GS);
+  let r = applyCharacterOpen(s, GS, 'director');
   assert.equal(r.state.day, 20);
   assert.equal(r.state.lastCharacterId, 'director');
-  r = applyCharacterOpen(r.state, G, 'director');
+  r = applyCharacterOpen(r.state, GS, 'director');
   assert.equal(r.state.day, 20);
   assert.deepEqual(r.events, []);
-  r = applyCharacterOpen(r.state, G, 'vaso');
+  r = applyCharacterOpen(r.state, GS, 'vaso');
   assert.equal(r.state.day, 40);
   assert.deepEqual(r.state.visited, ['director', 'vaso']);
   // 5 გადასვლა → ზამთარი
   s = r.state;
   let events = [];
-  for (const id of ['tina', 'otari', 'bela']) { const x = applyCharacterOpen(s, G, id); s = x.state; events = events.concat(x.events); }
+  for (const id of ['tina', 'otari', 'bela']) { const x = applyCharacterOpen(s, GS, id); s = x.state; events = events.concat(x.events); }
   assert.equal(s.day, 100);
   assert.equal(s.season, 'winter');
   assert.equal(s.crackStage, 1);
@@ -98,7 +125,7 @@ test('სხვა პერსონაჟის გახსნა = +20 დ�
 
 test('ჩამონგრევა დღე 360-ზე → nextCycle: ციკლი+1, დღე 0', () => {
   const s = withDerived({ ...initialState(1), day: 350, lastCharacterId: 'a' }, G);
-  const r = applyCharacterOpen(s, G, 'b');
+  const r = applyExchange(s, G, 'a');
   assert.deepEqual(r.events, [{ type: 'collapse' }]);
   const n = nextCycle(r.state, G);
   assert.equal(n.cycle, 2);
@@ -108,8 +135,9 @@ test('ჩამონგრევა დღე 360-ზე → nextCycle: ცი�
 });
 
 test('days_per_exchange: 0 → შეტყობინება დროს არ ამატებს (exchanges მაინც ითვლება); >0 → ამატებს', () => {
-  const s = withDerived(initialState(1), G);
-  let r = applyExchange(s, G, 'tina');
+  const G0 = withDefaults({ days_per_exchange: 0 });
+  const s = withDerived(initialState(1), G0);
+  let r = applyExchange(s, G0, 'tina');
   assert.equal(r.state.day, 0);
   assert.equal(r.state.exchanges, 1);
   const G2 = withDefaults({ days_per_exchange: 2 });

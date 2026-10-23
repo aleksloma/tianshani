@@ -159,7 +159,8 @@ for (const [season, day, label] of [['autumn', 50, '21 ოქტომბერ�
     await settle(page);
     const t = await treeState(page);
     expect(t.season).toBe(season);
-    expect(t.tip).toContain(label);
+    expect(t.date).toBe(label); // Round 2 §5: მთავარი ხაზი — თარიღი
+    expect(t.meta).toMatch(/^ბზარი \d\/5 · ეგზემპლარი \d\/3$/);
     await expect(page.locator('#season-tree')).toHaveAttribute('data-season', season);
     // ჯგუფების ხილვადობა სეზონის მიხედვით
     const op = await page.locator('#season-tree').evaluate((svg) => Object.fromEntries(
@@ -213,6 +214,9 @@ test.describe('მობილური', () => {
     await page.locator('#stat-season').tap();
     await expect(page.locator('#stat-season')).toHaveClass(/open/);
     await expect(page.locator('#season-tip')).toHaveCSS('opacity', '1');
-    await expect(page.locator('#season-tip')).toContainText('შემოდგომა · 1 სექტემბერი');
+    // Round 2 §5: თარიღი წლის და სეზონის სახელის გარეშე + ბზარი/ეგზემპლარი
+    await expect(page.locator('#season-tip-date')).toHaveText('1 სექტემბერი');
+    await expect(page.locator('#season-tip-meta')).toHaveText('ბზარი 1/5 · ეგზემპლარი 3/3');
+    await expect(page.locator('#season-tip')).not.toContainText('შემოდგომა');
   });
 });
