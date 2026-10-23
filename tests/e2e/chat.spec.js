@@ -1,6 +1,6 @@
 // ჩატი: ცენტრში მოსვლა, სტრიმინგი, ისტორია (გადატვირთვა, ცალკე პერსონაჟები), უხილავები, ენა, გადამისამართება, შეცდომები.
 import { test, expect } from '@playwright/test';
-import { openWall, openFrame, openFromMenu, send, storage, SHOTS } from './helpers.js';
+import { openWall, openFrame, openFromMenu, send, storage, tokensShown, SHOTS } from './helpers.js';
 
 test('ჩარჩო → ცენტრში → ჩატი; პასუხი სტრიმით; ისტორია გადატვირთვას უძლებს; Esc აბრუნებს', async ({ page }) => {
   await openWall(page);
@@ -57,12 +57,27 @@ test('ჩარჩო → ცენტრში → ჩატი; პასუ�
 
 test('ბალანსი მცირდება პასუხის შემდეგ', async ({ page }) => {
   await openWall(page);
-  const num = async () => Number((await page.locator('#tokens-val').textContent()).replace(/\D/g, ''));
-  await expect(page.locator('#tokens-val')).toContainText('ტოკ.');
-  const before = await num();
+  const before = await tokensShown(page);
   await openFrame(page, 'tina');
   await send(page, 'დირექტორი აქ არის?');
-  await expect.poll(num).toBeLessThan(before);
+  await expect.poll(() => tokensShown(page)).toBeLessThan(before);
+});
+
+test('Round 2 §8: პასუხი ხაზებად (≥2 ხაზი ბუშტში); რემარკა ცალკე ხაზზე', async ({ page }) => {
+  await openWall(page);
+  await openFrame(page, 'director');
+  await send(page, 'გამარჯობათ, ერთი მოთხრობა მაქვს, წაიკითხავთ?');
+  const bubble = page.locator('#chat-log .msg.char .bubble').last();
+  const lines = bubble.locator('.speech.line');
+  expect(await lines.count()).toBeGreaterThanOrEqual(2);
+  // ხაზები მართლა ცალ-ცალკე რიგებშია (ვერტიკალურად დაშორებული), ტექსტში \n/„*“ არ ჩანს
+  const tops = await lines.evaluateAll((els) => els.map((e) => Math.round(e.getBoundingClientRect().top)));
+  for (let i = 1; i < tops.length; i++) expect(tops[i]).toBeGreaterThan(tops[i - 1]);
+  expect(await lines.first().evaluate((e) => getComputedStyle(e).display)).toBe('block');
+  expect(await bubble.textContent()).not.toContain('*');
+  const stageTop = await bubble.locator('.stage').first().evaluate((e) => Math.round(e.getBoundingClientRect().bottom));
+  expect(stageTop).toBeLessThanOrEqual(tops[0] + 1);
+  await bubble.screenshot({ path: `${SHOTS}/R2-08-bubble-lines.png` });
 });
 
 test('ისტორიის გასუფთავება ამ პერსონაჟთან', async ({ page }) => {
@@ -114,15 +129,15 @@ test('არაქართულ შეტყობინებაზე პა
   expect(reply).toMatch(/[A-Za-z]{4,}/);
 });
 
-test('გადამისამართება: „→ მივიდე X-სთან“ ღილაკი ხსნის სხვა პერსონაჟს', async ({ page }) => {
+test('გადამისამართება (Round 2 §8): პირველ გაცვლაზე ღილაკი არ არის; ხელნაწერზე მე-3 შეტყობინების შემდეგ — „→ მივიდე X-სთან“', async ({ page }) => {
   await openWall(page);
   await openFrame(page, 'director');
-  let found = false;
-  for (let i = 0; i < 8 && !found; i++) {
-    await send(page, `მოთხრობა წაიკითხეთ? ${i}`);
-    found = (await page.locator('#chat-log .redirect').count()) > 0;
-  }
-  expect(found).toBe(true);
+  await send(page, 'მოთხრობა წაიკითხეთ?');
+  await expect(page.locator('#chat-log .redirect')).toHaveCount(0);
+  await send(page, 'ხელნაწერი დაგიტოვეთ, ნახეთ?');
+  await expect(page.locator('#chat-log .redirect')).toHaveCount(0);
+  await send(page, 'მაინც, ჩემი მოთხრობა როდის წაიკითხავთ?');
+  await expect(page.locator('#chat-log .redirect')).toHaveCount(1);
   const btn = page.locator('#chat-log .redirect').last();
   const target = await btn.getAttribute('data-target');
   expect(['tina', 'vaso', 'otari']).toContain(target);
@@ -132,14 +147,15 @@ test('გადამისამართება: „→ მივიდე X
   await expect(page.locator('#chat')).toBeVisible();
 });
 
-test('ლიმიტი ამოიწურა (429) — ქართული შეტყობინება ჩატში', async ({ page }) => {
-  const MSG = 'ლიმიტი ამოიწურა. ბუღალტერია დაკეტილია, მომავალ თვეში მობრძანდით.';
-  await page.route('**/api/chat', (route) => route.fulfill({ status: 429, contentType: 'application/json', body: JSON.stringify({ error: MSG, code: 'limit' }) }));
+test('უცნობი 429 (rate) — ტექსტური შეტყობინება ჩატში, ფანჯრის გარეშე, JSON არ ჩანს', async ({ page }) => {
+  const MSG = 'ძალიან ჩქარა წერთ. თინა ვერ ასწრებს — ერთ წუთში მობრძანდით.';
+  await page.route('**/api/chat', (route) => route.fulfill({ status: 429, contentType: 'application/json', body: JSON.stringify({ error: MSG, code: 'rate' }) }));
   await openWall(page);
   await openFrame(page, 'otari');
   await page.locator('#chat-input').fill('გამარჯობა');
   await page.locator('#chat-input').press('Enter');
   await expect(page.locator('#chat-log .msg.system')).toHaveText(MSG);
+  await expect(page.locator('#limit-modal')).toBeHidden();
   expect((await storage(page, 'tianshani.game'))?.exchanges ?? 0).toBe(0);
   await expect(page.locator('#chat-send')).toBeEnabled();
 });

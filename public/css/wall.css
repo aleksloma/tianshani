@@ -46,7 +46,6 @@ button { font: inherit; color: inherit; }
     url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='260' height='260'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .25  0 0 0 0 .24  0 0 0 0 .2  0 0 0 .55 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"),
     /* დიდი ლაქები */
     url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='900' height='700'%3E%3Cfilter id='b'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.006' numOctaves='4' seed='7'/%3E%3CfeColorMatrix values='0 0 0 0 .45  0 0 0 0 .40  0 0 0 0 .30  0 0 0 .5 -.12'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23b)'/%3E%3C/svg%3E"),
-    var(--wall-photo, none),
     /* ჩამოფცქვნილი ადგილები (ოქერი) */
     radial-gradient(ellipse 140px 90px at 12% 38%, rgba(176, 128, 72, 0.35), transparent 70%),
     radial-gradient(ellipse 90px 60px at 86% 22%, rgba(176, 128, 72, 0.30), transparent 70%),
@@ -54,18 +53,24 @@ button { font: inherit; color: inherit; }
     /* ქვედა ზეთის საღებავი (საბჭოური ოფისის პანელი) */
     linear-gradient(180deg, transparent 0 66%, rgba(40, 52, 50, 0.55) 66%, rgba(40, 52, 50, 0.55) calc(66% + 3px), rgba(92, 120, 128, 0.42) calc(66% + 3px), rgba(80, 104, 112, 0.48) 100%),
     linear-gradient(180deg, #c8d0cc 0%, #bbc5c3 55%, #aab4b2 100%);
-  background-size: 260px 260px, 900px 700px, cover, auto, auto, auto, auto, auto;
-  background-blend-mode: multiply, multiply, multiply, normal, normal, normal, normal, normal;
+  background-size: 260px 260px, 900px 700px, auto, auto, auto, auto, auto;
+  background-blend-mode: multiply, multiply, normal, normal, normal, normal, normal;
 }
-/* კედლის ფოტო (public/assets/wall.jpg) — თუ არის, ის არის კედელი; პროცედურული ფენები მხოლოდ fallback-ია */
-#wall.has-photo {
-  background-color: #d9cfb4;
-  background-image: var(--wall-photo);
+/* კედლის ფოტო ბზარის საფეხურის მიხედვით (wall.background_by_stage) — ორი ფენა, cross-fade ~1.5 წმ.
+   ფოტო ფარავს პროცედურულ ბათქაშს, რომელიც მხოლოდ fallback-ია (თუ არც ერთი სურათი არ არის). */
+#wall.has-photo { background-color: #d9cfb4; }
+.wall-photo {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
   background-size: cover;
   background-position: center top;
   background-repeat: no-repeat;
-  background-blend-mode: normal;
+  opacity: 0;
+  transition: opacity 1.5s ease;
+  pointer-events: none;
 }
+.wall-photo.active { opacity: 1; }
 #wall.has-photo::before { opacity: 0.55; } /* ფოტოს ფერი რომ არ „დაიხრჩოს“ */
 
 /* სეზონის ტონი */
@@ -77,7 +82,7 @@ button { font: inherit; color: inherit; }
   mix-blend-mode: multiply;
   transition: background 1.2s ease;
   pointer-events: none;
-  z-index: 0;
+  z-index: 1; /* ფოტო-ფენების (z 0) ზემოთ, ჩარჩოების (z 2) ქვემოთ */
 }
 /* ნათურის მოყვითალო შუქი */
 #wall-bg {
@@ -134,7 +139,24 @@ button { font: inherit; color: inherit; }
 .stat { position: relative; white-space: nowrap; display: inline-flex; align-items: center; gap: 4px; }
 .stat .ico { font-size: 15px; line-height: 1; }
 .crack-ico { width: 15px; height: 15px; color: #4a3f35; }
-.stat.tokens { font-size: 11px; color: var(--ink-soft); }
+/* ---------- ტოკენების მთვლელი (Round 2 §1) ---------- */
+.stat.tokens {
+  display: inline-grid;
+  grid-template-columns: auto;
+  gap: 1px;
+  font-size: 12px;
+  color: var(--ink);
+  cursor: help;
+  white-space: nowrap;
+}
+.stat.tokens .tok-main b { font-weight: 700; font-variant-numeric: tabular-nums; }
+.stat.tokens .tok-of { color: var(--ink-soft); font-size: 11px; }
+.stat.tokens .tok-bar { display: block; height: 3px; background: rgba(42, 38, 34, 0.15); border-radius: 2px; overflow: hidden; }
+.stat.tokens .tok-bar i { display: block; height: 100%; width: 100%; background: #3d6b4f; transition: width 0.6s ease; }
+.stat.tokens .tok-bar i.low { background: var(--red); }
+.stat.tokens .tok-out { font-size: 10px; color: var(--ink-soft); font-variant-numeric: tabular-nums; }
+.tokens-tip { right: 0; left: auto; width: 250px; white-space: pre-line; line-height: 1.45; }
+#stat-tokens:hover .tooltip, #stat-tokens:focus .tooltip { opacity: 1; }
 
 /* ---------- სეზონის ხე ---------- */
 .tree-btn {
@@ -167,7 +189,10 @@ button { font: inherit; color: inherit; }
   100% { transform: translate(3px, 40px); opacity: 0; }
 }
 /* .tree-btn-ს line-height: 0 აქვს (SVG-ისთვის) — tooltip-ს საკუთარი სჭირდება, თორემ ხაზები ერთმანეთზე ედება */
-.tree-tip { right: auto; left: 0; width: 260px; max-width: min(300px, calc(100vw - 24px)); line-height: 1.45; text-align: left; font-family: var(--font); }
+.tree-tip { right: auto; left: 0; width: max-content; min-width: 150px; max-width: min(300px, calc(100vw - 24px)); line-height: 1.45; text-align: left; font-family: var(--font); }
+/* Round 2 §5: თარიღი — მთავარი, დიდი; ბზარი/ეგზემპლარები — პატარა მეორე ხაზი */
+.tree-tip .tip-date { display: block; font-family: var(--font-title); font-size: 18px; font-weight: 700; letter-spacing: 0.02em; }
+.tree-tip .tip-meta { display: block; font-size: 11px; opacity: 0.8; margin-top: 2px; }
 .tree-btn:hover .tooltip, .tree-btn:focus-visible .tooltip, .tree-btn.open .tooltip { opacity: 1; }
 .tree-btn:hover .tree, .tree-btn.open .tree { transform: scale(1.25); transform-origin: 50% 100%; }
 .tree-btn .tree { transition: transform 0.3s ease; }
@@ -200,23 +225,6 @@ button { font: inherit; color: inherit; }
 }
 .banner[hidden] { display: none; }
 
-/* ---------- ბზარი ---------- */
-#crack {
-  position: absolute;
-  top: 0; left: 0;
-  z-index: 1;
-  pointer-events: none;
-  overflow: visible;
-}
-#crack path { fill: none; stroke-linecap: round; stroke-linejoin: round; transition: stroke-dashoffset 2.4s cubic-bezier(.3,.6,.3,1); }
-#crack.no-anim path { transition: none; }
-#crack .crack-dark { stroke: #2f2922; }
-#crack .crack-light { stroke: rgba(255, 252, 240, 0.45); }
-#crack .crack-dark.trunk { stroke-width: 2.6; }
-#crack .crack-light.trunk { stroke-width: 1.3; }
-#crack .crack-dark.branch { stroke-width: 1.4; }
-#crack .crack-light.branch { stroke-width: 0.8; }
-
 /* ---------- ჩარჩოები ---------- */
 #frames { position: absolute; inset: 0; z-index: 2; }
 .frame {
@@ -243,7 +251,6 @@ button { font: inherit; color: inherit; }
   transform-origin: 50% 50%; /* layout.js-ის collision check ცენტრის გარშემო მობრუნებას ითვლის */
   transition: transform 0.9s cubic-bezier(.3,.7,.3,1.4), visibility 0s;
 }
-.frame.tilted { --extra: calc(var(--tilt-dir, 1) * 3deg); }
 .frame:hover:not(.portrait), .frame:focus-visible:not(.portrait) { animation: wobble 0.7s ease-in-out; }
 .frame:focus-visible { outline: 3px solid #f0d27a; outline-offset: 3px; }
 .frame.lifted { visibility: hidden; }
@@ -438,10 +445,23 @@ body.collapsing .painting { transition: transform 1.4s cubic-bezier(.55,0,1,.45)
   cursor: pointer;
 }
 .menu-item:hover, .menu-item:focus-visible { background: rgba(124, 157, 176, 0.25); outline: none; }
-.mi-name { font-weight: 600; font-size: 14px; }
-.mi-role { font-size: 11.5px; color: var(--ink-soft); }
-.menu-item.invisible .mi-name { font-style: italic; color: #4a4038; }
-.menu-item.invisible .mi-name::after { content: ' 🔒'; font-style: normal; font-size: 11px; }
+/* Round 2 §6: ფოტო | სახელი (მუქი) / თანამდებობა (პატარა, ჩამქრალი); ერთი ბრტყელი სია */
+.menu-item { flex-direction: row; align-items: center; gap: 10px; }
+.mi-thumb {
+  flex: none;
+  width: 40px; height: 40px;
+  border-radius: 5px;
+  object-fit: cover;
+  object-position: 50% 22%;
+  border: 2px solid #6e4527;
+  box-shadow: inset 0 0 0 1px rgba(214, 170, 120, 0.4), 1px 2px 3px rgba(20, 14, 8, 0.3);
+  background: #e6e0cf;
+  filter: sepia(0.3) contrast(0.9);
+}
+.mi-thumb.silhouette { object-fit: contain; object-position: 50% 100%; filter: sepia(0.15); }
+.mi-text { display: flex; flex-direction: column; min-width: 0; }
+.mi-name { font-weight: 700; font-size: 14px; }
+.mi-role { font-size: 11.5px; color: var(--ink-soft); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 /* ---------- ინტერტიტრი ---------- */
 #intertitle {
@@ -514,6 +534,6 @@ body.collapsing #noticeboard, body.collapsing #others { transition: transform 1.
 @media (prefers-reduced-motion: reduce) {
   .frame:hover:not(.portrait) { animation: none; }
   .tree .leaf, .tree .flake { animation: none; }
-  #crack path { transition: none; }
+  .wall-photo { transition: none; }
   body.shaking #wall, body.shaking #topbar { animation: none; }
 }

@@ -1,6 +1,24 @@
 // E2E დამხმარეები.
 import { expect } from '@playwright/test';
 import fs from 'node:fs';
+import { openDb } from '../../src/db.js';
+
+/** e2e სერვერის ბაზა (WAL) — ტესტი პირდაპირ წერს ხარჯს/გამოყენებას, რომ ნამდვილი 429/state გზა შემოწმდეს. */
+let dbStore = null;
+export function e2eStore() {
+  if (!dbStore) dbStore = openDb('test-results/e2e/e2e.db');
+  return dbStore;
+}
+export const monthKey = () => new Date().toISOString().slice(0, 7);
+
+/** ადმინის API (ცალკე request context-ით). */
+export async function adminApi(request, method, path) {
+  const login = await request.post('/api/admin/login', { data: { password: 'e2e-admin-pass' } });
+  expect(login.status()).toBe(200);
+  const res = await request.fetch(path, { method });
+  expect(res.status()).toBe(200);
+  return res.json();
+}
 
 export const SHOTS = 'test-results/screens';
 fs.mkdirSync(SHOTS, { recursive: true });
@@ -109,7 +127,9 @@ export function expectSameSpot(a, b) {
 export async function treeState(page) {
   return page.evaluate(() => {
     const t = document.getElementById('season-tree');
-    return { season: t.dataset.season, progress: Number(t.dataset.progress), tip: document.getElementById('season-tip').textContent };
+    const date = document.getElementById('season-tip-date').textContent;
+    const meta = document.getElementById('season-tip-meta').textContent;
+    return { season: t.dataset.season, progress: Number(t.dataset.progress), date, meta, tip: `${date} | ${meta}` };
   });
 }
 
@@ -122,5 +142,23 @@ export async function send(page, text) {
   await expect(page.locator('#chat-send')).toBeEnabled();
   await expect(page.locator('#intertitle')).toBeHidden({ timeout: 15_000 });
 }
+
+/** შეტყობინების გაგზავნა; ველოდებით მხოლოდ პასუხს (ინტერტიტრს — არა), რომ ტესტმა ის თავად დაიჭიროს. */
+export async function sendNoWait(page, text) {
+  const before = await page.locator('#chat-log .msg.char:not(.streaming)').count();
+  await page.locator('#chat-input').fill(text);
+  await page.locator('#chat-input').press('Enter');
+  await expect(page.locator('#chat-log .msg.char:not(.streaming)')).toHaveCount(before + 1, { timeout: 15_000 });
+}
+
+/** SSE პასუხის done ივენთი (page.waitForResponse-ის შედეგიდან). */
+export async function sseDone(response) {
+  const text = await response.text();
+  const events = text.split('\n\n').filter(Boolean).map((c) => JSON.parse(c.replace(/^data:\s*/, '')));
+  return events.find((e) => e.done) || null;
+}
+
+/** ტოკენების მთვლელის რიცხვი (თხელი სივრცეები მოშორებული). */
+export const tokensShown = (page) => page.locator('#tokens-in').evaluate((el) => Number(el.textContent.replace(/[\s ]/g, '')));
 
 export const storage = (page, key) => page.evaluate((k) => JSON.parse(localStorage.getItem(k) || 'null'), key);

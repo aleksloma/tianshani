@@ -1,4 +1,4 @@
-// აპლიკაციის ჩატვირთვა: მონაცემები, კედელი, ჩატი, კალენდარი და ხე, ზედა ზოლი.
+// აპლიკაციის ჩატვირთვა: მონაცემები, კედელი, ჩატი, კალენდარი და ხე, ტოკენების მთვლელი, ლიმიტის ფანჯარა.
 import { clientId, storageAvailable, clearAllChats, setJSON, KEYS } from './storage.js';
 import { createWall, createOthersMenu, renderRollCall } from './wall.js';
 import { createChat } from './chat.js';
@@ -7,6 +7,9 @@ import {
 } from './game.js';
 import { withDefaults, dateFor, formatDateKa, SEASON_KA } from './calendar.js';
 import { treeMarkup, updateTree } from './tree.js';
+import { formatTokens, periodLine } from './format.js';
+import { createLimitModal } from './limitModal.js';
+import { createWallBackground } from './background.js';
 
 let cid = clientId();
 function syncClientId(id) { cid = id; setJSON(KEYS.client, id); }
@@ -17,7 +20,6 @@ function api(path, opts = {}) {
 }
 
 const $ = (id) => document.getElementById(id);
-const fmt = new Intl.NumberFormat('ka-GE');
 
 async function main() {
   const [data, state] = await Promise.all([
@@ -28,8 +30,9 @@ async function main() {
   const gameCfg = withDefaults(cfg.game);
   const byId = Object.fromEntries(data.characters.map((c) => [c.id, c]));
   let game = loadState(gameCfg);
+  const modal = createLimitModal();
 
-  // --- ზედა ზოლი: ხე + tooltip, ბზარი, ეგზემპლარები, შენობა ---
+  // --- ზედა ზოლი: ხე + tooltip (თარიღი), ბზარი, ეგზემპლარები, შენობა ---
   $('season-tree-slot').innerHTML = treeMarkup();
   const tree = $('season-tree');
   const treeBtn = $('stat-season');
@@ -39,12 +42,14 @@ async function main() {
   function renderStatus() {
     document.body.dataset.season = game.season;
     updateTree(tree, { season: game.season, progress: game.progress });
-    const date = formatDateKa(dateFor(gameCfg, game.day));
+    const date = formatDateKa(dateFor(gameCfg, game.day)); // წლის გარეშე: „10 სექტემბერი“
     const crack = `${game.crackStage + 1}/${gameCfg.crack_stages}`;
     const left = gameCfg.copies - game.lostCopies;
     const copies = `${left}/${gameCfg.copies}`;
-    $('season-tip').textContent = `${SEASON_KA[game.season] || game.season} · ${date} · ${game.daysLeft} დღე შემდეგ სეზონამდე · ბზარი ${crack} · ეგზემპლარი ${copies}`;
-    treeBtn.setAttribute('aria-label', `სეზონი: ${SEASON_KA[game.season]}, ${date}`);
+    // Round 2 §5: სეზონის სახელი აღარ ჩანს (ხე თავად არის სეზონი) — მთავარი ხაზი თარიღია
+    $('season-tip-date').textContent = date;
+    $('season-tip-meta').textContent = `ბზარი ${crack} · ეგზემპლარი ${copies}`;
+    treeBtn.setAttribute('aria-label', `${date} (${SEASON_KA[game.season]})`);
     $('crack-val').textContent = crack;
     $('copies-val').textContent = copies;
     const notes = LOST_COPY_NOTES.slice(0, game.lostCopies);
@@ -52,23 +57,49 @@ async function main() {
     $('stat-copies').setAttribute('aria-label', `ეგზემპლარი ${copies}. ${$('copies-tip').textContent}`);
     $('cycle-val').textContent = String(game.cycle);
   }
-  function renderTokens(remaining) {
-    if (!remaining) return;
-    const n = Math.min(remaining.input, remaining.output);
-    $('tokens-val').textContent = `${fmt.format(n)} ტოკ.`;
+
+  // --- ტოკენების მთვლელი (Round 2 §1): /api/state ჩატვირთვისას, done ყოველი პასუხის შემდეგ ---
+  let tokenInfo = { limits: state?.limits, period: state?.period, resets_at: state?.resets_at };
+  function renderTokens(info) {
+    if (!info?.remaining) return;
+    tokenInfo = { ...tokenInfo, ...Object.fromEntries(Object.entries(info).filter(([, v]) => v !== undefined)) };
+    const { remaining, limits } = tokenInfo;
+    $('tokens-in').textContent = formatTokens(remaining.input);
+    $('tokens-in').dataset.value = String(remaining.input);
+    $('tokens-in-limit').textContent = limits ? formatTokens(limits.input) : '…';
+    $('tokens-out').textContent = formatTokens(remaining.output);
+    $('tokens-out').dataset.value = String(remaining.output);
+    const pct = limits?.input ? Math.max(0, Math.min(100, (remaining.input / limits.input) * 100)) : 100;
+    const bar = $('tokens-bar');
+    bar.style.width = `${pct}%`;
+    bar.classList.toggle('low', pct < 15);
+    $('tokens-tip').textContent = [
+      `შემავალი: ${formatTokens(remaining.input)}${limits ? ` / ${formatTokens(limits.input)}` : ''}`,
+      `გამომავალი: ${formatTokens(remaining.output)}${limits ? ` / ${formatTokens(limits.output)}` : ''}`,
+      periodLine(tokenInfo.period, tokenInfo.resets_at),
+    ].join('\n'); // სამი ხაზი (white-space: pre-line)
+    $('stat-tokens').setAttribute('aria-label', `ტოკენები: ${$('tokens-tip').textContent}`);
   }
+
+  /** ლიმიტის/ბიუჯეტის მდგომარეობა სერვერიდან — გადატვირთვა ფანჯარას ვერ გვერდს აუვლის. */
+  function applyLimitState(s) {
+    if (!s) return;
+    if (s.global?.exhausted) modal.block('global_budget', s.global.resets_at);
+    else if (s.exhausted) modal.block('client_limit', s.resets_at ?? null);
+    else if (modal.isBlocked()) modal.unblock();
+  }
+
   // სერვერის cookie პრიორიტეტულია: localStorage-ის ID მას ვუსწორებთ
   if (state?.client_id && state.client_id !== cid) syncClientId(state.client_id);
   renderStatus();
-  renderTokens(state?.remaining);
-  if (data.wall_image) {
-    const w = $('wall');
-    w.style.setProperty('--wall-photo', `url("${new URL(data.wall_image, window.location.href).href}")`);
-    w.classList.add('has-photo');
-  }
+  renderTokens(state);
   if (data.mock_notice) { $('mock-banner').textContent = data.mock_notice; $('mock-banner').hidden = false; }
   if (!storageAvailable()) $('storage-banner').hidden = false;
   renderRollCall(data.roll_call || []);
+
+  // --- კედლის ფონი ბზარის საფეხურის მიხედვით (Round 2 §7) ---
+  const background = createWallBackground(data.wall_backgrounds || (data.wall_image ? [data.wall_image] : []));
+  background.set(game.crackStage, { instant: true });
 
   // --- კედელი, მენიუ, ჩატი ---
   let chat = null;
@@ -77,7 +108,6 @@ async function main() {
     characters: data.characters,
     wallCfg: { ...cfg.wall, layout_seed: cfg.wall.layout_seed + game.cycle },
     onOpen: (id, node) => chat.open(id, node),
-    wallPhoto: Boolean(data.wall_image),
     // „გრენლანდია“ ჩამოვარდა — ამ სესიაში პერსონაჟებმა იციან; გადატვირთვაზე ისევ ეკიდება (არ ინახება)
     painting: { fallen: false, onDrop: () => { game = { ...game, paintingFallen: true }; } },
   });
@@ -94,16 +124,14 @@ async function main() {
     return n;
   };
 
-  /** სეზონის ცვლილება(ები) და/ან ჩამონგრევა — რაც კალენდარმა დააბრუნა. */
+  /** სეზონის ცვლილება(ები) და/ან ჩამონგრევა — რაც კალენდარმა დააბრუნა. პასუხის დასრულების შემდეგ ეშვება. */
   async function playEvents(events) {
     for (const ev of events) {
       if (ev.type === 'season') {
-        wall.setStage(game.crackStage);
         const p = showIntertitle(`${SEASON_KA[ev.season]}.`, 1500);
-        setTimeout(renderStatus, 300); // ფონის ტონი და ხე შავი ეკრანის მიღმა იცვლება
+        setTimeout(() => { renderStatus(); background.set(game.crackStage); }, 300); // ფონი და ხე შავი ეკრანის მიღმა იცვლება
         await p;
       } else if (ev.type === 'collapse') {
-        wall.setStage(gameCfg.crack_stages - 1);
         await chat.close({ instant: true });
         await collapseScene();
         game = nextCycle(game, gameCfg);
@@ -111,7 +139,7 @@ async function main() {
         clearAllChats();
         wall.setPaintingFallen(false); // ახალ შენობაში სურათი ისევ ეკიდება
         wall.setSeed(cfg.wall.layout_seed + game.cycle); // ახალი შენობა — სხვა არეულობა
-        wall.setStage(0);
+        background.set(0, { instant: true });
         renderStatus();
         return true;
       }
@@ -120,7 +148,7 @@ async function main() {
     return false;
   }
 
-  /** ჩატი გაიხსნა — დრო მიდის (სხვა პერსონაჟი = +N დღე). */
+  /** ჩატი გაიხსნა — დრო მიდის, თუ days_per_character_switch > 0 (Round 2-ის დეფოლტი 0). */
   async function onOpened(id) {
     const { state: s, events } = applyCharacterOpen(game, gameCfg, id);
     game = { ...s, paintingFallen: game.paintingFallen };
@@ -128,7 +156,7 @@ async function main() {
     await playEvents(events);
   }
 
-  /** პასუხი დასრულდა — სტატისტიკა (+ დღეები, თუ days_per_exchange > 0). */
+  /** პასუხი დასრულდა — +days_per_exchange დღე (Round 2: 20); თარიღი და მთვლელი ერთად განახლდება. */
   async function onExchange(id) {
     const { state: s, events } = applyExchange(game, gameCfg, id);
     game = { ...s, paintingFallen: game.paintingFallen };
@@ -141,6 +169,7 @@ async function main() {
     getConfig: () => cfg,
     getGameState: () => game,
     onTokens: renderTokens,
+    limitModal: modal,
   });
 
   $('others-btn').addEventListener('click', (e) => menu.toggle(e.currentTarget, { variant: 'wall' }));
@@ -148,7 +177,9 @@ async function main() {
   // ფონტები ჩაიტვირთა → ზომები შეიძლება შეიცვალა
   wall.render();
   document.fonts?.ready.then(() => wall.render());
-  wall.setStage(game.crackStage);
+
+  // ლიმიტი/ბიუჯეტი — ფანჯარა მაშინვე, თუ ამოწურულია (ყველა ბრაუზერში, არა მხოლოდ წარუმატებელი გაგზავნის შემდეგ)
+  applyLimitState(state);
 
   // ტესტებისა და დებაგისთვის (მხოლოდ წასაკითხად)
   window.tianshani = {
@@ -156,6 +187,8 @@ async function main() {
     get game() { return { ...game }; },
     get layout() { return wall.layout; },
     chat,
+    modal,
+    background,
     ready: true,
   };
   document.body.classList.add('ready');
