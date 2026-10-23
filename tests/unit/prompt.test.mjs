@@ -54,8 +54,16 @@ test('ახალი შენობა (ციკლი > 1) ჩნდებ�
 
 test('sanitizeGameState: არასწორი მნიშვნელობები ნორმალიზდება', () => {
   assert.deepEqual(sanitizeGameState({ season: 'monsoon', crackStage: 99, lostCopies: -4, cycle: 'x' }, cfg),
-    { season: 'autumn', crackStage: 4, lostCopies: 0, cycle: 1 });
-  assert.deepEqual(sanitizeGameState(null, cfg), { season: 'autumn', crackStage: 0, lostCopies: 0, cycle: 1 });
-  assert.deepEqual(sanitizeGameState({ season: 'summer', crackStage: '3', lostCopies: 3, cycle: 2 }, cfg),
-    { season: 'summer', crackStage: 3, lostCopies: 3, cycle: 2 });
+    { season: 'autumn', crackStage: 4, lostCopies: 0, cycle: 1, paintingFallen: false });
+  assert.deepEqual(sanitizeGameState(null, cfg), { season: 'autumn', crackStage: 0, lostCopies: 0, cycle: 1, paintingFallen: false });
+  assert.deepEqual(sanitizeGameState({ season: 'summer', crackStage: '3', lostCopies: 3, cycle: 2, paintingFallen: true }, cfg),
+    { season: 'summer', crackStage: 3, lostCopies: 3, cycle: 2, paintingFallen: true });
+  assert.equal(sanitizeGameState({ paintingFallen: 'yes' }, cfg).paintingFallen, false);
+});
+
+test('ჩამოვარდნილი სურათი პრომპტში ჩნდება', () => {
+  const on = buildPrompt({ speaker: byId.vaso, gameState: { ...GS, paintingFallen: true }, cfg }).systemInstruction;
+  const off = buildPrompt({ speaker: byId.vaso, gameState: { ...GS, paintingFallen: false }, cfg }).systemInstruction;
+  assert.ok(on.includes('has just fallen off the wall'));
+  assert.ok(!off.includes('has just fallen off the wall'));
 });

@@ -12,6 +12,11 @@ const SEASON_LINES = {
 };
 const CRACK_LINES = ['ეს ბზარი იყო აქ?', 'ბზარი გაიზარდა, არა?'];
 const NEW_BUILDING = 'ახალ შენობაში ვართ, ყველაფერი თავიდან.';
+const PAINTING_LINES = {
+  vaso: 'სურათი ჩამოვარდა! ხომ ვამბობდი, ოცდაშვიდი წელია ვამბობ!',
+  grisha: 'სურათი ჩამოვარდა? ვინ მოგცათ ჩამოვარდნის უფლება!',
+  mikho: 'ჩამოვარდა… მარტო ხომ ვერ ავწევ.',
+};
 
 // არაქართულ შეტყობინებაზე — პასუხი იმავე ენაზე, ცნობილი ფრაზა ქართულად რჩება
 const FOREIGN = {
@@ -75,6 +80,7 @@ export function composeMockReply({ speaker, invisible, userText, historyLen, gam
   if ((h & 1) === 0) parts.push(pick(SEASON_LINES[gameState.season] || [], h >>> 5));
   if (gameState.crackStage >= 2 && (h & 2) === 0) parts.push(pick(CRACK_LINES, h >>> 7));
   if (gameState.cycle > 1 && historyLen < 2) parts.push(NEW_BUILDING);
+  if (gameState.paintingFallen && (h & 8) === 0) parts.push(PAINTING_LINES[speaker.id] || 'სურათი ჩამოვარდა, გაიგეთ?');
 
   // გადამისამართება სახელით (ნახევარ შემთხვევაში)
   const redirects = (speaker.redirects_to || []).filter((id) => byId[id] && id !== invisible?.id);

@@ -40,6 +40,9 @@ function clientIdMiddleware(store) {
   };
 }
 
+/** settings-ის `_comment` ველები მხოლოდ ადამიანისთვისაა — კლიენტს არ ვუგზავნით. */
+const noComments = (o) => Object.fromEntries(Object.entries(o).filter(([k]) => !k.startsWith('_')));
+
 /** აპლიკაციის აწყობა (ტესტებისთვისაც). */
 export function createApp(cfg) {
   const store = openDb(cfg.logging.db_path);
@@ -59,7 +62,13 @@ export function createApp(cfg) {
   app.use('/api/admin', adminRouter(cfg, store));
 
   // --- სტატიკა ---
-  app.use(express.static(path.join(ROOT, 'public'), { extensions: ['html'], maxAge: '1h' }));
+  // HTML/JS/CSS — ყოველთვის ETag-ით გადამოწმება (deploy-ის შემდეგ ძველი მოდულები არ დარჩეს); სურათები — 1 დღე
+  app.use(express.static(path.join(ROOT, 'public'), {
+    extensions: ['html'],
+    setHeaders(res, file) {
+      res.setHeader('Cache-Control', /\.(jpe?g|png|webp|svg|ico)$/i.test(file) ? 'public, max-age=86400' : 'no-cache');
+    },
+  }));
 
   app.get('/api/health', (req, res) => res.json({ ok: true, provider, model: cfg.gemini.mock ? 'mock' : (currentModel() || cfg.gemini.model) }));
 
@@ -69,8 +78,8 @@ export function createApp(cfg) {
       film_ka: meta.title_ka,
       characters: publicList(cfg.wall.characters_on_wall),
       config: {
-        game: cfg.game,
-        wall: cfg.wall,
+        game: noComments(cfg.game),
+        wall: noComments(cfg.wall),
         chat: { history_window: cfg.chat.history_window, max_message_chars: cfg.limits.max_message_chars },
         seasons_ka: SEASON_KA,
       },

@@ -291,7 +291,7 @@ export function createChat({ byId, api, getConfig, getGameState, onExchange, onT
     const payload = {
       characterId: id,
       messages: msgs.slice(-cfg.chat.history_window).map(({ role, content }) => ({ role, content })),
-      gameState: { season: gs.season, crackStage: gs.crackStage, lostCopies: gs.lostCopies, cycle: gs.cycle },
+      gameState: { season: gs.season, crackStage: gs.crackStage, lostCopies: gs.lostCopies, cycle: gs.cycle, paintingFallen: Boolean(gs.paintingFallen) },
       lastSpokenBy: lastSpokenBy(id),
     };
 

@@ -57,6 +57,17 @@ button { font: inherit; color: inherit; }
   background-size: 260px 260px, 900px 700px, cover, auto, auto, auto, auto, auto;
   background-blend-mode: multiply, multiply, multiply, normal, normal, normal, normal, normal;
 }
+/* კედლის ფოტო (public/assets/wall.jpg) — თუ არის, ის არის კედელი; პროცედურული ფენები მხოლოდ fallback-ია */
+#wall.has-photo {
+  background-color: #d9cfb4;
+  background-image: var(--wall-photo);
+  background-size: cover;
+  background-position: center top;
+  background-repeat: no-repeat;
+  background-blend-mode: normal;
+}
+#wall.has-photo::before { opacity: 0.55; } /* ფოტოს ფერი რომ არ „დაიხრჩოს“ */
+
 /* სეზონის ტონი */
 #wall::before {
   content: '';
@@ -76,7 +87,7 @@ button { font: inherit; color: inherit; }
   z-index: 4;
   background:
     radial-gradient(ellipse 70% 55% at 50% 0%, var(--lamp), transparent 70%),
-    radial-gradient(ellipse 120% 100% at 50% 40%, transparent 55%, rgba(30, 24, 16, 0.28) 100%);
+    radial-gradient(ellipse 120% 100% at 50% 40%, transparent 60%, rgba(30, 24, 16, 0.16) 100%);
   mix-blend-mode: soft-light;
 }
 
@@ -243,12 +254,67 @@ button { font: inherit; color: inherit; }
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
-  overflow-wrap: anywhere;
+  overflow-wrap: normal; /* სიტყვა შუაზე არ გაიყოს — გრძელს wall.js შრიფტს უმცირებს */
 }
 .plate-role { font-size: 10.5px; color: #3d301a; white-space: nowrap; text-overflow: ellipsis; }
 .frame[data-tier='0'] .plate-name { font-size: 13.5px; }
 .frame.small .plate-name { font-size: 11px; }
 .frame.small .plate-role { font-size: 9.5px; }
+
+/* ---------- „გრენლანდია“ — ყანყალა სურათი ---------- */
+.painting {
+  --rot: 3deg;
+  position: absolute;
+  padding: 0;
+  margin: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  transform: rotate(var(--rot));
+  transform-origin: 50% 50%;
+  filter: drop-shadow(6px 12px 10px rgba(20, 14, 8, 0.45)) sepia(0.12);
+}
+.painting[hidden], .painting-ghost[hidden] { display: none; }
+.painting img { display: block; width: 100%; height: 100%; object-fit: contain; pointer-events: none; }
+.painting:not(.dropping):hover, .painting:not(.dropping):focus-visible { animation: loose 0.9s ease-in-out; }
+.painting:focus-visible { outline: 3px solid #f0d27a; outline-offset: 4px; }
+@keyframes loose {
+  0%, 100% { rotate: 0deg; }
+  20% { rotate: 2.6deg; }
+  45% { rotate: -1.8deg; }
+  70% { rotate: 1.1deg; }
+}
+/* სადაც სურათი ეკიდა: გაუხუნარი ბათქაშის ლაქა და ორი ლურსმანი */
+.painting-ghost {
+  position: absolute;
+  transform: rotate(var(--rot));
+  background: rgba(255, 252, 238, 0.15);
+  box-shadow: inset 0 0 18px rgba(255, 255, 255, 0.25), 0 0 0 1px rgba(90, 70, 40, 0.10);
+  border-radius: 2px;
+  pointer-events: none;
+}
+.painting-ghost .nail {
+  position: absolute;
+  top: 6%;
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%, #c9c4b8, #4d463d 70%);
+  box-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5);
+}
+.painting-ghost .nail:first-child { left: 22%; }
+.painting-ghost .nail:last-child { right: 22%; top: 9%; transform: rotate(40deg) scaleX(1.8); border-radius: 2px; } /* მოღუნული */
+.puff {
+  position: absolute;
+  z-index: 3;
+  width: 5px; height: 4px;
+  background: #e8e1cf;
+  border-radius: 1px;
+  pointer-events: none;
+  animation: puff 1.6s cubic-bezier(.4,0,1,1) forwards;
+}
+@keyframes puff { to { transform: translate(var(--drift), 260px) rotate(200deg); opacity: 0; } }
+body.thud #wall, body.thud #topbar { animation: shake 0.09s linear 3; }
+body.collapsing .painting { transition: transform 1.4s cubic-bezier(.55,0,1,.45) 0.1s; transform: translateY(115vh) rotate(40deg); }
 
 /* ---------- დაფა და „ესაუბრე სხვას“ ---------- */
 .pinned-note, .door-note {

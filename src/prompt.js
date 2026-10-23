@@ -128,6 +128,9 @@ export function stateBlock(gs, cfg) {
     `Current season: ${gs.season}. The crack in the wall has grown to stage ${gs.crackStage + 1} of ${stages}. Copies of the manuscript lost so far: ${gs.lostCopies} of ${cfg.game.copies}.`,
     SEASON_FLAVOR_EN[gs.season] || '',
   ];
+  if (gs.paintingFallen) {
+    lines.push('The huge painting „გრენლანდია“ (the Greenland landscape with polar bears that hung loose above Vaso for twenty-seven years) has just fallen off the wall. Nobody was badly hurt, plaster is everywhere, nobody has the authority to carry it out. React in character if it fits (Vaso: "ხომ ვამბობდი!", Grisha: "ვინ მოგცათ უფლება?", Mikho: "მარტო ხომ ვერ ავწევ").');
+  }
   if (gs.cycle > 1) {
     lines.push(`The old building has collapsed ${gs.cycle - 1} time(s). Everyone has moved into a NEW building (building №${gs.cycle}) — and exactly the same life started again. You may mention it: „ახალ შენობაში ვართ, ყველაფერი თავიდან“.`);
   }
@@ -193,5 +196,6 @@ export function sanitizeGameState(gs, cfg) {
     crackStage: int(g.crackStage, 0, cfg.game.crack_stages - 1, 0),
     lostCopies: int(g.lostCopies, 0, cfg.game.copies, 0),
     cycle: int(g.cycle, 1, 9999, 1),
+    paintingFallen: g.paintingFallen === true,
   };
 }

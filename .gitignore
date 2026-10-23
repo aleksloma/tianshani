@@ -18,6 +18,9 @@ playwright-report/
 # local duplicate of the source data files (not part of the app)
 Claude outputs/
 
+# original source photos (~5 MB PNG); optimized copies live in public/assets/
+/photos/
+
 # OS / editor noise
 .DS_Store
 Thumbs.db

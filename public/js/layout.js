@@ -57,18 +57,26 @@ export function computeLayout({ width, height, items, seed, headerHeight = 0, zo
   const gap = mobile ? 12 : 24;
   const margin = mobile ? 10 : 18;
   const base = mobile ? BASE_W.mobile : BASE_W.desktop;
-  const total = items.length;
-  const tiers = items.map((it) => tierForRank(it.rank, total));
+  // განსაკუთრებული ელემენტები (მაგ. ნახატი): საკუთარი ზომა/პროპორცია/გადახრა — { size: {w, mw, aspect}, rot: [min, max] }
+  const special = items.filter((it) => it.size);
+  const plain = items.filter((it) => !it.size);
+  const total = plain.length;
+  const tiers = plain.map((it) => tierForRank(it.rank, total));
+  const specialW = (it) => (mobile ? it.size.mw || it.size.w * 0.65 : it.size.w);
 
   // მასშტაბი: დესკტოპზე ჩარჩოები კედლის ~26%-ს იკავებს; მობილურზე სიგანით
-  const sumArea = tiers.reduce((n, t) => n + base[t] * base[t] * FRAME_ASPECT, 0) || 1;
+  const sumArea = (tiers.reduce((n, t) => n + base[t] * base[t] * FRAME_ASPECT, 0)
+    + special.reduce((n, it) => n + specialW(it) ** 2 * it.size.aspect, 0)) || 1;
   const usable = W * Math.max(200, height - headerHeight);
   const scale = mobile
     ? Math.min(1.15, Math.max(0.8, W / 400))
     : Math.min(1.3, Math.max(0.55, Math.sqrt((0.26 * usable) / sumArea)));
 
-  // დიდები ჯერ — ასე უფრო მეტი ადგილი რჩება
-  const order = items.map((it, i) => ({ ...it, tier: tiers[i] })).sort((a, b) => a.tier - b.tier || a.rank - b.rank);
+  // განსაკუთრებულები და დიდები ჯერ — ასე უფრო მეტი ადგილი რჩება
+  const order = [
+    ...special.map((it) => ({ ...it, tier: -1 })),
+    ...plain.map((it, i) => ({ ...it, tier: tiers[i] })).sort((a, b) => a.tier - b.tier || a.rank - b.rank),
+  ];
 
   let H = Math.max(Math.floor(height), headerHeight + 200);
   for (let grow = 0; grow < 20; grow++) {
@@ -77,9 +85,10 @@ export function computeLayout({ width, height, items, seed, headerHeight = 0, zo
     const placed = [];
     let ok = true;
     for (const it of order) {
-      let w = base[it.tier] * scale;
-      let h = w * FRAME_ASPECT;
-      const rotation = (rnd() < 0.5 ? -1 : 1) * (MIN_ROT + rnd() * (MAX_ROT - MIN_ROT));
+      let w = (it.size ? specialW(it) : base[it.tier]) * scale;
+      let h = w * (it.size ? it.size.aspect : FRAME_ASPECT);
+      const [rMin, rMax] = it.rot || [MIN_ROT, MAX_ROT];
+      const rotation = (rnd() < 0.5 ? -1 : 1) * (rMin + rnd() * (rMax - rMin));
       let found = null;
       for (let shrink = 0; shrink < 6 && !found; shrink++) {
         const { bw, bh } = rotatedSize(w, h, Math.abs(rotation) + TILT_RESERVE_DEG);

@@ -4,6 +4,39 @@ import { generateCrack, drawCrack, setCrackStage, framesNearCrack } from './crac
 
 const SILHOUETTE = 'assets/silhouette.svg';
 
+// „გრენლანდია“ — ვასოს თავზე ჩამოკიდებული სურათი (public/assets/painting.webp, 760×539, ჩარჩოიანი, გამჭვირვალე კიდეებით)
+export const PAINTING = { id: 'painting', src: 'assets/painting.webp', size: { w: 450, mw: 250, aspect: 539 / 760 }, rot: [2.5, 4] };
+
+// კედლის ფოტოზე (public/assets/wall.jpg, 1672×941) არსებული ბზარის წერტილები — ახალი ბზარი იქიდან იწყება
+const WALL_PHOTO = { w: 1672, h: 941, crack: [[910, 0], [870, 250], [840, 450], [790, 640], [760, 940]] };
+
+/** ფოტოს ბზარის x კოორდინატი კედლის y სიმაღლეზე (background-size: cover, center top). */
+function photoCrackX(W, H, y) {
+  const s = Math.max(W / WALL_PHOTO.w, H / WALL_PHOTO.h);
+  const ox = (W - WALL_PHOTO.w * s) / 2;
+  const iy = y / s;
+  const pts = WALL_PHOTO.crack;
+  let i = 0;
+  while (i < pts.length - 2 && pts[i + 1][1] < iy) i++;
+  const [x0, y0] = pts[i];
+  const [x1, y1] = pts[i + 1];
+  const t = Math.min(1, Math.max(0, (iy - y0) / (y1 - y0)));
+  return ox + (x0 + (x1 - x0) * t) * s;
+}
+
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+/** ფირფიტაზე გრძელი სიტყვა (მაგ. „მარკშეიდერი“) — შრიფტი მცირდება, სანამ არ ჩაეტევა. */
+function fitText(el, min = 8.5) {
+  if (!el) return;
+  el.style.fontSize = '';
+  let size = parseFloat(getComputedStyle(el).fontSize);
+  while (el.scrollWidth > el.clientWidth + 0.5 && size > min) {
+    size -= 0.5;
+    el.style.fontSize = `${size}px`;
+  }
+}
+
 /** ფირფიტის ტექსტი. */
 export function plateText(c) {
   return { name: c.short_name_ka, role: c.role_short_ka };
@@ -47,7 +80,26 @@ function zonesFor(othersEl, boardEl) {
   };
 }
 
-export function createWall({ characters, wallCfg, onOpen }) {
+/** ნახატის ელემენტი + მისი „კვალი“ კედელზე (ჩამოვარდნის შემდეგ). */
+function paintingNodes() {
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.id = 'painting';
+  btn.className = 'painting';
+  btn.title = 'გრენლანდია. ოცდაშვიდი წელია ყანყალებს…';
+  btn.setAttribute('aria-label', 'სურათი „გრენლანდია“ — ყანყალებს. დააჭირეთ და ჩამოვარდება');
+  const img = document.createElement('img');
+  img.src = PAINTING.src;
+  img.alt = '';
+  btn.append(img);
+  const ghost = document.createElement('div');
+  ghost.className = 'painting-ghost';
+  ghost.setAttribute('aria-hidden', 'true');
+  ghost.innerHTML = '<i class="nail"></i><i class="nail"></i>';
+  return { btn, ghost };
+}
+
+export function createWall({ characters, wallCfg, onOpen, painting = { fallen: false, onDrop: () => {} }, wallPhoto = false }) {
   const wallEl = document.getElementById('wall');
   const framesEl = document.getElementById('frames');
   const crackEl = document.getElementById('crack');
@@ -60,6 +112,12 @@ export function createWall({ characters, wallCfg, onOpen }) {
   let crack = null;
   let seed = wallCfg.layout_seed;
   let stage = 0;
+  let fallen = Boolean(painting.fallen);
+  let dropping = false;
+
+  const pn = paintingNodes();
+  framesEl.append(pn.ghost, pn.btn);
+  pn.btn.addEventListener('click', () => drop());
 
   for (const c of onWall) {
     const n = frameNode(c);
@@ -68,17 +126,80 @@ export function createWall({ characters, wallCfg, onOpen }) {
     framesEl.append(n);
   }
 
+  /** ნახატის მდგომარეობა DOM-ში (ჩამოკიდებული / ჩამოვარდნილი). */
+  function showPainting() {
+    pn.btn.hidden = fallen;
+    pn.ghost.hidden = !fallen;
+    pn.btn.getAnimations().forEach((a) => a.cancel());
+    pn.btn.style.opacity = '';
+  }
+
+  /** ჯერ ერთი ლურსმანი უშვებს (გადაიხრება), მერე ვარდება და ქრება. */
+  async function drop() {
+    if (fallen || dropping) return;
+    dropping = true;
+    pn.btn.classList.add('dropping');
+    const f = layout.frames.find((x) => x.id === PAINTING.id);
+    const rot = f.rotation;
+    const dir = rot < 0 ? -1 : 1;
+    const slip = pn.btn.animate([
+      { transform: `rotate(${rot}deg)` },
+      { transform: `translateY(8px) rotate(${rot + 10 * dir}deg)`, offset: 0.4 },
+      { transform: `translateY(5px) rotate(${rot + 6 * dir}deg)`, offset: 0.65 },
+      { transform: `translateY(12px) rotate(${rot + 15 * dir}deg)` },
+    ], { duration: 700, easing: 'ease-out', fill: 'forwards' });
+    await slip.finished;
+    plasterPuff(f);
+    const fallPx = Math.max(window.innerHeight, layout.height) - f.y + 200;
+    const fall = pn.btn.animate([
+      { transform: `translateY(12px) rotate(${rot + 15 * dir}deg)`, opacity: 1 },
+      { transform: `translateY(${fallPx}px) rotate(${rot + 38 * dir}deg)`, opacity: 0.85 },
+    ], { duration: 950, easing: 'cubic-bezier(.45,0,1,.55)', fill: 'forwards' });
+    await fall.finished;
+    fallen = true;
+    dropping = false;
+    pn.btn.classList.remove('dropping');
+    showPainting();
+    painting.onDrop(); // მდგომარეობა მაშინვე ინახება
+    // დარტყმა იატაკზე
+    document.body.classList.add('thud');
+    await sleep(260);
+    document.body.classList.remove('thud');
+  }
+
+  /** ცოტა ბათქაში იქიდან, სადაც სურათი ეკიდა. */
+  function plasterPuff(f) {
+    for (let i = 0; i < 18; i++) {
+      const p = document.createElement('i');
+      p.className = 'puff';
+      p.style.left = `${f.x + f.w * (0.1 + Math.random() * 0.8)}px`;
+      p.style.top = `${f.y + Math.random() * 10}px`;
+      p.style.setProperty('--drift', `${(Math.random() - 0.5) * 60}px`);
+      p.style.animationDelay = `${Math.random() * 0.3}s`;
+      framesEl.append(p);
+      setTimeout(() => p.remove(), 2200);
+    }
+  }
+
   function render() {
     const W = document.documentElement.clientWidth;
     const H = window.innerHeight;
     const headerHeight = Math.ceil(topbar.getBoundingClientRect().height);
     layout = computeLayout({
       width: W, height: H, headerHeight, seed,
-      items: onWall.map((c, i) => ({ id: c.id, rank: i })),
+      // ნახატი ჩამოვარდნის შემდეგაც ინახავს ადგილს — კედელზე ღია ლაქა რჩება, სხვები არ ხტებიან
+      items: [{ id: PAINTING.id, rank: -1, size: PAINTING.size, rot: PAINTING.rot }, ...onWall.map((c, i) => ({ id: c.id, rank: i }))],
       zones: zonesFor(othersEl, boardEl),
     });
     wallEl.style.height = `${layout.height}px`;
     for (const f of layout.frames) {
+      if (f.id === PAINTING.id) {
+        for (const el of [pn.btn, pn.ghost]) {
+          Object.assign(el.style, { left: `${f.x}px`, top: `${f.y}px`, width: `${f.w}px`, height: `${f.h}px` });
+          el.style.setProperty('--rot', `${f.rotation.toFixed(2)}deg`);
+        }
+        continue;
+      }
       const n = nodes.get(f.id);
       n.style.left = `${f.x}px`;
       n.style.top = `${f.y}px`;
@@ -88,11 +209,14 @@ export function createWall({ characters, wallCfg, onOpen }) {
       n.style.setProperty('--tilt-dir', f.rotation < 0 ? '-1' : '1');
       n.classList.toggle('small', f.tier === 2);
       n.dataset.tier = String(f.tier);
+      fitText(n.querySelector('.plate-name'));
     }
     crack = generateCrack({
       width: layout.width, height: layout.height, top: headerHeight, seed,
       obstacles: layout.frames.map((f) => f.box),
+      startX: wallPhoto ? photoCrackX(layout.width, layout.height, headerHeight) : null,
     });
+    showPainting();
     drawCrack(crackEl, crack, layout.width, layout.height);
     // პირველი ჩვენება — ანიმაციის გარეშე
     crackEl.classList.add('no-anim');
@@ -107,17 +231,20 @@ export function createWall({ characters, wallCfg, onOpen }) {
     stage = s;
     setCrackStage(crackEl, s);
     const tiltCount = s >= 4 ? 3 : s >= 3 ? 2 : 0;
-    const tilted = new Set(tiltCount && crack ? framesNearCrack(crack, layout.frames, tiltCount) : []);
+    const tilted = new Set(tiltCount && crack ? framesNearCrack(crack, layout.frames.filter((f) => f.id !== PAINTING.id), tiltCount) : []);
     for (const [id, n] of nodes) n.classList.toggle('tilted', tilted.has(id));
   }
 
   function setSeed(newSeed) { seed = newSeed; render(); }
 
+  /** ახალ შენობაში სურათი ისევ ეკიდება. */
+  function setPaintingFallen(v) { fallen = Boolean(v); showPainting(); }
+
   let t = null;
   window.addEventListener('resize', () => { clearTimeout(t); t = setTimeout(render, 150); });
 
   return {
-    render, setStage, setSeed,
+    render, setStage, setSeed, setPaintingFallen, dropPainting: drop,
     frameNode: (id) => nodes.get(id) || null,
     get layout() { return layout; },
   };

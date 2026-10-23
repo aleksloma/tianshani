@@ -6,7 +6,7 @@ export const LOST_COPY_NOTES = ['ერთი თინას უჯრაში
 export const COLLAPSE_TEXT = 'შენობა ჩამოინგრა. ახალი შენობა. ყველაფერი თავიდან.';
 
 export function initialState(cycle = 1, seasons = ['autumn']) {
-  return { cycle, season: seasons[0], exchanges: 0, crackStage: 0, lostCopies: 0, visited: [] };
+  return { cycle, season: seasons[0], exchanges: 0, crackStage: 0, lostCopies: 0, paintingFallen: false, visited: [] };
 }
 
 export function loadState(gameCfg) {
@@ -19,6 +19,7 @@ export function loadState(gameCfg) {
     exchanges: Number.isInteger(s.exchanges) && s.exchanges >= 0 ? s.exchanges : 0,
     crackStage: Math.min(gameCfg.crack_stages - 1, Math.max(0, s.crackStage | 0)),
     lostCopies: Math.min(gameCfg.copies, Math.max(0, s.lostCopies | 0)),
+    paintingFallen: s.paintingFallen === true,
     visited: Array.isArray(s.visited) ? s.visited.filter((x) => typeof x === 'string') : [],
   };
 }

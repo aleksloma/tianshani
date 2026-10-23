@@ -42,7 +42,11 @@ test('სეზონები: ყოველ N გაცვლაზე → �
   assert.equal(r.event, 'collapse');
   assert.equal(r.state.crackStage, 4);
   const n = nextCycle(r.state, G);
-  assert.deepEqual({ ...n, visited: [] }, { cycle: 2, season: 'autumn', exchanges: 0, crackStage: 0, lostCopies: 0, visited: [] });
+  assert.deepEqual({ ...n, visited: [] }, { cycle: 2, season: 'autumn', exchanges: 0, crackStage: 0, lostCopies: 0, paintingFallen: false, visited: [] });
+  // ჩამოვარდნილი სურათი სეზონებს შორის რჩება, ახალ შენობაში ბრუნდება
+  const fallen = applyExchange({ ...initialState(1, G.seasons), paintingFallen: true }, G, 'vaso').state;
+  assert.equal(fallen.paintingFallen, true);
+  assert.equal(nextCycle({ ...fallen, cycle: 1 }, G).paintingFallen, false);
 });
 
 test('periodKey: monthly → YYYY-MM, lifetime → all', () => {

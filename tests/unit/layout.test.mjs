@@ -54,6 +54,22 @@ for (const [W, H] of VIEWPORTS) {
   }
 }
 
+test('განსაკუთრებული ელემენტი (ნახატი): საკუთარი პროპორცია და 2.5–4° გადახრა, გადაფარვის გარეშე', () => {
+  const painting = { id: 'painting', rank: -1, size: { w: 450, mw: 250, aspect: 539 / 760 }, rot: [2.5, 4] };
+  for (const [W, H] of VIEWPORTS) {
+    for (const seed of [1984, 1985, 1986]) {
+      const L = computeLayout({ width: W, height: H, items: [painting, ...items], seed, headerHeight: W < 700 ? 120 : 96, zones });
+      assert.equal(L.frames.length, 13);
+      assert.deepEqual(findOverlaps(L), [], `${W}x${H}/${seed}`);
+      const p = L.frames.find((f) => f.id === 'painting');
+      assert.ok(Math.abs(p.rotation) >= 2.5 && Math.abs(p.rotation) <= 4, String(p.rotation));
+      assert.ok(Math.abs(p.h / p.w - 539 / 760) < 1e-9);
+      assert.ok(p.w > L.frames.filter((f) => f.id !== 'painting').reduce((m, f) => Math.max(m, f.w), 0), 'ყველაზე დიდია');
+      for (const f of L.frames.filter((x) => x.id !== 'painting')) assert.ok(Math.abs(f.rotation) >= MIN_ROT);
+    }
+  }
+});
+
 test('ზომის კლასები: უფრო „მდიდარი“ პერსონაჟი უფრო დიდია (3 ზომა)', () => {
   const L = computeLayout({ width: 1440, height: 900, items, seed: 1984, headerHeight: 96, zones });
   const tiers = new Set(L.frames.map((f) => f.tier));

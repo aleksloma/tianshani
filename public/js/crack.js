@@ -17,10 +17,12 @@ export function polyLength(pts) {
  * ბზარის გენერაცია: ზემოდან ქვემოთ, ჩარჩოებს შორის გზის ძებნით (obstacles = ჩარჩოების bbox-ები).
  * @returns {{trunk: Array<{x,y}>, branches: Array<{points, stage}>}}
  */
-export function generateCrack({ width, height, top = 0, seed, obstacles = [], stages = 5 }) {
+export function generateCrack({ width, height, top = 0, seed, obstacles = [], stages = 5, startX = null }) {
   const rnd = mulberry32(seed * 7 + 11);
   const step = 13;
-  let p = { x: width * (0.3 + rnd() * 0.4), y: top + 4 };
+  const rx = width * (0.3 + rnd() * 0.4);
+  // startX: კედლის ფოტოზე არსებული ბზარის ადგილი — ახალი ბზარი იქიდან „იზრდება“
+  let p = { x: startX ?? rx, y: top + 4 };
   let a = Math.PI / 2 + (rnd() - 0.5) * 0.6;
   const trunk = [p];
   for (let i = 0; i < 1200 && p.y < height - 8; i++) {

@@ -48,7 +48,11 @@ async function main() {
   if (state?.client_id && state.client_id !== cid) syncClientId(state.client_id);
   renderStatus();
   renderTokens(state?.remaining);
-  if (data.wall_image) document.getElementById('wall').style.setProperty('--wall-photo', `url("${new URL(data.wall_image, window.location.href).href}")`);
+  if (data.wall_image) {
+    const w = document.getElementById('wall');
+    w.style.setProperty('--wall-photo', `url("${new URL(data.wall_image, window.location.href).href}")`);
+    w.classList.add('has-photo');
+  }
   if (data.mock_notice) { $('mock-banner').textContent = data.mock_notice; $('mock-banner').hidden = false; }
   if (!storageAvailable()) $('storage-banner').hidden = false;
   renderRollCall(data.roll_call || []);
@@ -60,6 +64,9 @@ async function main() {
     characters: data.characters,
     wallCfg: { ...cfg.wall, layout_seed: cfg.wall.layout_seed + game.cycle },
     onOpen: (id, node) => chat.open(id, node),
+    wallPhoto: Boolean(data.wall_image),
+    // „გრენლანდია“ ჩამოვარდა — ამ შენობაში აღარ დაბრუნდება; პერსონაჟებმაც იციან
+    painting: { fallen: game.paintingFallen, onDrop: () => { game = { ...game, paintingFallen: true }; saveState(game); } },
   });
   // კედელზე არმყოფი პერსონაჟის პორტრეტი (შუაში მოსატანად)
   const buildFrame = (c) => {
@@ -93,6 +100,7 @@ async function main() {
       game = nextCycle(game, cfg.game);
       saveState(game);
       clearAllChats();
+      wall.setPaintingFallen(false); // ახალ შენობაში სურათი ისევ ეკიდება
       wall.setSeed(cfg.wall.layout_seed + game.cycle); // ახალი შენობა — სხვა არეულობა
       wall.setStage(0);
       renderStatus();

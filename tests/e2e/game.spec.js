@@ -91,5 +91,5 @@ test('ზაფხულის ბოლოს ჩამონგრევა: �
   await page.locator('#chat-input').fill('ახალ შენობაში ვართ?');
   await page.locator('#chat-input').press('Enter');
   const body = (await req).postDataJSON();
-  expect(body.gameState).toEqual({ season: 'autumn', crackStage: 0, lostCopies: 0, cycle: 2 });
+  expect(body.gameState).toEqual({ season: 'autumn', crackStage: 0, lostCopies: 0, cycle: 2, paintingFallen: false });
 });

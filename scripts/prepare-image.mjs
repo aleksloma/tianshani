@@ -19,6 +19,10 @@ const H = opt('h', 480);
 const FOCUS = opt('focus', 0.3);
 const MAX_KB = opt('max', 150);
 const COVER = rest.includes('--cover');
+// --webp: გამჭვირვალობა შენარჩუნდება (მაგ. ჩარჩოიანი ნახატი); დეფოლტი JPEG
+const FORMAT = rest.includes('--webp') ? 'image/webp' : 'image/jpeg';
+// --region x,y,w,h: წინასწარი crop ორიგინალის პიქსელებში (მაგ. ჯგუფური კადრიდან ერთი სახე ან ვოტერმარკის მოჭრა)
+const REGION = (() => { const i = rest.indexOf('--region'); return i >= 0 ? rest[i + 1].split(',').map(Number) : null; })();
 
 const buf = fs.readFileSync(input);
 const sig = buf.subarray(0, 12).toString('hex');
@@ -32,33 +36,37 @@ const browser = await chromium.launch();
 try {
   const page = await browser.newPage();
   const dataUrl = `data:${mime};base64,${buf.toString('base64')}`;
-  const result = await page.evaluate(async ({ dataUrl, W, H, FOCUS, MAX_KB, COVER }) => {
+  const result = await page.evaluate(async ({ dataUrl, W, H, FOCUS, MAX_KB, COVER, FORMAT, REGION }) => {
     const img = new Image();
     img.src = dataUrl;
     await img.decode();
     let sw = img.naturalWidth; let sh = img.naturalHeight; let sx = 0; let sy = 0;
+    if (REGION) {
+      [sx, sy, sw, sh] = REGION;
+      sw = Math.min(sw, img.naturalWidth - sx); sh = Math.min(sh, img.naturalHeight - sy);
+    }
+    const bx = sx; const by = sy;
     let outW = W; let outH = H;
     if (COVER) {
       const scale = Math.min(1, W / sw);
       outW = Math.round(sw * scale); outH = Math.round(sh * scale);
     } else {
       const target = W / H;
-      if (sw / sh > target) { const nw = sh * target; sx = (sw - nw) / 2; sw = nw; } else { const nh = sw / target; sy = (sh - nh) * FOCUS; sh = nh; }
+      if (sw / sh > target) { const nw = sh * target; sx = bx + (sw - nw) / 2; sw = nw; } else { const nh = sw / target; sy = by + (sh - nh) * FOCUS; sh = nh; }
     }
     const c = document.createElement('canvas');
     c.width = outW; c.height = outH;
     const ctx = c.getContext('2d');
     ctx.imageSmoothingQuality = 'high';
-    ctx.fillStyle = '#e9e1cc';
-    ctx.fillRect(0, 0, outW, outH);
+    if (FORMAT === 'image/jpeg') { ctx.fillStyle = '#e9e1cc'; ctx.fillRect(0, 0, outW, outH); }
     ctx.drawImage(img, sx, sy, sw, sh, 0, 0, outW, outH);
     let q = 0.86; let url = '';
     for (; q >= 0.4; q -= 0.06) {
-      url = c.toDataURL('image/jpeg', q);
+      url = c.toDataURL(FORMAT, q);
       if ((url.length - 23) * 0.75 / 1024 <= MAX_KB) break;
     }
     return { url, q, natural: [img.naturalWidth, img.naturalHeight], out: [outW, outH] };
-  }, { dataUrl, W, H, FOCUS, MAX_KB, COVER });
+  }, { dataUrl, W, H, FOCUS, MAX_KB, COVER, FORMAT, REGION });
   const out = Buffer.from(result.url.split(',')[1], 'base64');
   fs.mkdirSync(path.dirname(output), { recursive: true });
   fs.writeFileSync(output, out);

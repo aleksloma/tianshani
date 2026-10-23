@@ -27,9 +27,12 @@ export async function frameRects(page) {
       const m = new DOMMatrix(getComputedStyle(el).transform);
       return { id: el.dataset.id, ...r(el), angle: (Math.atan2(m.b, m.a) * 180) / Math.PI };
     });
+    const painting = document.getElementById('painting');
+    const zones = { topbar: r(document.getElementById('topbar')), others: r(document.getElementById('others')), board: r(document.getElementById('noticeboard')) };
+    if (painting && !painting.hidden) zones.painting = r(painting); // ნახატიც დაბრკოლებაა
     return {
       frames,
-      zones: { topbar: r(document.getElementById('topbar')), others: r(document.getElementById('others')), board: r(document.getElementById('noticeboard')) },
+      zones,
       page: { w: document.documentElement.clientWidth, h: document.documentElement.scrollHeight },
     };
   });
