@@ -10,8 +10,12 @@ import { loadConfig, ROOT } from './config.js';
 import { byId, publicList, pickProxy, famousRollCall, meta } from './characters.js';
 import { buildPrompt, sanitizeGameState, annotateForProxy, pickStageMode, SEASON_KA } from './prompt.js';
 import { openDb } from './db.js';
-import { balance, createRateLimiter, MSG_LIMIT, MSG_LIMIT_LIFETIME, MSG_RATE, MSG_TOO_LONG } from './limits.js';
+import { balance, createRateLimiter, MSG_LIMIT, MSG_RATE, MSG_TOO_LONG } from './limits.js';
+import {
+  MSG_BUDGET, costUsd, globalStatus, wouldOvershoot, reserveUsd, estimateTokens, createWarnLogger,
+} from './budget.js';
 import { detectRedirect } from './redirect.js';
+import { pacingState } from './pacing.js';
 import { mockStream } from './mock.js';
 import { geminiStream, resolveModel, currentModel } from './gemini.js';
 import { log, logExchange } from './logger.js';
@@ -49,6 +53,23 @@ export function createApp(cfg) {
   const app = express();
   const rate = createRateLimiter(cfg.limits.max_requests_per_minute);
   const provider = cfg.gemini.mock ? 'mock' : 'gemini';
+  const budgetWarn = createWarnLogger(log);
+
+  /** wall.background_by_stage → მხოლოდ არსებული ფაილები (public/-ის შიგნით); დანარჩენი null. */
+  const publicDir = path.join(ROOT, 'public');
+  const wallBackgrounds = (Array.isArray(cfg.wall.background_by_stage) ? cfg.wall.background_by_stage : ['assets/wall.jpg'])
+    .map((p) => {
+      if (typeof p !== 'string' || !p) return null;
+      const abs = path.resolve(publicDir, p);
+      if (!abs.startsWith(publicDir + path.sep) || !fs.existsSync(abs)) {
+        log.warn(`[wall] background_by_stage: ფაილი ვერ მოიძებნა — ${p} (გამოიყენება წინა საფეხურის სურათი)`);
+        return null;
+      }
+      return p.replace(/\\/g, '/');
+    });
+
+  /** 429 — ბრაუზერის ლიმიტი ან გლობალური ბიუჯეტი; ერთი და იგივე ტექსტი, UI-ს მოდალი აჩვენებს. */
+  const limitBody = (kind, resets) => ({ error: kind, message: kind === 'global_budget' ? MSG_BUDGET : MSG_LIMIT, resets_at: resets });
 
   app.disable('x-powered-by');
   app.set('trust proxy', 1); // ჰოსტინგზე (Render/Railway/Fly) req.ip და req.secure სწორად
@@ -84,8 +105,9 @@ export function createApp(cfg) {
         seasons_ka: SEASON_KA,
       },
       roll_call: famousRollCall?.lines || [],
-      // კედლის ფოტო-ტექსტურა (თუ ჩამოიტვირთა); თუ არა — მხოლოდ პროცედურული ბათქაში
-      wall_image: fs.existsSync(path.join(ROOT, 'public', 'assets', 'wall.jpg')) ? 'assets/wall.jpg' : null,
+      // კედლის ფოტოები ბზარის საფეხურის მიხედვით (Round 2 §7); არარსებული ფაილი → null (კლიენტი წინა სურათს აიღებს)
+      wall_backgrounds: wallBackgrounds,
+      wall_image: wallBackgrounds[0] || null,
       mock: cfg.gemini.mock,
       mock_notice: cfg.gemini.mock ? `${MSG_NO_KEY} — სატესტო რეჟიმი, პასუხები LLM-ის გარეშე.` : null,
     });
@@ -93,7 +115,15 @@ export function createApp(cfg) {
 
   app.get('/api/state', (req, res) => {
     // client_id — რომ localStorage-ის ID cookie-ს დაემთხვეს (cookie პრიორიტეტულია)
-    res.json({ ...balance(store, cfg, req.clientId), client_id: req.clientId, mock: cfg.gemini.mock, provider });
+    const g = globalStatus(store, cfg);
+    res.json({
+      ...balance(store, cfg, req.clientId),
+      client_id: req.clientId,
+      mock: cfg.gemini.mock,
+      provider,
+      // გლობალური ბიუჯეტი — მოდალი გვერდის ჩატვირთვისთანავე ყველას უჩანს (ხარჯის თანხა კლიენტს არ ვუჩვენებთ ტექსტად, მხოლოდ სტატუსი)
+      global: { budget_usd: g.budget_usd, spent_usd: Math.round(g.spent_usd * 10000) / 10000, exhausted: g.exhausted, resets_at: g.resets_at },
+    });
   });
 
   app.post('/api/chat', async (req, res) => {
@@ -113,9 +143,14 @@ export function createApp(cfg) {
     if (last.content.length > cfg.limits.max_message_chars) return res.status(413).json({ error: MSG_TOO_LONG });
 
     if (!rate.allow(clientId)) return res.status(429).json({ error: MSG_RATE, code: 'rate' });
+    // 1) გლობალური თვიური ბიუჯეტი (ყველასთვის ერთი)
+    const gNow = globalStatus(store, cfg);
+    budgetWarn.check(gNow);
+    if (gNow.exhausted) return res.status(429).json(limitBody('global_budget', gNow.resets_at));
+    // 2) ამ ბრაუზერის ლიმიტი
     const bal = balance(store, cfg, clientId);
     if (bal.exhausted) {
-      return res.status(429).json({ error: cfg.limits.period === 'lifetime' ? MSG_LIMIT_LIFETIME : MSG_LIMIT, code: 'limit', remaining: bal.remaining });
+      return res.status(429).json({ ...limitBody('client_limit', bal.resets_at), code: 'limit', remaining: bal.remaining });
     }
 
     const gameState = sanitizeGameState(req.body.gameState, cfg);
@@ -130,12 +165,21 @@ export function createApp(cfg) {
     }
 
     const stageMode = pickStageMode({ invisible, historyLen: clean.length - 1 });
-    const { systemInstruction, fewShot } = buildPrompt({ speaker, invisible, gameState, cfg, stageMode });
+    const pacing = pacingState(clean, speaker);
+    const { systemInstruction, fewShot } = buildPrompt({ speaker, invisible, gameState, cfg, stageMode, pacing });
     // წარმომადგენლის ჩატში მომხმარებლის შეტყობინებებს (მხოლოდ მოდელისთვის) ემატება „ვის მიმართავს“ შენიშვნა; ლოგში — ორიგინალი
     const convo = invisible
       ? clean.map((m) => (m.role === 'user' ? { ...m, content: annotateForProxy(m.content, invisible, speaker) } : m))
       : clean;
     const contents = [...fewShot, ...convo];
+
+    // 3) რეზერვი: ბოლო მოთხოვნამ ბიუჯეტი არ უნდა გადააჭარბოს (პრომპტი + max_output_tokens უარეს შემთხვევაში)
+    const promptTokens = estimateTokens(systemInstruction) + contents.reduce((n, m) => n + estimateTokens(m.content), 0);
+    const reserve = reserveUsd({ promptTokens, maxOutputTokens: cfg.gemini.max_output_tokens, prices: cfg.budget });
+    if (wouldOvershoot(gNow, reserve)) {
+      log.warn(`[budget] მოთხოვნა უარყოფილია: ხარჯი $${gNow.spent_usd.toFixed(4)} + რეზერვი $${reserve.toFixed(4)} ≥ $${gNow.budget_usd}`);
+      return res.status(429).json(limitBody('global_budget', gNow.resets_at));
+    }
 
     // --- SSE ---
     res.status(200);
@@ -154,7 +198,7 @@ export function createApp(cfg) {
     let usage = { input: 0, output: 0 };
     try {
       const gen = cfg.gemini.mock
-        ? mockStream({ systemInstruction, contents, speaker, invisible, userText: last.content, gameState, signal: ac.signal, historyLen: clean.length - 1 })
+        ? mockStream({ systemInstruction, contents, speaker, invisible, userText: last.content, gameState, signal: ac.signal, historyLen: clean.length - 1, manuscriptCount: pacing.manuscriptCount })
         : geminiStream({ cfg, systemInstruction, contents, signal: ac.signal });
       for await (const ev of gen) {
         if (ev.delta) { reply += ev.delta; send({ delta: ev.delta }); }
@@ -165,13 +209,18 @@ export function createApp(cfg) {
       clearTimeout(timer);
       log.error(`[chat] ${characterId}: ${e?.message || e}`);
       // ტოკენები მაინც დაიხარჯა, თუ რამე დაბრუნდა
-      if (usage.input || usage.output) store.addUsage(clientId, bal.period_key, usage.input, usage.output);
+      if (usage.input || usage.output) {
+        store.addUsage(clientId, bal.period_key, usage.input, usage.output);
+        store.addGlobal(gNow.period_key, usage.input, usage.output, costUsd(usage.input, usage.output, cfg.budget));
+      }
       send({ error: MSG_API_ERROR });
       return res.end();
     }
     clearTimeout(timer);
 
     store.addUsage(clientId, bal.period_key, usage.input, usage.output);
+    // გლობალური ხარჯი — რეალური usageMetadata-დან (mock-ში ყალბი usage-დან)
+    store.addGlobal(gNow.period_key, usage.input, usage.output, costUsd(usage.input, usage.output, cfg.budget));
     logExchange(store, cfg, { clientId, characterId: target.id, spokenBy: speaker.id, userText: last.content, reply, usage, gameState });
 
     const after = balance(store, cfg, clientId);
@@ -179,7 +228,12 @@ export function createApp(cfg) {
       done: true,
       usage,
       remaining: after.remaining,
-      suggested_redirect: detectRedirect({ speaker, reply, userText: last.content, currentId: target.id }),
+      limits: after.limits,
+      period: after.period,
+      resets_at: after.resets_at,
+      exhausted: after.exhausted,
+      // „→ მივიდე …“ მხოლოდ ხელნაწერზე მე-3 შეტყობინებიდან და მხოლოდ თუ პასუხში მართლა ასახელებს (FIXES_ROUND2 §8)
+      suggested_redirect: detectRedirect({ speaker, reply, currentId: target.id, manuscriptCount: pacing.manuscriptCount }),
       spoken_by: speaker.id,
       spoken_by_name: speaker.short_name_ka,
     });

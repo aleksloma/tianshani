@@ -11,8 +11,8 @@
     "_comment": "api_key — Google AI Studio-ს გასაღები (https://aistudio.google.com/apikey). თუ ცარიელია ან PASTE_YOUR_KEY — სერვერი mock რეჟიმში გაეშვება (პასუხები მონაცემთა ბაზიდან, LLM-ის გარეშე). model — მოდელის ID; თუ API-ში ვერ მოიძებნა, უახლოესი flash მოდელი აირჩევა და კონსოლში დაილოგება. thinking_budget — 0 = „ფიქრი“ გამორთულია (მოკლე, სწრაფი პასუხები, max_output_tokens არ იხარჯება ფიქრზე); null = მოდელის დეფოლტი. mock: true აიძულებს mock რეჟიმს გასაღების არსებობის მიუხედავად (ტესტებისთვის).",
     "api_key": "PASTE_YOUR_KEY",
     "model": "gemini-3.8-flash",
-    "temperature": 0.9,
-    "max_output_tokens": 400,
+    "temperature": 0.8,
+    "max_output_tokens": 250,
     "request_timeout_ms": 60000,
     "thinking_budget": 0,
     "mock": false
@@ -27,26 +27,35 @@
     "max_message_chars": 2000
   },
 
+  "budget": {
+    "_comment": "გლობალური თვიური ბიუჯეტი ყველა მომხმარებლისთვის ერთად (USD, კალენდარული თვე UTC; env GLOBAL_MONTHLY_USD გადაფარავს; 0 = გამორთული). ხარჯი = input/1e6 × price_input + output/1e6 × price_output, Gemini-ს რეალური usageMetadata-დან. ფასები კონფიგშია, რადგან Gemini 3.8 Flash-ის intro ფასი 2027-01-01-დან ორმაგდება (1.50 / 7.50) — მაშინ ეს ორი რიცხვი განაახლეთ. warn_at_percent — ამ პროცენტზე ადმინში ყვითელი ბანერი და ლოგში გაფრთხილება (დღეში ერთხელ). ამოწურვისას ყველას ერთი და იგივე „ბიუჯეტში გარღვევა გვაქვს“ ფანჯარა ეჩვენება.",
+    "global_monthly_usd": 50,
+    "price_input_per_1m_usd": 0.75,
+    "price_output_per_1m_usd": 3.75,
+    "warn_at_percent": 80
+  },
+
   "chat": {
     "_comment": "history_window — რამდენი ბოლო შეტყობინება გაეგზავნოს მოდელს თითო მოთხოვნაზე.",
     "history_window": 20
   },
 
   "game": {
-    "_comment": "შიდა კალენდარი. start_date — პირველი დღე (1983-09-01). days_per_season — სეზონის სიგრძე დღეებში (90): შემოდგომა 0–89, ზამთარი 90–179, გაზაფხული 180–269, ზაფხული 270–359, 360-ე დღეს შენობა ინგრევა. days_per_character_switch — რამდენი დღე გადის, როცა მომხმარებელი სხვა პერსონაჟთან გადადის (20 → სეზონი ყოველ 4–5 გადასვლაზე; იგივე პერსონაჟის ხელახლა გახსნა დროს არ ამატებს). days_per_exchange — დღეები თითო შეტყობინება-პასუხზე (0 = გამორთული). seasons — სეზონების რიგი. crack_stages — ბზარის საფეხურები (0..n-1). copies — ეგზემპლარები ციკლის დასაწყისში.",
+    "_comment": "შიდა კალენდარი. start_date — პირველი დღე (1983-09-01; წელი მხოლოდ LLM-ის პრომპტში ჩანს). days_per_season — სეზონის სიგრძე დღეებში (90): შემოდგომა 0–89, ზამთარი 90–179, გაზაფხული 180–269, ზაფხული 270–359, 360-ე დღეს შენობა ინგრევა. days_per_exchange — დღეები ყოველ დასრულებულ შეტყობინება-პასუხზე, ნებისმიერ პერსონაჟთან (20 → სეზონი ყოველ 4–5 შეტყობინებაზე, ჩამონგრევა ~18-ზე). days_per_character_switch — დღეები სხვა პერსონაჟთან გადასვლისას (0 = გამორთული; ორივე შეიძლება ერთად). seasons — სეზონების რიგი. crack_stages — ბზარის საფეხურები (0..n-1). copies — ეგზემპლარები ციკლის დასაწყისში.",
     "start_date": "1983-09-01",
     "days_per_season": 90,
-    "days_per_character_switch": 20,
-    "days_per_exchange": 0,
+    "days_per_character_switch": 0,
+    "days_per_exchange": 20,
     "seasons": ["autumn", "winter", "spring", "summer"],
     "crack_stages": 5,
     "copies": 3
   },
 
   "wall": {
-    "_comment": "characters_on_wall — რამდენი ჩარჩო ეკიდოს კედელზე (ტოპ N კონტენტის ქულით). layout_seed — განლაგების seed (seed + ციკლის ნომერი → დეტერმინისტული, მაგრამ არეული განლაგება).",
+    "_comment": "characters_on_wall — რამდენი ჩარჩო ეკიდოს კედელზე (ტოპ N კონტენტის ქულით). layout_seed — განლაგების seed (seed + ციკლის ნომერი → დეტერმინისტული, მაგრამ არეული განლაგება). background_by_stage — კედლის ფოტო ბზარის თითო საფეხურზე (ინდექსი = crackStage 0..4); null → უახლოესი წინა სურათი. მაგ.: [\"assets/wall.jpg\", \"assets/wall_1.jpg\", \"assets/wall_2.jpg\", \"assets/wall_3.jpg\", \"assets/wall_4.jpg\"] — ჩადეთ ფაილები public/assets/-ში და შეავსეთ მასივი; სეზონის ცვლილებაზე ფონი ~1.5 წმ-ში გადადის. კოდის შეცვლა საჭირო არ არის.",
     "characters_on_wall": 12,
-    "layout_seed": 1983
+    "layout_seed": 1983,
+    "background_by_stage": ["assets/wall.jpg", null, null, null, null]
   },
 
   "admin": {

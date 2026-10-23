@@ -43,6 +43,28 @@ async function loadStats() {
     card('გამომავალი ტოკენი სულ', t.output_tokens),
     top,
   );
+  renderBudget(s.budget);
+}
+
+const usd = (v) => `$${Number(v || 0).toFixed(Number(v) < 1 ? 4 : 2)}`;
+
+/** „ბიუჯეტი“ ბარათი + ყვითელი ბანერი warn_at_percent-ზე. */
+function renderBudget(b) {
+  if (!b) return;
+  $('b-spent').textContent = `${usd(b.spent_usd)} / $${b.budget_usd}`;
+  $('b-pct').textContent = `${b.percent}%`;
+  $('b-tokens').textContent = `${fmt.format(b.input_tokens)} / ${fmt.format(b.output_tokens)}`;
+  $('b-proj').textContent = `${usd(b.projected_usd)} (${b.projected_percent}%)`;
+  const bar = $('b-bar');
+  bar.style.width = `${Math.min(100, b.percent)}%`;
+  bar.className = b.exhausted ? 'hot' : b.warn ? 'warn' : '';
+  $('b-meta').textContent = `${b.period_key} · ${b.days_elapsed} / ${b.days_in_month} დღე · ფასი: $${b.prices.input_per_1m} შემ. / $${b.prices.output_per_1m} გამ. 1M ტოკენზე · მოთხოვნები: ${b.requests}${b.enabled ? '' : ' · ბიუჯეტი გამორთულია'}`;
+  const warn = $('budget-warn');
+  warn.hidden = !(b.warn || b.exhausted);
+  warn.textContent = b.exhausted
+    ? `თვიური ბიუჯეტი ამოიწურა (${b.percent}%) — ყველა მომხმარებელს „ბიუჯეტში გარღვევა გვაქვს“ ფანჯარა ეჩვენება.`
+    : `ყურადღება: თვიური ბიუჯეტის ${b.percent}% დახარჯულია (გაფრთხილების ზღვარი ${b.warn_at_percent}%).`;
+  warn.classList.toggle('hot', Boolean(b.exhausted));
 }
 
 async function loadClients() {
@@ -56,6 +78,7 @@ async function loadClients() {
       el('span', { class: 'cid', text: c.client_id }),
       el('span', { class: 'cmeta', text: `ბოლოს: ${when(c.last_seen)} · შეტყობინება: ${c.messages} · პერსონაჟი: ${c.characters}` }),
       el('span', { class: 'cmeta', text: `ტოკენი (${data.period_key}): ${fmt.format(c.input_tokens)} შემ. / ${fmt.format(c.output_tokens)} გამ. · ლიმიტის ${pct}%` }),
+      el('span', { class: 'cmeta cost', text: `ხარჯი: ${usd(c.cost_usd)} (სულ ${usd(c.total_cost_usd)})` }),
       el('span', { class: 'bar' }, el('i', { class: pct >= 80 ? 'hot' : '', style: `width:${pct}%` })));
     b.addEventListener('click', () => openClient(c.client_id));
     return el('li', {}, b);
@@ -120,6 +143,12 @@ $('login-form').addEventListener('submit', async (e) => {
 });
 $('logout').addEventListener('click', async () => { await fetch('/api/admin/logout', { method: 'POST', credentials: 'same-origin' }); showLogin(); });
 $('search').addEventListener('input', () => { clearTimeout(searchTimer); searchTimer = setTimeout(loadClients, 250); });
+$('budget-reset').addEventListener('click', async () => {
+  await api('/api/admin/budget/reset', { method: 'POST' });
+  await loadStats();
+  $('budget-reset').textContent = 'განულებულია ✓';
+  setTimeout(() => { $('budget-reset').textContent = 'ბიუჯეტის განულება ამ თვისთვის'; }, 2000);
+});
 $('reset-limit').addEventListener('click', async () => {
   if (!selected) return;
   await api(`/api/admin/clients/${encodeURIComponent(selected)}/reset-limit`, { method: 'POST' });

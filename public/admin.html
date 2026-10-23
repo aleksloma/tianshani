@@ -38,6 +38,23 @@
       </div>
     </header>
 
+    <!-- გლობალური თვიური ბიუჯეტი (FIXES_ROUND2 §3) -->
+    <div id="budget-warn" class="budget-warn" role="alert" hidden></div>
+    <section class="budget-card" id="budget-card" aria-label="ბიუჯეტი">
+      <div class="budget-head">
+        <h2>ბიუჯეტი</h2>
+        <button id="budget-reset" class="btn danger" type="button">ბიუჯეტის განულება ამ თვისთვის</button>
+      </div>
+      <div class="budget-grid">
+        <div><div class="v" id="b-spent">—</div><div class="k">დახარჯულია ამ თვეში</div></div>
+        <div><div class="v" id="b-pct">—</div><div class="k">ბიუჯეტის</div></div>
+        <div><div class="v" id="b-tokens">—</div><div class="k">ტოკენები შემ. / გამ.</div></div>
+        <div><div class="v" id="b-proj">—</div><div class="k">პროგნოზი თვის ბოლოს</div></div>
+      </div>
+      <div class="bar big"><i id="b-bar"></i></div>
+      <p class="muted" id="b-meta"></p>
+    </section>
+
     <section class="stats" id="stats" aria-label="ჯამური სტატისტიკა"></section>
 
     <div class="cols">

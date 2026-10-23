@@ -3,6 +3,7 @@ import crypto from 'node:crypto';
 import express from 'express';
 import { byId } from './characters.js';
 import { periodKey, createRateLimiter } from './limits.js';
+import { globalStatus, globalPeriodKey, costUsd, projectedMonthEnd } from './budget.js';
 
 const COOKIE = 'tianshani_admin';
 const SESSION_MS = 12 * 60 * 60 * 1000; // 12 საათი
@@ -67,7 +68,24 @@ export function adminRouter(cfg, store) {
     const top = db.prepare(`SELECT character_id, COUNT(*) AS n FROM messages WHERE role = 'user'
         GROUP BY character_id ORDER BY n DESC LIMIT 10`).all()
       .map((t) => ({ ...t, name: byId[t.character_id]?.short_name_ka || t.character_id }));
-    res.json({ totals, top_characters: top, period: cfg.limits.period, period_key: key, mock: cfg.gemini.mock });
+    // გლობალური თვიური ბიუჯეტი (FIXES_ROUND2 §3)
+    const g = globalStatus(store, cfg);
+    const proj = projectedMonthEnd(g.spent_usd);
+    res.json({
+      totals, top_characters: top, period: cfg.limits.period, period_key: key, mock: cfg.gemini.mock,
+      budget: {
+        ...g,
+        ...proj,
+        projected_percent: g.budget_usd > 0 ? Math.round((proj.projected_usd / g.budget_usd) * 1000) / 10 : 0,
+        prices: { input_per_1m: cfg.budget.price_input_per_1m_usd, output_per_1m: cfg.budget.price_output_per_1m_usd },
+      },
+    });
+  });
+
+  /** მიმდინარე თვის გლობალური მთვლელის განულება (ბრაუზერების მთვლელები უცვლელი რჩება). */
+  r.post('/budget/reset', (req, res) => {
+    const removed = store.resetGlobal(globalPeriodKey());
+    res.json({ ok: true, removed });
   });
 
   r.get('/clients', (req, res) => {
@@ -92,6 +110,9 @@ export function adminRouter(cfg, store) {
       clients: rows.map((c) => ({
         ...c,
         limit_pct: Math.min(100, Math.round(100 * Math.max(c.input_tokens / li, c.output_tokens / lo))),
+        // ხარჯი USD — იგივე ფორმულით, რაც გლობალურ ბიუჯეტში (მიმდინარე პერიოდი და სულ)
+        cost_usd: Math.round(costUsd(c.input_tokens, c.output_tokens, cfg.budget) * 10000) / 10000,
+        total_cost_usd: Math.round(costUsd(c.total_input_tokens, c.total_output_tokens, cfg.budget) * 10000) / 10000,
       })),
     });
   });

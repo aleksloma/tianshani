@@ -54,9 +54,13 @@ npm start
 | `PORT` | ჰოსტინგი თავად აყენებს | პორტი; როცა `PORT` არსებობს, host ავტომატურად `0.0.0.0`-ა |
 | `HOST` | არა | host-ის ხელით მითითება |
 | `DB_PATH` | რეკომენდებული | SQLite ფაილის გზა persistent disk-ზე, მაგ. `/var/data/tianshani.db` |
+| `GLOBAL_MONTHLY_USD` | არა | გამომცემლობის თვიური ბიუჯეტი დოლარებში (ნაგულისხმევი 50) |
 
 - **Build:** `npm ci` · **Start:** `npm start` · Node ≥ 20 (`package.json → engines`).
 - სხვა პარამეტრები (ლიმიტები, მოდელი, შიდა კალენდარი: `game.start_date`, `game.days_per_season`, `game.days_per_character_switch`, `game.days_per_exchange`) აიღება `settings.example.json`-იდან; შესაცვლელად ჰოსტინგზე შეგიძლიათ `settings.json` ფაილიც შექმნათ, ან `SETTINGS_PATH`-ით სხვა ფაილზე მიუთითოთ.
+- **შიდა დრო:** ყოველი გაცვლა (შეკითხვა + პასუხი) დროს `game.days_per_exchange` დღით (ნაგულისხმევი 20) წაწევს; პერსონაჟის გახსნა დროს არ ცვლის (`game.days_per_character_switch: 0`).
+- **გლობალური ბიუჯეტი (`budget`):** `global_monthly_usd` (ნაგულისხმევი 50), `price_input_per_1m_usd` 0.75, `price_output_per_1m_usd` 3.75, `warn_at_percent` 80. ყოველი მოთხოვნის წინ სერვერი ითვლის ამ თვის ხარჯს (UTC თვე) + მოსალოდნელ ხარჯს; თუ ბიუჯეტს გადააჭარბებს — ყველა ბრაუზერს 429 და მოდალი „ბიუჯეტში გარღვევა გვაქვს“. ადმინში — ბიუჯეტის ბარათი და „ბიუჯეტის განულება ამ თვისთვის“. **2027-01-01-დან Gemini-ს ფასი ორმაგდება** (1.50 / 7.50) — მაშინ ფასები `settings.json`-ში განაახლეთ. `0` ან უარყოფითი ბიუჯეტი ლიმიტს თიშავს (კონსოლში გაფრთხილებით).
+- **კედლის ფონი ეტაპების მიხედვით:** `wall.background_by_stage` — 5 ელემენტი (ბზარის ეტაპები 0–4), თითო სურათის გზა `public/`-დან ან `null` (= წინა ეტაპის ფონი რჩება). ახალ ეტაპზე ფონი 1.5 წამში ნელა იცვლება. ახალი ფოტოს დასამატებლად ჩადეთ ფაილი `public/assets/`-ში და ჩაწერეთ გზა შესაბამის პოზიციაზე.
 - **SQLite და ეფემერული დისკი:** Render/Railway/Fly-ის სტანდარტულ ინსტანსებზე ფაილური სისტემა ყოველ deploy-ზე/გადატვირთვაზე იშლება — `data/tianshani.db` (ლოგები, ტოკენების აღრიცხვა, ადმინის სესიები) დაიკარგება. ამიტომ მიაბით persistent disk/volume და `DB_PATH` მასზე მიუთითეთ (Render: Disk → `/var/data`, Railway: Volume, Fly: `fly volumes create` + mount).
 - მაგალითი (Render Web Service): Runtime Node, Build `npm ci`, Start `npm start`, Environment: `GEMINI_API_KEY`, `ADMIN_PASSWORD`, `DB_PATH=/var/data/tianshani.db`, Disk mount path `/var/data`.
 - `better-sqlite3` Linux-ზე prebuilt binary-ს იყენებს; build tools საჭირო არ არის.

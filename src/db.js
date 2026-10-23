@@ -31,6 +31,14 @@ CREATE TABLE IF NOT EXISTS messages (
   created_at    TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_messages_client ON messages(client_id, character_id, id);
+CREATE TABLE IF NOT EXISTS global_usage (
+  period_key    TEXT PRIMARY KEY,
+  input_tokens  INTEGER NOT NULL DEFAULT 0,
+  output_tokens INTEGER NOT NULL DEFAULT 0,
+  cost_usd      REAL NOT NULL DEFAULT 0,
+  requests      INTEGER NOT NULL DEFAULT 0,
+  updated_at    TEXT NOT NULL
+);
 CREATE TABLE IF NOT EXISTS usage (
   client_id     TEXT NOT NULL,
   period_key    TEXT NOT NULL,
@@ -74,6 +82,14 @@ export function openDb(dbPath) {
       ON CONFLICT(client_id, period_key) DO UPDATE SET
         input_tokens = input_tokens + @input, output_tokens = output_tokens + @output, requests = requests + 1, last_seen = @now`),
     resetUsage: db.prepare('DELETE FROM usage WHERE client_id = ? AND period_key = ?'),
+    getGlobal: db.prepare('SELECT * FROM global_usage WHERE period_key = ?'),
+    addGlobal: db.prepare(`
+      INSERT INTO global_usage (period_key, input_tokens, output_tokens, cost_usd, requests, updated_at)
+      VALUES (@period_key, @input, @output, @cost, 1, @now)
+      ON CONFLICT(period_key) DO UPDATE SET
+        input_tokens = input_tokens + @input, output_tokens = output_tokens + @output, cost_usd = cost_usd + @cost,
+        requests = requests + 1, updated_at = @now`),
+    resetGlobal: db.prepare('DELETE FROM global_usage WHERE period_key = ?'),
   };
 
   return {
@@ -91,6 +107,14 @@ export function openDb(dbPath) {
       stmts.addUsage.run({ client_id: clientId, period_key: periodKey, input, output, now: now() });
     },
     resetUsage(clientId, periodKey) { return stmts.resetUsage.run(clientId, periodKey).changes; },
+    // გლობალური თვიური ხარჯი (ყველა ბრაუზერი ერთად)
+    getGlobal(periodKey) {
+      return stmts.getGlobal.get(periodKey) || { period_key: periodKey, input_tokens: 0, output_tokens: 0, cost_usd: 0, requests: 0 };
+    },
+    addGlobal(periodKey, input, output, cost) {
+      stmts.addGlobal.run({ period_key: periodKey, input, output, cost, now: now() });
+    },
+    resetGlobal(periodKey) { return stmts.resetGlobal.run(periodKey).changes; },
     close() { db.close(); },
   };
 }

@@ -81,6 +81,27 @@ button:focus-visible, .btn:focus-visible, input:focus-visible { outline: 2px sol
 .stat-card.top { grid-column: span 2; }
 .stat-card.top ol { margin: 4px 0 0; padding-left: 20px; font-size: 13px; columns: 2; }
 
+/* გლობალური ბიუჯეტი */
+.budget-warn {
+  margin: -14px 0 16px;
+  padding: 10px 14px;
+  background: #f5d76e;
+  border: 2px solid #b8941f;
+  color: #3a2c05;
+  font-weight: 600;
+  border-radius: 2px;
+}
+.budget-warn.hot { background: #f2b8ad; border-color: var(--red); color: #4a120b; }
+.budget-card { background: var(--paper); padding: 14px 16px 10px; margin-bottom: 30px; border-left: 4px solid #8a6b3a; box-shadow: 0 3px 8px rgba(0, 0, 0, 0.18); }
+.budget-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 8px; }
+.budget-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 10px; }
+.budget-grid .v { font-size: 20px; font-weight: 700; font-family: var(--font-title); }
+.budget-grid .k { font-size: 12px; color: var(--ink-soft); }
+.bar.big { height: 8px; margin: 10px 0 4px; }
+.bar i.warn { background: #d4a72c; }
+.btn.danger { background: #8a2a1e; }
+.cmeta.cost { color: #6b4a14; }
+
 .cols { display: grid; grid-template-columns: minmax(260px, 360px) 1fr; gap: 20px; align-items: start; }
 @media (max-width: 860px) { .cols { grid-template-columns: 1fr; } .stat-card.top { grid-column: auto; } }
 

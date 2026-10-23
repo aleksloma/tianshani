@@ -38,8 +38,10 @@ test('/admin: არასწორი პაროლი → შეცდომ
   await expect(page.locator('#conversation .cmsg')).toHaveCount(2);
   await expect(page.locator('#conversation .cmsg.assistant s.struck')).toHaveText('კოპალეიშვილი');
   await expect(page.locator('#conversation .cmsg.user .text')).toHaveText('კოპალეიშვილი სად არის?');
-  // Round 1 §4: მეორე პერსონაჟის გახსნა (45+45 დღე, e2e კონფიგი) → ზამთარი; სერვერი სეზონს დღიდან ითვლის
-  await expect(page.locator('#conversation .badge').first()).toContainText('ზამთარი · შენობა №1');
+  // Round 2 §5: მეორე შეტყობინება დღე 20-ზე გაიგზავნა (ერთი გაცვლა = +20 დღე) → შემოდგომა; სერვერი სეზონს დღიდან ითვლის
+  await expect(page.locator('#conversation .badge').first()).toContainText('შემოდგომა · შენობა №1');
+  // Round 2 §3: კლიენტის ხარჯი USD-ში
+  await expect(item.locator('.cmeta.cost')).toContainText('$');
   await page.screenshot({ path: `${SHOTS}/10-admin.png`, fullPage: true });
 
   // ძებნა

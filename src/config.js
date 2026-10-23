@@ -67,6 +67,15 @@ export function loadConfig(overrides = {}) {
   if (env.ADMIN_PASSWORD) cfg.admin.password = env.ADMIN_PASSWORD;
   if (env.DB_PATH) cfg.logging.db_path = env.DB_PATH;
   if (env.GEMINI_MOCK === '1' || env.GEMINI_MOCK === 'true') cfg.gemini.mock = true;
+  // --- ბიუჯეტი (FIXES_ROUND2 §3): env, რიცხვები, დეფოლტები ---
+  cfg.budget = cfg.budget || {};
+  if (env.GLOBAL_MONTHLY_USD !== undefined && env.GLOBAL_MONTHLY_USD !== '') cfg.budget.global_monthly_usd = Number(env.GLOBAL_MONTHLY_USD);
+  const num = (v, d) => (Number.isFinite(Number(v)) ? Number(v) : d);
+  cfg.budget.global_monthly_usd = num(cfg.budget.global_monthly_usd, 50);
+  cfg.budget.price_input_per_1m_usd = num(cfg.budget.price_input_per_1m_usd, 0.75);
+  cfg.budget.price_output_per_1m_usd = num(cfg.budget.price_output_per_1m_usd, 3.75);
+  cfg.budget.warn_at_percent = num(cfg.budget.warn_at_percent, 80);
+  if (cfg.budget.global_monthly_usd <= 0) warnings.push('budget.global_monthly_usd ≤ 0 — გლობალური ბიუჯეტი გამორთულია (ხარჯი მაინც ითვლება).');
 
   // --- ვალიდაცია ---
   const hasKey = typeof cfg.gemini.api_key === 'string' && !PLACEHOLDER_KEYS.has(cfg.gemini.api_key.trim());
