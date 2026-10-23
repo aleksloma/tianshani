@@ -193,6 +193,7 @@ export function createWall({ characters, wallCfg, onOpen, painting = { fallen: f
     });
     wallEl.style.height = `${layout.height}px`;
     for (const f of layout.frames) {
+      // ჩარჩოს მხოლოდ განლაგების left/top/size/--rot ეწერება; ცენტრში ყოფნის კვალი (lifted) აქ არ იცვლება
       if (f.id === PAINTING.id) {
         for (const el of [pn.btn, pn.ghost]) {
           Object.assign(el.style, { left: `${f.x}px`, top: `${f.y}px`, width: `${f.w}px`, height: `${f.h}px` });

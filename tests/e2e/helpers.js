@@ -54,20 +54,63 @@ export function expectNoOverlaps({ frames, zones }, gap) {
   }
 }
 
+/** გახსნამ შეიძლება დრო გადაწიოს (Round 1 §4) → ინტერტიტრის დასრულებას ველოდებით. */
+export async function waitIntertitle(page) {
+  await page.waitForTimeout(80);
+  await expect(page.locator('#intertitle')).toBeHidden({ timeout: 15_000 });
+}
+
 /** ჩატის გახსნა კედლის ჩარჩოზე დაჭერით. */
 export async function openFrame(page, id) {
   await page.locator(`#frames .frame[data-id="${id}"]`).click();
   await expect(page.locator('#chat')).toBeVisible();
   await expect(page.locator('.frame.portrait')).toHaveCount(1);
   await page.waitForTimeout(500);
+  await waitIntertitle(page);
 }
 
-/** ჩატის გახსნა „ესაუბრე სხვას“ მენიუდან. */
+/** ჩატის გახსნა „ესაუბრე სხვას“ მენიუდან (კედლის კუთხის ღილაკი, ან ჩატის ქვედა ზოლი, თუ ჩატი ღიაა). */
 export async function openFromMenu(page, id) {
-  await page.locator('#others-btn').click();
+  // ჩატი „ღიაა“ მხოლოდ მაშინ, როცა .shown აქვს (დახურვის ანიმაციის დროს #chat ჯერ კიდევ ჩანს, მაგრამ უკვე იხურება)
+  const inChat = (await page.locator('#chat.shown').count()) > 0;
+  if (!inChat) await expect(page.locator('#chat')).toBeHidden();
+  await page.locator(inChat ? '#chat-others' : '#others-btn').click();
   await page.locator(`#others-menu .menu-item[data-id="${id}"]`).click();
   await expect(page.locator('#chat')).toBeVisible();
+  await expect(page.locator(`.frame.portrait[data-id="${id}"]`)).toHaveCount(1, { timeout: 5000 });
   await page.waitForTimeout(500);
+  await waitIntertitle(page);
+}
+
+/** ჩარჩოს მართკუთხედი + კუთხე + რა სტილი აქვს „ზედმეტად“ (ცენტრში ყოფნის კვალი). */
+export async function frameState(page, id) {
+  return page.locator(`#frames .frame[data-id="${id}"]`).evaluate((el) => {
+    const b = el.getBoundingClientRect();
+    const m = new DOMMatrix(getComputedStyle(el).transform);
+    return {
+      x: b.left + scrollX, y: b.top + scrollY, w: b.width, h: b.height,
+      angle: (Math.atan2(m.b, m.a) * 180) / Math.PI,
+      lifted: el.classList.contains('lifted'),
+      visible: getComputedStyle(el).visibility === 'visible',
+      inlineTransform: el.style.transform,
+      inlineTransition: el.style.transition,
+      inlineOpacity: el.style.opacity,
+    };
+  });
+}
+
+/** ორი მდგომარეობა ერთნაირია (±2px, კუთხე ±0.05°). */
+export function expectSameSpot(a, b) {
+  for (const k of ['x', 'y', 'w', 'h']) expect(Math.abs(a[k] - b[k]), k).toBeLessThanOrEqual(2);
+  expect(Math.abs(a.angle - b.angle)).toBeLessThanOrEqual(0.05);
+}
+
+/** სეზონის ხის მდგომარეობა და tooltip-ის ტექსტი. */
+export async function treeState(page) {
+  return page.evaluate(() => {
+    const t = document.getElementById('season-tree');
+    return { season: t.dataset.season, progress: Number(t.dataset.progress), tip: document.getElementById('season-tip').textContent };
+  });
 }
 
 /** შეტყობინების გაგზავნა და პასუხის დასრულებამდე ლოდინი (ინტერტიტრის ჩათვლით). */

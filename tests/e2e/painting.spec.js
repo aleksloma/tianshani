@@ -20,52 +20,52 @@ test('კედლის ფოტო არის ფონი; ნახატ
   await expect(page.locator('.painting-ghost')).toBeHidden();
 });
 
-test('დაჭერა → ნახატი ვარდება და ქრება; ადგილზე ლაქა რჩება; გადატვირთვის შემდეგაც; პერსონაჟებმა იციან', async ({ page }) => {
+test('დაჭერა → ნახატი ვარდება და ქრება; ადგილზე ლაქა რჩება; პერსონაჟებმა იციან; გადატვირთვაზე (Round 1 §1) ისევ ეკიდება', async ({ page }) => {
   await openWall(page);
   await page.locator('#painting').click();
   await expect(page.locator('#painting')).toHaveClass(/dropping/);
   await page.screenshot({ path: `${SHOTS}/11-painting-falling.png` });
   await expect(page.locator('#painting')).toBeHidden({ timeout: 5000 });
   await expect(page.locator('.painting-ghost')).toBeVisible();
-  expect((await storage(page, 'tianshani.game')).paintingFallen).toBe(true);
   await settle(page);
   await page.screenshot({ path: `${SHOTS}/12-painting-fallen.png` });
-  // ჩარჩოები ადგილზე დარჩნენ (არაფერი „გადახტა“)
   const before = (await frameRects(page)).frames.map((f) => [f.id, Math.round(f.x), Math.round(f.y)]);
 
-  await page.reload();
-  await page.waitForFunction(() => window.tianshani?.ready === true);
-  await settle(page);
-  await expect(page.locator('#painting')).toBeHidden();
-  await expect(page.locator('.painting-ghost')).toBeVisible();
-  const after = (await frameRects(page)).frames.map((f) => [f.id, Math.round(f.x), Math.round(f.y)]);
-  expect(after).toEqual(before);
-
-  // სერვერს ეგზავნება paintingFallen
+  // ამ სესიაში სერვერს ეგზავნება paintingFallen
   const req = page.waitForRequest((r) => r.url().endsWith('/api/chat'));
   await openFrame(page, 'vaso');
   await page.locator('#chat-input').fill('სურათი სად არის?');
   await page.locator('#chat-input').press('Enter');
   expect((await req).postDataJSON().gameState.paintingFallen).toBe(true);
+  await expect(page.locator('#chat-send')).toBeEnabled({ timeout: 15_000 });
+
+  // localStorage-ში ჩამოვარდნა არ ინახება → გადატვირთვაზე სურათი ისევ ეკიდება, ჩარჩოები იმავე ადგილას
+  expect(await storage(page, 'tianshani.game')).not.toHaveProperty('paintingFallen');
+  await page.reload();
+  await page.waitForFunction(() => window.tianshani?.ready === true);
+  await settle(page);
+  await expect(page.locator('#painting')).toBeVisible();
+  await expect(page.locator('.painting-ghost')).toBeHidden();
+  const after = (await frameRects(page)).frames.map((f) => [f.id, Math.round(f.x), Math.round(f.y)]);
+  expect(after).toEqual(before);
 });
 
 test('ჩამონგრევის შემდეგ ახალ შენობაში ნახატი ისევ ეკიდება', async ({ page }) => {
   await page.addInitScript(() => {
     if (!sessionStorage.getItem('seeded')) {
-      localStorage.setItem('tianshani.game', JSON.stringify({ cycle: 1, season: 'summer', exchanges: 1, crackStage: 3, lostCopies: 3, paintingFallen: true, visited: [] }));
+      localStorage.setItem('tianshani.game', JSON.stringify({ cycle: 1, day: 340, exchanges: 0, lastCharacterId: 'vaso', visited: [] }));
       sessionStorage.setItem('seeded', '1');
     }
   });
   await openWall(page);
-  await expect(page.locator('#painting')).toBeHidden();
-  await openFrame(page, 'tina');
-  await page.locator('#chat-input').fill('რა ხდება?');
-  await page.locator('#chat-input').press('Enter');
+  await page.locator('#painting').click();
+  await expect(page.locator('#painting')).toBeHidden({ timeout: 5000 });
+  await page.locator('#frames .frame[data-id="tina"]').click(); // 340 + 45 → ჩამონგრევა
   await expect(page.locator('#intertitle p')).toHaveText('შენობა ჩამოინგრა. ახალი შენობა. ყველაფერი თავიდან.', { timeout: 15_000 });
   await expect(page.locator('#intertitle')).toBeHidden({ timeout: 10_000 });
   await expect(page.locator('#painting')).toBeVisible();
   await expect(page.locator('.painting-ghost')).toBeHidden();
-  expect((await storage(page, 'tianshani.game')).paintingFallen).toBe(false);
+  expect(await page.evaluate(() => window.tianshani.game.paintingFallen)).toBe(false);
   await settle(page);
   expectNoOverlaps(await frameRects(page), 20);
 });

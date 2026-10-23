@@ -1,10 +1,15 @@
-// ჩატის პანელი: ჩარჩო ცენტრში (FLIP), სტრიმინგი (SSE fetch-ით), უხილავთა „~~გივი~~ სოსო“, გადამისამართების ღილაკი.
+// ჩატის პანელი: ჩარჩო ცენტრში და უკან (FLIP), სტრიმინგი (SSE fetch-ით), სცენური რემარკები,
+// უხილავთა წარმომადგენლები („~~გივი~~ სოსო“ + თამბნეილი + „პასუხობს: სოსო“), გადამისამართების ღილაკი.
 import { getChat, saveChat, clearChat } from './storage.js';
+import { renderSegments } from './stage.js';
 
 const TYPING = ['…ფიქრობს', '…ტელეფონზეა', '…საუზმობს', '…რეზოლუციას წერს', '…ბზარს უყურებს', '…ყურმილს იღებს'];
 const TYPING_ABSENT = ['…კარს აკაკუნებენ', '…ვიღაც მოდის დერეფანში', '…ხაზი დაკავებულია', '…დაელოდეთ'];
 export const MSG_API_ERROR = 'ხაზი დაკავებულია. ცოტა ხანში სცადეთ.';
 const ANIM_MS = 420;
+const EASE_IN = 'cubic-bezier(.2,.8,.2,1)';
+const EASE_OUT = 'cubic-bezier(.5,0,.3,1)';
+const SILHOUETTE = 'assets/silhouette.svg';
 
 /** „-სთან“: თინა → თინასთან, ოთარი → ოთართან. */
 export function withName(c) {
@@ -13,51 +18,107 @@ export function withName(c) {
   return n.endsWith('ი') ? `${n.slice(0, -1)}თან` : `${n}სთან`;
 }
 
+/** წარმომადგენლის აქცენტის ფერი (id-დან, სტაბილური). */
+export function accentFor(id) {
+  let h = 0;
+  for (const ch of String(id)) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
+  return `hsl(${h % 360} 42% 34%)`;
+}
+
 const rand = (arr) => arr[Math.floor(Math.random() * arr.length)];
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-export function createChat({ byId, api, getConfig, getGameState, onExchange, onTokens, wall, menu, buildFrame }) {
+export function createChat({ byId, api, getConfig, getGameState, onExchange, onOpened, onTokens, wall, menu, buildFrame }) {
   const panel = document.getElementById('chat');
   const backdrop = document.getElementById('chat-backdrop');
   const log = document.getElementById('chat-log');
   const nameEl = document.getElementById('chat-name');
   const roleEl = document.getElementById('chat-role');
+  const subEl = document.getElementById('chat-sub');
   const form = document.getElementById('chat-form');
   const input = document.getElementById('chat-input');
   const sendBtn = document.getElementById('chat-send');
 
-  let current = null;     // { id, portrait, source, sourceTransform }
+  let current = null;     // { id, portrait, source } — მხოლოდ მეხსიერებაში, არასდროს ინახება
   let session = 0;        // ღია ჩატის „ვერსია“ — სტრიმი ძველ ჩატს DOM-ში აღარ წერს
   const busy = new Set(); // პერსონაჟები, ვისთანაც პასუხი მიდის
 
-  // ---------- სათაური და ბუშტები ----------
+  // ---------- წარმომადგენელი ----------
 
-  /** სახელის ელემენტი: უხილავისთვის გადახაზული სახელი + რეალური ავტორი. */
-  function whoNode(targetId, spokenBy) {
+  /** ვინ პასუხობს ახლა უხილავის ნაცვლად: ბოლო მოპასუხე, ან სიის პირველი (სანამ პირველი პასუხი მოვა). */
+  function currentProxy(id) {
+    const c = byId[id];
+    if (!c || c.reachable) return null;
+    return lastSpokenBy(id) || c.proxies?.[0] || null;
+  }
+
+  function lastSpokenBy(id) {
+    const msgs = getChat(id);
+    for (let i = msgs.length - 1; i >= 0; i--) if (msgs[i].spoken_by) return msgs[i].spoken_by;
+    return null;
+  }
+
+  function thumb(proxyId, size = 24) {
+    const p = byId[proxyId];
+    const img = document.createElement('img');
+    img.className = 'thumb';
+    img.alt = '';
+    img.width = size;
+    img.height = size;
+    img.src = p?.image || SILHOUETTE;
+    return img;
+  }
+
+  /** სახელის ელემენტი: ხილულისთვის სახელი; უხილავისთვის [თამბნეილი] ~~უხილავი~~ **წარმომადგენელი**. */
+  function whoNode(targetId, spokenBy, { header = false } = {}) {
     const target = byId[targetId];
     const span = document.createElement('span');
     span.className = 'who';
-    if (!target.reachable) {
-      const s = document.createElement('s');
-      s.className = 'struck';
-      s.textContent = target.short_name_ka;
-      span.append(s, ' ');
-      const real = document.createElement('span');
-      real.className = 'real';
-      real.textContent = spokenBy && byId[spokenBy] ? byId[spokenBy].short_name_ka : '…';
-      span.append(real);
-    } else {
+    if (target.reachable) {
       span.textContent = target.short_name_ka;
+      return span;
     }
+    const proxyId = spokenBy && byId[spokenBy] ? spokenBy : null;
+    span.classList.add('proxied');
+    if (!header && proxyId) span.append(thumb(proxyId));
+    const s = document.createElement('s');
+    s.className = 'struck';
+    s.textContent = target.short_name_ka;
+    span.append(s, ' ');
+    const real = document.createElement('b');
+    real.className = 'real';
+    real.textContent = proxyId ? byId[proxyId].short_name_ka : '…';
+    if (proxyId) real.style.setProperty('--accent', accentFor(proxyId));
+    span.append(real);
     return span;
   }
 
-  function setHeader(id, spokenBy) {
+  /** სათაური + ქვესათაური + პორტრეტის „პასუხობს: X“ ბეჯი. */
+  function setSpeaker(id, spokenBy) {
     const c = byId[id];
-    nameEl.replaceChildren(whoNode(id, spokenBy));
+    nameEl.replaceChildren(whoNode(id, spokenBy, { header: true }));
     roleEl.textContent = c.role_ka;
     panel.classList.toggle('absent', !c.reachable);
+    const proxy = !c.reachable && spokenBy && byId[spokenBy] ? byId[spokenBy] : null;
+    subEl.hidden = !proxy;
+    subEl.textContent = proxy ? `${c.short_name_ka} ადგილზე არ არის — ${proxy.short_name_ka} პასუხობს მის ნაცვლად` : '';
+    if (current?.id === id) setBadge(current.portrait, proxy);
   }
+
+  function setBadge(portrait, proxy) {
+    portrait.querySelector('.proxy-badge')?.remove();
+    if (!proxy) return;
+    const b = document.createElement('div');
+    b.className = 'proxy-badge';
+    b.style.setProperty('--accent', accentFor(proxy.id));
+    const cap = document.createElement('span');
+    cap.className = 'cap';
+    cap.textContent = `პასუხობს: ${proxy.short_name_ka}`;
+    b.append(thumb(proxy.id, 56), cap);
+    portrait.append(b);
+  }
+
+  // ---------- ბუშტები ----------
 
   function redirectButton(targetId) {
     const t = byId[targetId];
@@ -71,14 +132,25 @@ export function createChat({ byId, api, getConfig, getGameState, onExchange, onT
     return b;
   }
 
+  function bubbleNode(text) {
+    const bubble = document.createElement('div');
+    bubble.className = 'bubble';
+    renderSegments(bubble, text);
+    return bubble;
+  }
+
   function messageNode(id, m) {
     const row = document.createElement('div');
     row.className = `msg ${m.role === 'user' ? 'user' : 'char'}`;
     if (m.role !== 'user') row.append(whoNode(id, m.spoken_by));
-    const bubble = document.createElement('div');
-    bubble.className = 'bubble';
-    bubble.textContent = m.content;
-    row.append(bubble);
+    if (m.role === 'user') {
+      const bubble = document.createElement('div');
+      bubble.className = 'bubble';
+      bubble.textContent = m.content; // მომხმარებლის ტექსტი არ იპარსება
+      row.append(bubble);
+    } else {
+      row.append(bubbleNode(m.content));
+    }
     if (m.redirect) { const b = redirectButton(m.redirect); if (b) row.append(b); }
     return row;
   }
@@ -136,14 +208,15 @@ export function createChat({ byId, api, getConfig, getGameState, onExchange, onT
     };
   }
 
-  /** ჩარჩოს ხილული (მობრუნებამდელი) მართკუთხედი viewport-ში. */
-  function sourceRect(node) {
+  /** ჩარჩოს „სახლი“: განლაგების მართკუთხედი viewport-ში (მობრუნებამდე) + კუთხე. ყოველ ჯერზე თავიდან ითვლება. */
+  function homeRect(node) {
     const wallRect = document.getElementById('wall').getBoundingClientRect();
     const f = wall.layout?.frames.find((x) => x.id === node.dataset.id);
     if (!f) return null;
     return { x: wallRect.left + f.x, y: wallRect.top + f.y, w: f.w, h: f.h, rot: f.rotation };
   }
 
+  /** transform, რომელიც ცენტრალურ პორტრეტს (to) კედლის ჩარჩოს ადგილას (from) აყენებს. */
   function flipTransform(from, to) {
     const dx = from.x + from.w / 2 - (to.x + to.w / 2);
     const dy = from.y + from.h / 2 - (to.y + to.h / 2);
@@ -161,6 +234,12 @@ export function createChat({ byId, api, getConfig, getGameState, onExchange, onT
     Object.assign(portrait.style, { left: `${t.x}px`, top: `${t.y}px`, width: `${t.w}px`, height: `${t.h}px` });
   }
 
+  /** სად „მიფრინდეს“ პორტრეტი: კედლის ჩარჩოსთან (თუ არის), თორემ ქვემოთ, პატარავდება. */
+  function awayTransform(source, portraitRect) {
+    const home = source ? homeRect(source) : null;
+    return home ? flipTransform(home, portraitRect) : 'translate(0, 40px) scale(0.6) rotate(-4deg)';
+  }
+
   async function open(id, sourceNode = null) {
     const c = byId[id];
     if (!c) return;
@@ -173,7 +252,7 @@ export function createChat({ byId, api, getConfig, getGameState, onExchange, onT
     const fromWall = sourceNode && sourceNode.classList.contains('frame') ? sourceNode : wall.frameNode(id);
     const portrait = fromWall ? fromWall.cloneNode(true) : buildFrame(c);
     portrait.classList.add('portrait');
-    portrait.classList.remove('tilted');
+    portrait.classList.remove('tilted', 'lifted');
     portrait.removeAttribute('aria-label');
     portrait.tabIndex = -1;
     portrait.dataset.id = id;
@@ -186,19 +265,16 @@ export function createChat({ byId, api, getConfig, getGameState, onExchange, onT
     placePortrait(portrait, rects);
     document.body.append(portrait);
 
-    const src = fromWall ? sourceRect(fromWall) : null;
-    const startTransform = src
-      ? flipTransform(src, { ...rects.portrait })
-      : 'translate(0, 40px) scale(0.6) rotate(-4deg)';
+    const startTransform = awayTransform(fromWall, rects.portrait);
     portrait.style.transition = 'none';
     portrait.style.transform = startTransform;
-    if (!src) portrait.style.opacity = '0';
-    if (fromWall) fromWall.classList.add('lifted');
-    current = { id, portrait, source: fromWall, startTransform };
+    if (!fromWall) portrait.style.opacity = '0';
+    if (fromWall) fromWall.classList.add('lifted'); // ერთადერთი, რაც კედლის ჩარჩოს ემატება — დახურვისას იხსნება
+    current = { id, portrait, source: fromWall };
 
     document.body.classList.add('chat-open');
     backdrop.hidden = false;
-    setHeader(id, lastSpokenBy(id));
+    setSpeaker(id, currentProxy(id));
     renderLog(id);
     placePanel(rects);
     panel.hidden = false;
@@ -206,27 +282,34 @@ export function createChat({ byId, api, getConfig, getGameState, onExchange, onT
     // FLIP: შემდეგ კადრში საბოლოო მდგომარეობა
     void portrait.getBoundingClientRect();
     requestAnimationFrame(() => {
-      portrait.style.transition = `transform ${ANIM_MS}ms cubic-bezier(.2,.8,.2,1), opacity ${ANIM_MS}ms`;
+      portrait.style.transition = `transform ${ANIM_MS}ms ${EASE_IN}, opacity ${ANIM_MS}ms`;
       portrait.style.transform = 'rotate(-1.5deg)';
       portrait.style.opacity = '1';
       panel.classList.add('shown');
     });
     input.value = '';
     updateBusy();
-    setTimeout(() => input.focus({ preventScroll: true }), ANIM_MS);
+    setTimeout(() => { if (current?.id === id) input.focus({ preventScroll: true }); }, ANIM_MS);
+
+    // დრო მიდის: სხვა პერსონაჟთან გადასვლა = დღეები; შეიძლება სეზონი შეიცვალოს ან შენობა ჩამოინგრეს
+    if (onOpened) await onOpened(id);
   }
 
+  /** დახურვა: პორტრეტი უკან, ზუსტად კედლის ჩარჩოს ადგილას (იგივე ხანგრძლივობა), მერე ჩარჩო ისევ ჩანს. */
   async function close({ instant = false } = {}) {
     if (!current) return;
-    const { portrait, source, startTransform } = current;
+    const { portrait, source } = current;
     current = null;
     session += 1;
     menu.close();
     panel.classList.remove('shown');
     document.body.classList.remove('chat-open');
     if (!instant) {
-      portrait.style.transition = `transform ${ANIM_MS}ms cubic-bezier(.5,0,.3,1), opacity ${ANIM_MS}ms`;
-      portrait.style.transform = startTransform;
+      const rect = portrait.getBoundingClientRect();
+      // სახლი დახურვისას თავიდან ითვლება — თუ ფანჯარა შეიცვალა, პორტრეტი ახალ ადგილას ბრუნდება
+      const base = { x: parseFloat(portrait.style.left), y: parseFloat(portrait.style.top), w: parseFloat(portrait.style.width) || rect.width, h: parseFloat(portrait.style.height) || rect.height };
+      portrait.style.transition = `transform ${ANIM_MS}ms ${EASE_OUT}, opacity ${ANIM_MS}ms`;
+      portrait.style.transform = awayTransform(source, base);
       if (!source) portrait.style.opacity = '0';
       await sleep(ANIM_MS);
     }
@@ -234,19 +317,15 @@ export function createChat({ byId, api, getConfig, getGameState, onExchange, onT
     source?.classList.remove('lifted');
     panel.hidden = true;
     backdrop.hidden = true;
+    subEl.hidden = true;
   }
 
+  /** სხვა პერსონაჟი: ჯერ მიმდინარე ბრუნდება კედელზე, მერე ახალი მოდის ცენტრში. */
   async function switchTo(id) {
     await close();
     const node = wall.frameNode(id);
     if (node) node.scrollIntoView({ block: 'nearest', behavior: 'instant' });
     await open(id, node);
-  }
-
-  function lastSpokenBy(id) {
-    const msgs = getChat(id);
-    for (let i = msgs.length - 1; i >= 0; i--) if (msgs[i].spoken_by) return msgs[i].spoken_by;
-    return null;
   }
 
   function updateBusy() {
@@ -279,7 +358,7 @@ export function createChat({ byId, api, getConfig, getGameState, onExchange, onT
     // „წერს…“ ინდიკატორი
     const row = document.createElement('div');
     row.className = 'msg char streaming';
-    const who = whoNode(id, null);
+    const who = whoNode(id, currentProxy(id));
     const typing = document.createElement('div');
     typing.className = 'typing';
     typing.textContent = c.reachable ? `${c.short_name_ka} ${rand(TYPING)}` : rand(TYPING_ABSENT);
@@ -291,8 +370,11 @@ export function createChat({ byId, api, getConfig, getGameState, onExchange, onT
     const payload = {
       characterId: id,
       messages: msgs.slice(-cfg.chat.history_window).map(({ role, content }) => ({ role, content })),
-      gameState: { season: gs.season, crackStage: gs.crackStage, lostCopies: gs.lostCopies, cycle: gs.cycle, paintingFallen: Boolean(gs.paintingFallen) },
-      lastSpokenBy: lastSpokenBy(id),
+      gameState: {
+        day: gs.day, season: gs.season, crackStage: gs.crackStage, lostCopies: gs.lostCopies, cycle: gs.cycle,
+        paintingFallen: Boolean(gs.paintingFallen),
+      },
+      lastSpokenBy: currentProxy(id),
     };
 
     let reply = '';
@@ -327,7 +409,7 @@ export function createChat({ byId, api, getConfig, getGameState, onExchange, onT
               bubble.className = 'bubble';
               typing.replaceWith(bubble);
             }
-            bubble.textContent = reply;
+            renderSegments(bubble, reply); // სტრიმინგზეც: გაუხსნელი * → რემარკა ბოლომდე, ვარსკვლავი არ ციმციმებს
             if (live()) scrollDown();
           }
           if (ev.error) error = ev.error;
@@ -355,7 +437,7 @@ export function createChat({ byId, api, getConfig, getGameState, onExchange, onT
     row.classList.remove('streaming');
     row.querySelector('.who').replaceWith(whoNode(id, done.spoken_by));
     if (m.redirect) { const b = redirectButton(m.redirect); if (b) row.append(b); }
-    if (live()) { setHeader(id, done.spoken_by); scrollDown(); }
+    if (live()) { setSpeaker(id, done.spoken_by); scrollDown(); }
     if (done.remaining) onTokens(done.remaining);
     busy.delete(id);
     updateBusy();
@@ -380,7 +462,7 @@ export function createChat({ byId, api, getConfig, getGameState, onExchange, onT
     if (!current) return;
     clearChat(current.id);
     renderLog(current.id);
-    setHeader(current.id, null);
+    setSpeaker(current.id, currentProxy(current.id));
   });
   document.getElementById('chat-others').addEventListener('click', (e) => {
     menu.toggle(e.currentTarget, { variant: 'chat', exclude: current?.id });
@@ -388,6 +470,7 @@ export function createChat({ byId, api, getConfig, getGameState, onExchange, onT
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape' && current && !menu.isOpen()) close();
   });
+  // ფანჯრის ზომის ცვლილებაზე პორტრეტი ცენტრში რჩება; სახლი დახურვისას თავიდან ითვლება
   window.addEventListener('resize', () => {
     if (!current) return;
     const r = targetRects();

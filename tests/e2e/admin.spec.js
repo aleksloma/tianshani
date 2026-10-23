@@ -38,7 +38,8 @@ test('/admin: არასწორი პაროლი → შეცდომ
   await expect(page.locator('#conversation .cmsg')).toHaveCount(2);
   await expect(page.locator('#conversation .cmsg.assistant s.struck')).toHaveText('კოპალეიშვილი');
   await expect(page.locator('#conversation .cmsg.user .text')).toHaveText('კოპალეიშვილი სად არის?');
-  await expect(page.locator('#conversation .badge').first()).toContainText('შემოდგომა · შენობა №1');
+  // Round 1 §4: მეორე პერსონაჟის გახსნა (45+45 დღე, e2e კონფიგი) → ზამთარი; სერვერი სეზონს დღიდან ითვლის
+  await expect(page.locator('#conversation .badge').first()).toContainText('ზამთარი · შენობა №1');
   await page.screenshot({ path: `${SHOTS}/10-admin.png`, fullPage: true });
 
   // ძებნა
