@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="ka">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>საქმე — ადმინი</title>
+  <meta name="robots" content="noindex, nofollow">
+  <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Georgian:wght@400;500;700&family=Noto+Serif+Georgian:wdth,wght@62.5..100,400..900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/admin.css">
+</head>
+<body>
+  <!-- შესვლა -->
+  <section id="login" class="folder login" hidden>
+    <div class="folder-tab">საქმე №1983</div>
+    <h1>დაბეჭდე ტიანშანი — არქივი</h1>
+    <p class="muted">მხოლოდ სამსახურებრივი სარგებლობისთვის.</p>
+    <form id="login-form">
+      <label for="pw">პაროლი</label>
+      <input id="pw" name="password" type="password" autocomplete="current-password" required>
+      <button type="submit">შესვლა</button>
+      <p id="login-error" class="error" role="alert"></p>
+    </form>
+  </section>
+
+  <!-- არქივი -->
+  <main id="app" hidden>
+    <header class="admin-top">
+      <div>
+        <h1>საქმე: „ცისფერი მთები“ — მიმოწერის არქივი</h1>
+        <p class="muted" id="mode-line"></p>
+      </div>
+      <div class="actions">
+        <a id="export-all" class="btn" href="/api/admin/export">ექსპორტი (JSON)</a>
+        <button id="logout" class="btn ghost" type="button">გასვლა</button>
+      </div>
+    </header>
+
+    <section class="stats" id="stats" aria-label="ჯამური სტატისტიკა"></section>
+
+    <div class="cols">
+      <aside class="folder clients">
+        <div class="folder-tab">ბრაუზერები</div>
+        <input id="search" type="search" placeholder="ძებნა: ID, ბრაუზერი, ტექსტი…" aria-label="ძებნა">
+        <ul id="client-list" class="client-list"></ul>
+      </aside>
+
+      <section class="folder detail" id="detail">
+        <div class="folder-tab" id="detail-tab">საქმე</div>
+        <p class="muted" id="detail-empty">აირჩიეთ ბრაუზერი მარცხნივ.</p>
+        <div id="detail-body" hidden>
+          <div class="detail-head">
+            <div>
+              <h2 id="detail-title"></h2>
+              <p class="muted" id="detail-meta"></p>
+            </div>
+            <div class="actions">
+              <button id="reset-limit" class="btn" type="button">ლიმიტის განულება ამ კლიენტისთვის</button>
+              <a id="export-one" class="btn ghost" href="#">ექსპორტი</a>
+            </div>
+          </div>
+          <div class="tabs" role="tablist" id="char-tabs"></div>
+          <div id="conversation" class="conversation"></div>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <script type="module" src="/js/admin.js"></script>
+</body>
+</html>
