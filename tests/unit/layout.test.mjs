@@ -1,10 +1,9 @@
-// public/js/layout.js + crack.js: არეული, მაგრამ დეტერმინისტული განლაგება, გადაფარვის გარეშე.
+// public/js/layout.js: არეული, მაგრამ დეტერმინისტული განლაგება, გადაფარვის გარეშე. (SVG ბზარი Round 2-ში ამოღებულია.)
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   computeLayout, findOverlaps, rotatedSize, rectsOverlap, mulberry32, MIN_ROT, MAX_ROT, TILT_RESERVE_DEG,
 } from '../../public/js/layout.js';
-import { generateCrack, polyLength, framesNearCrack } from '../../public/js/crack.js';
 
 const items = Array.from({ length: 12 }, (_, i) => ({ id: `c${i}`, rank: i }));
 const zones = (W, H) => [
@@ -103,18 +102,3 @@ test('მობილური: კედელი ვერტიკალუ�
   assert.ok(L.mobile);
 });
 
-test('ბზარი: დეტერმინისტული, კედლის ფარგლებში, ტოტებით და საფეხურებით', () => {
-  const L = computeLayout({ width: 1280, height: 800, items, seed: 1984, headerHeight: 90, zones });
-  const obstacles = L.frames.map((f) => f.box);
-  const a = generateCrack({ width: 1280, height: 800, top: 90, seed: 1984, obstacles });
-  const b = generateCrack({ width: 1280, height: 800, top: 90, seed: 1984, obstacles });
-  assert.deepEqual(a, b);
-  assert.ok(polyLength(a.trunk) > 600);
-  assert.ok(a.trunk.every((p) => p.x >= 0 && p.x <= 1280 && p.y >= 90 && p.y <= 800));
-  assert.ok(a.branches.length >= 5);
-  assert.ok(a.branches.every((br) => br.stage >= 1 && br.stage <= 4));
-  // ბზარი ძირითადად ჩარჩოებს შორის გადის
-  const inside = a.trunk.filter((p) => obstacles.some((o) => p.x > o.x && p.x < o.x + o.w && p.y > o.y && p.y < o.y + o.h)).length;
-  assert.ok(inside / a.trunk.length < 0.15, `${inside}/${a.trunk.length}`);
-  assert.equal(framesNearCrack(a, L.frames, 3).length, 3);
-});
