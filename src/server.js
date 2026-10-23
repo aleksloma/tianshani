@@ -8,7 +8,7 @@ import cookieParser from 'cookie-parser';
 
 import { loadConfig, ROOT } from './config.js';
 import { byId, publicList, pickProxy, famousRollCall, meta } from './characters.js';
-import { buildPrompt, sanitizeGameState, SEASON_KA } from './prompt.js';
+import { buildPrompt, sanitizeGameState, annotateForProxy, pickStageMode, SEASON_KA } from './prompt.js';
 import { openDb } from './db.js';
 import { balance, createRateLimiter, MSG_LIMIT, MSG_LIMIT_LIFETIME, MSG_RATE, MSG_TOO_LONG } from './limits.js';
 import { detectRedirect } from './redirect.js';
@@ -129,8 +129,13 @@ export function createApp(cfg) {
       speaker = byId[pickProxy(target.id, preferred)];
     }
 
-    const { systemInstruction, fewShot } = buildPrompt({ speaker, invisible, gameState, cfg });
-    const contents = [...fewShot, ...clean];
+    const stageMode = pickStageMode({ invisible, historyLen: clean.length - 1 });
+    const { systemInstruction, fewShot } = buildPrompt({ speaker, invisible, gameState, cfg, stageMode });
+    // წარმომადგენლის ჩატში მომხმარებლის შეტყობინებებს (მხოლოდ მოდელისთვის) ემატება „ვის მიმართავს“ შენიშვნა; ლოგში — ორიგინალი
+    const convo = invisible
+      ? clean.map((m) => (m.role === 'user' ? { ...m, content: annotateForProxy(m.content, invisible, speaker) } : m))
+      : clean;
+    const contents = [...fewShot, ...convo];
 
     // --- SSE ---
     res.status(200);
@@ -149,7 +154,7 @@ export function createApp(cfg) {
     let usage = { input: 0, output: 0 };
     try {
       const gen = cfg.gemini.mock
-        ? mockStream({ systemInstruction, contents, speaker, invisible, userText: last.content, gameState, signal: ac.signal })
+        ? mockStream({ systemInstruction, contents, speaker, invisible, userText: last.content, gameState, signal: ac.signal, historyLen: clean.length - 1 })
         : geminiStream({ cfg, systemInstruction, contents, signal: ac.signal });
       for await (const ev of gen) {
         if (ev.delta) { reply += ev.delta; send({ delta: ev.delta }); }

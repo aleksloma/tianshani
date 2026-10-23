@@ -87,11 +87,30 @@ test('API შეცდომა → SSE error „ხაზი დაკავე
   assert.equal(rows.n, 0);
 });
 
-test('უხილავი რეალურ გზაზეც: წარმომადგენლის პრომპტი, გივის system prompt-ის გარეშე', async () => {
+test('უხილავი რეალურ გზაზეც: წარმომადგენლის ხმა, მესამე პირი; გივის prompt მხოლოდ ფაქტად', async () => {
   const { byId } = await import('../../src/characters.js');
   const r = await chat(S.base, { characterId: 'givi', messages: userMsg('გივი არის?'), gameState: GS });
   const sys = calls.at(-1).config.systemInstruction;
-  assert.ok(sys.includes('The user has come looking for გივი'));
-  assert.ok(!sys.includes(byId.givi.system_prompt_en));
+  assert.ok(sys.includes('is addressing გივი, not you'));
+  assert.ok(sys.includes("on გივი's behalf"));
+  assert.ok(sys.includes('third person'));
+  const charBlock = sys.slice(sys.indexOf('# YOUR CHARACTER'), sys.indexOf('# CURRENT STATE'));
+  assert.ok(!charBlock.includes(byId.givi.system_prompt_en), 'ხმად — არასდროს');
   assert.notEqual(r.done.spoken_by, 'givi');
+  // მოდელს მიდის ანოტირებული მომხმარებლის შეტყობინება, ლოგში — ორიგინალი
+  const last = calls.at(-1).contents.at(-1).parts[0].text;
+  assert.ok(last.startsWith('[სიტუაცია: მომხმარებელი ელაპარაკება — გივი, არა შენ. გივი აქ არ არის.'), last);
+  assert.ok(last.endsWith('გივი არის?'));
+  const logged = S.store.db.prepare("SELECT content FROM messages WHERE role = 'user' ORDER BY id DESC LIMIT 1").get();
+  assert.equal(logged.content, 'გივი არის?');
+});
+
+test('Round 1: რეალურ მოთხოვნაში — სცენური რემარკების წესი და შიდა თარიღი', async () => {
+  await chat(S.base, { characterId: 'director', messages: userMsg('გამარჯობა'), gameState: { ...GS, day: 44 } });
+  const sys = calls.at(-1).config.systemInstruction;
+  assert.ok(sys.includes('STAGE DIRECTIONS'));
+  assert.ok(sys.includes('In-world date: 15 October 1983, autumn, day 45 of the season.'));
+  assert.match(sys, /FOR THIS REPLY: (no stage direction|you may use ONE)/, 'ხილულ პერსონაჟს — none/optional');
+  await chat(S.base, { characterId: 'gamkrelidze', messages: userMsg('წაიკითხეთ?'), gameState: GS });
+  assert.ok(calls.at(-1).config.systemInstruction.includes('FOR THIS REPLY: start with one short stage direction'), 'წარმომადგენლის პირველი პასუხი — სცენა');
 });

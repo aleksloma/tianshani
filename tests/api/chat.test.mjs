@@ -20,7 +20,12 @@ test('GET /api/characters: 29 პერსონაჟი, 12 კედელზ
   assert.ok(!raw.includes('system_prompt_en') && !raw.includes('You are '), 'სრული პრომპტები კლიენტთან არ მიდის');
   assert.ok(!raw.includes('test-admin-pass'), 'ადმინის პაროლი არ ჩანს');
   assert.ok(!('gemini' in j.config) && !('admin' in j.config) && !('logging' in j.config), 'საიდუმლო კონფიგი არ ჩანს');
-  assert.equal(j.config.game.exchanges_per_season, 8);
+  // Round 1 §4: დღეებზე დაფუძნებული დრო
+  assert.equal(j.config.game.start_date, '1983-09-01');
+  assert.equal(j.config.game.days_per_season, 90);
+  assert.equal(j.config.game.days_per_character_switch, 20);
+  assert.equal(j.config.game.days_per_exchange, 0);
+  assert.ok(!('_comment' in j.config.game));
   assert.deepEqual(j.config.game.seasons, ['autumn', 'winter', 'spring', 'summer']);
   assert.equal(j.config.wall.layout_seed, 1983);
   assert.equal(j.roll_call.length, 6);
@@ -133,6 +138,23 @@ test('ყველა შეტყობინება იწერება SQ
   assert.ok(rows[1].output_tokens > 0);
   const client = S.store.db.prepare('SELECT * FROM clients WHERE client_id = ?').get(cid);
   assert.ok(client.ip_hash && !client.ip_hash.includes('127.0.0.1'), 'IP მხოლოდ ჰეშით');
+});
+
+test('Round 1 §4: gameState.day → სერვერი სეზონს დღიდან ითვლის (ლოგში ზამთარი, თუნდაც კლიენტმა სხვა სეზონი გამოგზავნოს)', async () => {
+  const jar = cookieJar();
+  const r = await chat(S.base, { characterId: 'tina', messages: userMsg('გამარჯობა'), gameState: { day: 100, season: 'autumn', crackStage: 0, lostCopies: 0, cycle: 1 } }, { jar });
+  assert.equal(r.status, 200);
+  const row = S.store.db.prepare('SELECT season FROM messages WHERE client_id = ? AND role = ?').get(jar.get('tianshani_cid'), 'user');
+  assert.equal(row.season, 'winter');
+});
+
+test('Round 1 §2: mock პასუხები შეიცავს *…* რემარკას (ხილული) და სცენის რემარკას (წარმომადგენელი)', async () => {
+  const v = await chat(S.base, { characterId: 'director', messages: userMsg('გამარჯობა'), gameState: GS });
+  assert.match(v.reply, /\*\(ყურმილს იღებს\)[^*]+\*/);
+  const p = await chat(S.base, { characterId: 'gamkrelidze', messages: userMsg('წაიკითხეთ ჩემი მოთხრობა?'), gameState: GS });
+  assert.ok(p.reply.startsWith('*(დერეფანში გამოდის'));
+  assert.match(p.reply, /გამყრელიძ/);
+  assert.notEqual(p.done.spoken_by, 'gamkrelidze');
 });
 
 test('არაქართულ შეტყობინებაზე პასუხი იმავე ენაზე (mock)', async () => {

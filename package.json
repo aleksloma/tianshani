@@ -13,6 +13,7 @@
     "test": "node --test \"tests/unit/**/*.test.mjs\"",
     "test:api": "node --test --test-concurrency=1 \"tests/api/**/*.test.mjs\"",
     "test:e2e": "playwright test",
+    "test:real": "node --test \"tests/real/**/*.test.mjs\"",
     "test:all": "node scripts/run-all-tests.mjs",
     "voice:extract": "node scripts/extract-voice-extras.mjs"
   },

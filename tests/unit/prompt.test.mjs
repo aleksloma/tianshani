@@ -35,15 +35,24 @@ test('ხილული პერსონაჟი: სამყარო + �
   assert.equal(fs[1].role, 'assistant');
 });
 
-test('უხილავი: წარმომადგენლის პრომპტი + „არ არის ადგილზე“; უხილავის system_prompt_en ხმად არ გამოიყენება', () => {
+test('უხილავი: წარმომადგენლის ხმა; უხილავის system_prompt_en მხოლოდ ფაქტების სექციაში (Round 1 §3), არასდროს ხმად', () => {
   const { systemInstruction: s, fewShot: fs } = buildPrompt({ speaker: byId.soso, invisible: byId.givi, gameState: GS, cfg });
   assert.ok(s.includes(byId.soso.system_prompt_en), 'proxy-ს ხმა');
-  assert.ok(!s.includes(byId.givi.system_prompt_en), 'გივის system prompt არ უნდა იყოს');
-  assert.ok(s.includes('The user has come looking for გივი'));
-  assert.ok(s.includes('You are NOT that person'));
-  assert.ok(s.includes('Never speak as გივი'));
+  const charBlock = s.slice(s.indexOf('# YOUR CHARACTER'), s.indexOf('# CURRENT STATE'));
+  assert.ok(!charBlock.includes(byId.givi.system_prompt_en), 'გივის prompt პერსონაჟის ბლოკში არ არის');
+  const facts = s.slice(s.indexOf('## Facts about გივი'));
+  assert.ok(facts.includes(byId.givi.system_prompt_en), 'ფაქტად — ფაქტების სექციაში');
+  assert.ok(facts.includes('background facts only, NOT your voice'));
+  assert.ok(s.includes('is addressing გივი, not you'));
+  assert.ok(s.includes('never speak as გივი'));
   assert.ok(s.includes('მივლინებაშია'), 'ფაქტები');
-  assert.deepEqual(fs, fewShot(byId.soso), 'few-shot — წარმომადგენლისა');
+  // few-shot: წარმომადგენლის საკუთარი ნიმუშები + ბოლოს მესამე პირის მაგალითი
+  const own = fewShot(byId.soso);
+  assert.deepEqual(fs.slice(0, own.length), own, 'few-shot — წარმომადგენლისა');
+  assert.equal(fs.length, own.length + 2);
+  assert.ok(fs.at(-2).content.startsWith('[სიტუაცია: მომხმარებელი ელაპარაკება — გივი, არა შენ.'));
+  assert.ok(fs.at(-1).content.startsWith('*(დერეფანში გამოდის, დაკეტილ კარს უყურებს)* გივი? აქ არ არის'));
+  assert.ok(s.indexOf('# THIS CONVERSATION') < s.indexOf('# YOUR CHARACTER'), 'სცენა პერსონაჟის ბლოკამდე');
 });
 
 test('ახალი შენობა (ციკლი > 1) ჩნდება პრომპტში', () => {
@@ -53,11 +62,12 @@ test('ახალი შენობა (ციკლი > 1) ჩნდებ�
 });
 
 test('sanitizeGameState: არასწორი მნიშვნელობები ნორმალიზდება', () => {
+  // დღის გარეშე (ძველი კლიენტი): სეზონის პირველი დღე + კლიენტის ველები ნორმალიზებული
   assert.deepEqual(sanitizeGameState({ season: 'monsoon', crackStage: 99, lostCopies: -4, cycle: 'x' }, cfg),
-    { season: 'autumn', crackStage: 4, lostCopies: 0, cycle: 1, paintingFallen: false });
-  assert.deepEqual(sanitizeGameState(null, cfg), { season: 'autumn', crackStage: 0, lostCopies: 0, cycle: 1, paintingFallen: false });
+    { day: 0, season: 'autumn', crackStage: 4, lostCopies: 0, cycle: 1, paintingFallen: false });
+  assert.deepEqual(sanitizeGameState(null, cfg), { day: 0, season: 'autumn', crackStage: 0, lostCopies: 0, cycle: 1, paintingFallen: false });
   assert.deepEqual(sanitizeGameState({ season: 'summer', crackStage: '3', lostCopies: 3, cycle: 2, paintingFallen: true }, cfg),
-    { season: 'summer', crackStage: 3, lostCopies: 3, cycle: 2, paintingFallen: true });
+    { day: 270, season: 'summer', crackStage: 3, lostCopies: 3, cycle: 2, paintingFallen: true });
   assert.equal(sanitizeGameState({ paintingFallen: 'yes' }, cfg).paintingFallen, false);
 });
 

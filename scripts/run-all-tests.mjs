@@ -34,19 +34,32 @@ function e2e() {
   return { suite: 'e2e', ok: r.status === 0, tests: pass + fail + (s.skipped || 0), pass, fail, flaky: s.flaky || 0, ms: Date.now() - started };
 }
 
+/** რეალური Gemini-ს გასაღები არსებობს? (settings.json ან env) — მაშინ smoke ტესტიც ეშვება. */
+function hasRealKey() {
+  if (process.env.GEMINI_API_KEY) return true;
+  try {
+    const k = String(JSON.parse(fs.readFileSync(path.join(ROOT, 'settings.json'), 'utf8'))?.gemini?.api_key || '').trim();
+    return k !== '' && k !== 'PASTE_YOUR_KEY' && k !== 'YOUR_KEY';
+  } catch { return false; }
+}
+
 const results = [];
-console.log('\n=== 1/3 unit ===');
+console.log('\n=== 1/4 unit ===');
 results.push(nodeTest('unit', 'tests/unit/**/*.test.mjs'));
-console.log('\n=== 2/3 api ===');
+console.log('\n=== 2/4 api ===');
 results.push(nodeTest('api', 'tests/api/**/*.test.mjs', ['--test-concurrency=1']));
-console.log('\n=== 3/3 e2e (playwright) ===');
+console.log('\n=== 3/4 e2e (playwright) ===');
 results.push(e2e());
+console.log('\n=== 4/4 real Gemini smoke ===');
+if (hasRealKey()) results.push(nodeTest('real', 'tests/real/**/*.test.mjs'));
+else { console.log('გამოტოვებულია: Gemini-ს გასაღები არ არის.'); results.push({ suite: 'real', ok: true, tests: 0, pass: 0, fail: 0, ms: 0, skipped: true }); }
 
 const summary = { finished_at: new Date().toISOString(), node: process.version, ok: results.every((r) => r.ok), results };
 fs.writeFileSync(path.join(OUT, 'summary.json'), `${JSON.stringify(summary, null, 2)}\n`);
 
 console.log('\n=== შედეგი ===');
 for (const r of results) {
+  if (r.skipped) { console.log(`SKIP  ${r.suite.padEnd(5)}  (Gemini-ს გასაღები არ არის)`); continue; }
   console.log(`${r.ok ? 'PASS' : 'FAIL'}  ${r.suite.padEnd(5)}  ${String(r.pass).padStart(3)}/${String(r.tests).padEnd(3)} passed  ${r.fail} failed  ${(r.ms / 1000).toFixed(1)}s`);
 }
 console.log(summary.ok ? '\nყველაფერი მწვანეა.' : '\nზოგი ტესტი ჩავარდა.');
