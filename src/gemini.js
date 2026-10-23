@@ -55,6 +55,9 @@ export async function resolveModel(cfg, log = console) {
 
 export function currentModel() { return resolvedModel; }
 
+/** მხოლოდ ტესტებისთვის: ყალბი კლიენტის ჩასმა (გასაღების გარეშე რეალური კოდის შესამოწმებლად). */
+export function _setClientForTests(fake) { client = fake; resolvedModel = null; resolving = null; }
+
 /** ჩვენი {role, content} → Gemini contents (user/model), ერთნაირი როლები ერთიანდება. */
 export function toGeminiContents(messages) {
   const out = [];

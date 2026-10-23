@@ -1,0 +1,97 @@
+// რეალური Gemini გზა (mock: false) ყალბი SDK კლიენტით: ListModels fallback, მოთხოვნის ფორმა, usage, retry, შეცდომები.
+import test, { before, after } from 'node:test';
+import assert from 'node:assert/strict';
+import { startTestServer, chat, cookieJar, userMsg, GS } from '../helpers.mjs';
+import { _setClientForTests } from '../../src/gemini.js';
+
+const calls = [];
+let mode = 'ok';
+const fake = {
+  models: {
+    list: async () => (async function* models() {
+      yield { name: 'models/gemini-2.5-flash', supportedActions: ['generateContent'] };
+      yield { name: 'models/gemini-3.5-flash', supportedActions: ['generateContent', 'countTokens'] };
+      yield { name: 'models/gemini-3.5-flash-lite', supportedActions: ['generateContent'] };
+      yield { name: 'models/gemini-3.5-pro', supportedActions: ['generateContent'] };
+      yield { name: 'models/text-embedding-004', supportedActions: ['embedContent'] };
+    }()),
+    generateContentStream: async (req) => {
+      calls.push(req);
+      if (mode === 'throw') throw new Error('503 UNAVAILABLE');
+      if (mode === 'thinking' && req.config.thinkingConfig) throw new Error('thinking_budget 0 is not supported by this model');
+      return (async function* stream() {
+        yield { text: 'ძალიან კარგი! ' };
+        yield { text: 'დატოვე თინასთან, ბანკში ვარ.' };
+        yield { text: '', usageMetadata: { promptTokenCount: 1234, candidatesTokenCount: 56, thoughtsTokenCount: 4 } };
+      }());
+    },
+  },
+};
+
+let S;
+before(async () => {
+  S = await startTestServer({ gemini: { api_key: 'fake-key-for-tests', mock: false, model: 'gemini-3.8-flash' } });
+  _setClientForTests(fake);
+});
+after(async () => { await S.close(); });
+
+test('არარსებული მოდელი → უახლესი Flash (lite/pro/embedding-ის გარეშე); მოთხოვნის ფორმა', async () => {
+  assert.equal(S.cfg.gemini.mock, false);
+  const jar = cookieJar();
+  const r = await chat(S.base, { characterId: 'director', messages: userMsg('მოთხრობა წაიკითხეთ?'), gameState: GS }, { jar });
+  assert.equal(r.status, 200);
+  assert.equal(r.reply, 'ძალიან კარგი! დატოვე თინასთან, ბანკში ვარ.');
+  const req = calls.at(-1);
+  assert.equal(req.model, 'gemini-3.5-flash');
+  assert.equal(req.config.temperature, 0.9);
+  assert.equal(req.config.maxOutputTokens, 400);
+  assert.deepEqual(req.config.thinkingConfig, { thinkingBudget: 0 });
+  assert.ok(req.config.abortSignal);
+  assert.ok(req.config.systemInstruction.includes('# WORLD'));
+  assert.ok(req.config.systemInstruction.includes('Vazha Zazaevich'));
+  // few-shot (3 დიალოგი = 6) + ახალი შეტყობინება; როლები user/model მონაცვლეობით
+  assert.equal(req.contents.length, 7);
+  assert.deepEqual(req.contents.slice(0, 2).map((c) => c.role), ['user', 'model']);
+  assert.equal(req.contents.at(-1).role, 'user');
+  assert.equal(req.contents.at(-1).parts[0].text, 'მოთხრობა წაიკითხეთ?');
+  // usage რეალური რიცხვებიდან (thoughts → output)
+  assert.deepEqual(r.done.usage, { input: 1234, output: 60 });
+  assert.equal(r.done.suggested_redirect, 'tina');
+  const st = await (await fetch(`${S.base}/api/state`, { headers: { cookie: jar.header() } })).json();
+  assert.deepEqual([st.used.input, st.used.output, st.used.requests], [1234, 60, 1]);
+  const health = await (await fetch(`${S.base}/api/health`)).json();
+  assert.deepEqual(health, { ok: true, provider: 'gemini', model: 'gemini-3.5-flash' });
+});
+
+test('thinking_budget-ს თუ მოდელი არ იღებს — მეორე ცდა thinkingConfig-ის გარეშე', async () => {
+  mode = 'thinking';
+  const n = calls.length;
+  const r = await chat(S.base, { characterId: 'tina', messages: userMsg('გამარჯობა'), gameState: GS });
+  mode = 'ok';
+  assert.equal(r.status, 200);
+  assert.ok(r.done);
+  assert.equal(calls.length, n + 2);
+  assert.ok(calls[n].config.thinkingConfig);
+  assert.equal(calls[n + 1].config.thinkingConfig, undefined);
+});
+
+test('API შეცდომა → SSE error „ხაზი დაკავებულია…“, ლოგში პასუხი არ იწერება', async () => {
+  mode = 'throw';
+  const jar = cookieJar();
+  const r = await chat(S.base, { characterId: 'vaso', messages: userMsg('გამარჯობა'), gameState: GS }, { jar });
+  mode = 'ok';
+  assert.equal(r.status, 200);
+  assert.equal(r.error, 'ხაზი დაკავებულია. ცოტა ხანში სცადეთ.');
+  assert.equal(r.done, null);
+  const rows = S.store.db.prepare('SELECT COUNT(*) n FROM messages WHERE client_id = ?').get(jar.get('tianshani_cid'));
+  assert.equal(rows.n, 0);
+});
+
+test('უხილავი რეალურ გზაზეც: წარმომადგენლის პრომპტი, გივის system prompt-ის გარეშე', async () => {
+  const { byId } = await import('../../src/characters.js');
+  const r = await chat(S.base, { characterId: 'givi', messages: userMsg('გივი არის?'), gameState: GS });
+  const sys = calls.at(-1).config.systemInstruction;
+  assert.ok(sys.includes('The user has come looking for გივი'));
+  assert.ok(!sys.includes(byId.givi.system_prompt_en));
+  assert.notEqual(r.done.spoken_by, 'givi');
+});
