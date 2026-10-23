@@ -1,28 +1,11 @@
-// კედელი: ჩარჩოების რენდერი computeLayout-ის მიხედვით, ბზარი, „ესაუბრე სხვას“ მენიუ, განცხადებების დაფა.
+// კედელი: ჩარჩოების რენდერი computeLayout-ის მიხედვით, „ესაუბრე სხვას“ მენიუ, განცხადებების დაფა.
+// Round 2 §7: დახატული SVG ბზარი ამოღებულია — ბზარი ახლა კედლის ფოტოებშია (background.js, wall.background_by_stage).
 import { computeLayout } from './layout.js';
-import { generateCrack, drawCrack, setCrackStage, framesNearCrack } from './crack.js';
 
-const SILHOUETTE = 'assets/silhouette.svg';
+export const SILHOUETTE = 'assets/silhouette.svg';
 
 // „გრენლანდია“ — ვასოს თავზე ჩამოკიდებული სურათი (public/assets/painting.webp, 760×539, ჩარჩოიანი, გამჭვირვალე კიდეებით)
 export const PAINTING = { id: 'painting', src: 'assets/painting.webp', size: { w: 450, mw: 250, aspect: 539 / 760 }, rot: [2.5, 4] };
-
-// კედლის ფოტოზე (public/assets/wall.jpg, 1672×941) არსებული ბზარის წერტილები — ახალი ბზარი იქიდან იწყება
-const WALL_PHOTO = { w: 1672, h: 941, crack: [[910, 0], [870, 250], [840, 450], [790, 640], [760, 940]] };
-
-/** ფოტოს ბზარის x კოორდინატი კედლის y სიმაღლეზე (background-size: cover, center top). */
-function photoCrackX(W, H, y) {
-  const s = Math.max(W / WALL_PHOTO.w, H / WALL_PHOTO.h);
-  const ox = (W - WALL_PHOTO.w * s) / 2;
-  const iy = y / s;
-  const pts = WALL_PHOTO.crack;
-  let i = 0;
-  while (i < pts.length - 2 && pts[i + 1][1] < iy) i++;
-  const [x0, y0] = pts[i];
-  const [x1, y1] = pts[i + 1];
-  const t = Math.min(1, Math.max(0, (iy - y0) / (y1 - y0)));
-  return ox + (x0 + (x1 - x0) * t) * s;
-}
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -99,19 +82,16 @@ function paintingNodes() {
   return { btn, ghost };
 }
 
-export function createWall({ characters, wallCfg, onOpen, painting = { fallen: false, onDrop: () => {} }, wallPhoto = false }) {
+export function createWall({ characters, wallCfg, onOpen, painting = { fallen: false, onDrop: () => {} } }) {
   const wallEl = document.getElementById('wall');
   const framesEl = document.getElementById('frames');
-  const crackEl = document.getElementById('crack');
   const othersEl = document.getElementById('others');
   const boardEl = document.getElementById('noticeboard');
   const topbar = document.getElementById('topbar');
   const onWall = characters.filter((c) => c.on_wall).sort((a, b) => b.content_score - a.content_score);
   const nodes = new Map();
   let layout = null;
-  let crack = null;
   let seed = wallCfg.layout_seed;
-  let stage = 0;
   let fallen = Boolean(painting.fallen);
   let dropping = false;
 
@@ -207,33 +187,12 @@ export function createWall({ characters, wallCfg, onOpen, painting = { fallen: f
       n.style.width = `${f.w}px`;
       n.style.height = `${f.h}px`;
       n.style.setProperty('--rot', `${f.rotation.toFixed(2)}deg`);
-      n.style.setProperty('--tilt-dir', f.rotation < 0 ? '-1' : '1');
       n.classList.toggle('small', f.tier === 2);
       n.dataset.tier = String(f.tier);
       fitText(n.querySelector('.plate-name'));
     }
-    crack = generateCrack({
-      width: layout.width, height: layout.height, top: headerHeight, seed,
-      obstacles: layout.frames.map((f) => f.box),
-      startX: wallPhoto ? photoCrackX(layout.width, layout.height, headerHeight) : null,
-    });
     showPainting();
-    drawCrack(crackEl, crack, layout.width, layout.height);
-    // პირველი ჩვენება — ანიმაციის გარეშე
-    crackEl.classList.add('no-anim');
-    setStage(stage);
-    void crackEl.getBoundingClientRect();
-    crackEl.classList.remove('no-anim');
     window.tianshani = { ...(window.tianshani || {}), layout };
-  }
-
-  /** ბზარის საფეხური + 3–4 საფეხურზე ჩარჩოების დამატებითი გადახრა. */
-  function setStage(s) {
-    stage = s;
-    setCrackStage(crackEl, s);
-    const tiltCount = s >= 4 ? 3 : s >= 3 ? 2 : 0;
-    const tilted = new Set(tiltCount && crack ? framesNearCrack(crack, layout.frames.filter((f) => f.id !== PAINTING.id), tiltCount) : []);
-    for (const [id, n] of nodes) n.classList.toggle('tilted', tilted.has(id));
   }
 
   function setSeed(newSeed) { seed = newSeed; render(); }
@@ -245,7 +204,7 @@ export function createWall({ characters, wallCfg, onOpen, painting = { fallen: f
   window.addEventListener('resize', () => { clearTimeout(t); t = setTimeout(render, 150); });
 
   return {
-    render, setStage, setSeed, setPaintingFallen, dropPainting: drop,
+    render, setSeed, setPaintingFallen, dropPainting: drop,
     frameNode: (id) => nodes.get(id) || null,
     get layout() { return layout; },
   };
@@ -257,8 +216,14 @@ export function renderRollCall(lines) {
   ul.replaceChildren(...lines.map((l) => { const li = document.createElement('li'); li.textContent = l; return li; }));
 }
 
+/** მენიუს რიგი (Round 2 §6): ქულის კლებით; თანაბარ ქულაზე — ხილული ჯერ, უხილავი (appears ≠ on_screen) ბოლოს. */
+export function menuOrder(list) {
+  return [...list].sort((a, b) => (b.content_score - a.content_score) || (Number(b.reachable) - Number(a.reachable)));
+}
+
 /**
- * „ესაუბრე სხვას“ მენიუ. variant 'wall' — დანარჩენები (კედელზე არმყოფნი); 'chat' — ყველა, გარდა მიმდინარისა.
+ * „ესაუბრე სხვას“ მენიუ — ერთი ბრტყელი სია ფოტოებით (Round 2 §6): ჯგუფების, ხაზების და 🔒-ის გარეშე.
+ * variant 'wall' — კედელზე არმყოფნი; 'chat' — ყველა, გარდა მიმდინარისა.
  */
 export function createOthersMenu({ characters, onPick }) {
   const menu = document.getElementById('others-menu');
@@ -270,30 +235,30 @@ export function createOthersMenu({ characters, onPick }) {
     b.className = 'menu-item';
     b.setAttribute('role', 'option');
     b.dataset.id = c.id;
-    b.innerHTML = '<span class="mi-name"></span><span class="mi-role"></span>';
-    b.querySelector('.mi-name').textContent = c.short_name_ka;
-    b.querySelector('.mi-role').textContent = c.role_short_ka;
-    if (!c.reachable) b.classList.add('invisible');
+    const img = document.createElement('img');
+    img.className = 'mi-thumb';
+    img.alt = '';
+    img.loading = 'lazy';
+    img.decoding = 'async';
+    img.width = 40;
+    img.height = 40;
+    img.src = c.image || SILHOUETTE;
+    if (!c.image) img.classList.add('silhouette');
+    img.addEventListener('error', () => { img.src = SILHOUETTE; img.classList.add('silhouette'); }, { once: true });
+    const text = document.createElement('span');
+    text.className = 'mi-text';
+    text.innerHTML = '<span class="mi-name"></span><span class="mi-role"></span>';
+    text.querySelector('.mi-name').textContent = c.short_name_ka;
+    text.querySelector('.mi-role').textContent = c.role_short_ka;
+    b.append(img, text);
     b.addEventListener('click', () => { close(); onPick(c.id); });
     return b;
-  }
-  function section(title, list) {
-    if (!list.length) return [];
-    const h = document.createElement('div');
-    h.className = 'menu-section';
-    h.textContent = title;
-    return [h, ...list.map(item)];
   }
 
   function open(anchorEl, { variant = 'wall', exclude = null } = {}) {
     anchor = anchorEl;
-    const byScore = (a, b) => b.content_score - a.content_score;
-    const visible = characters.filter((c) => c.reachable && c.id !== exclude).sort(byScore);
-    const invisible = characters.filter((c) => !c.reachable && c.id !== exclude).sort(byScore);
-    const parts = variant === 'chat'
-      ? [...section('კედელზე', visible.filter((c) => c.on_wall)), ...section('დანარჩენები', visible.filter((c) => !c.on_wall))]
-      : section('დანარჩენები', visible.filter((c) => !c.on_wall));
-    menu.replaceChildren(...parts, ...section('ვინც არასდროს ჩანს', invisible));
+    const pool = characters.filter((c) => c.id !== exclude && (variant === 'chat' || !c.on_wall));
+    menu.replaceChildren(...menuOrder(pool).map(item));
     menu.hidden = false;
     menu.dataset.variant = variant;
     position();

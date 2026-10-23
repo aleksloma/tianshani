@@ -22,9 +22,44 @@ test('კედელი: 12 ჩარჩო სახელებით, არ
   // 3 ზომა
   const tiers = await page.locator('#frames .frame').evaluateAll((els) => [...new Set(els.map((e) => e.dataset.tier))].sort());
   expect(tiers).toEqual(['0', '1', '2']);
-  // ბზარის ფენა (ცალკე SVG)
-  await expect(page.locator('#crack path.trunk')).toHaveCount(2);
+  // Round 2 §7: დახატული SVG ბზარი აღარ არის; ფონი — კედლის ფოტო (stage 0)
+  await expect(page.locator('#crack')).toHaveCount(0);
+  await expect(page.locator('#wall')).toHaveAttribute('data-background', 'assets/wall.jpg');
   await page.screenshot({ path: `${SHOTS}/01-wall-desktop.png`, fullPage: true });
+});
+
+test('შუქრის პორტრეტი (Round 2 §4): ფოტო იტვირთება, შავ-თეთრია, ფირფიტით', async ({ page }) => {
+  await openWall(page);
+  const frame = page.locator('#frames .frame[data-id="shukri"]');
+  await expect(frame).toHaveCount(1);
+  const img = frame.locator('img').first();
+  await expect(img).toHaveAttribute('src', 'assets/characters/shukri.jpg');
+  await expect(frame.locator('.photo')).not.toHaveClass(/silhouette/);
+  await expect(frame.locator('.plate-name')).toHaveText('შუქრი');
+  await expect.poll(() => img.evaluate((el) => el.complete && el.naturalWidth)).toBeGreaterThan(0);
+  // ფაილი თავად შავ-თეთრია: პიქსელებში R≈G≈B (canvas-ით, CSS ფილტრის გარეშე)
+  const chroma = await page.evaluate(async () => {
+    const im = new Image();
+    im.src = 'assets/characters/shukri.jpg';
+    await im.decode();
+    const c = document.createElement('canvas');
+    c.width = im.naturalWidth; c.height = im.naturalHeight;
+    const ctx = c.getContext('2d');
+    ctx.drawImage(im, 0, 0);
+    const d = ctx.getImageData(0, 0, c.width, c.height).data;
+    let sum = 0; let max = 0; let n = 0;
+    for (let i = 0; i < d.length; i += 4 * 7) {
+      const v = Math.max(Math.abs(d[i] - d[i + 1]), Math.abs(d[i + 1] - d[i + 2]), Math.abs(d[i] - d[i + 2]));
+      sum += v; max = Math.max(max, v); n++;
+    }
+    return { avg: sum / n, max, w: im.naturalWidth, h: im.naturalHeight };
+  });
+  expect(chroma.avg).toBeLessThan(2);
+  expect(chroma.max).toBeLessThanOrEqual(8);
+  expect([chroma.w, chroma.h]).toEqual([360, 480]);
+  await frame.scrollIntoViewIfNeeded();
+  await frame.screenshot({ path: `${SHOTS}/R2-04-shukri-frame.png` });
+  await page.screenshot({ path: `${SHOTS}/R2-04-wall-with-shukri.png`, fullPage: true });
 });
 
 test('განლაგება დეტერმინისტულია: გადატვირთვაზე არ ხტება; ზომის ცვლილებაზე ხელახლა ითვლება', async ({ page }) => {
@@ -43,22 +78,66 @@ test('განლაგება დეტერმინისტულია:
   expectNoOverlaps(R, 20);
 });
 
-test('„ესაუბრე სხვას“: დანარჩენები კონტენტის კლებით + „ვინც არასდროს ჩანს“', async ({ page }) => {
+test('„ესაუბრე სხვას“ (Round 2 §6): ერთი ბრტყელი სია ფოტოებით, ქულის კლებით, უხილავები ბოლოს; 🔒 და ჯგუფები აღარ არის', async ({ page }) => {
   await openWall(page);
   const data = await (await page.request.get('/api/characters')).json();
+  const byId = Object.fromEntries(data.characters.map((c) => [c.id, c]));
   await page.locator('#others-btn').click();
   const menu = page.locator('#others-menu');
   await expect(menu).toBeVisible();
-  const sections = await menu.locator('.menu-section').allTextContents();
-  expect(sections).toEqual(['დანარჩენები', 'ვინც არასდროს ჩანს']);
-  const ids = await menu.locator('.menu-item').evaluateAll((els) => els.map((e) => e.dataset.id));
-  const offWall = data.characters.filter((c) => c.reachable && !c.on_wall).sort((x, y) => y.content_score - x.content_score).map((c) => c.id);
-  const invisible = data.characters.filter((c) => !c.reachable).sort((x, y) => y.content_score - x.content_score).map((c) => c.id);
-  expect(ids).toEqual([...offWall, ...invisible]);
-  expect(invisible).toHaveLength(9);
+  await expect(menu.getByText('ვინც არასდროს ჩანს')).toHaveCount(0);
+  expect(await menu.textContent()).not.toContain('🔒');
+  await expect(menu.locator('.menu-section, hr, .menu-divider')).toHaveCount(0);
+  const rows = await menu.locator('.menu-item').evaluateAll((els) => els.map((e) => {
+    const img = e.querySelector('img');
+    return {
+      id: e.dataset.id,
+      img: img ? img.getAttribute('src') : null,
+      lazy: img?.getAttribute('loading'),
+      w: img?.getBoundingClientRect().width,
+      h: img?.getBoundingClientRect().height,
+      italic: getComputedStyle(e).fontStyle,
+      nameWeight: Number(getComputedStyle(e.querySelector('.mi-name')).fontWeight),
+      role: e.querySelector('.mi-role')?.textContent,
+    };
+  }));
+  const expected = data.characters.filter((c) => !c.on_wall)
+    .sort((x, y) => (y.content_score - x.content_score) || (Number(y.reachable) - Number(x.reachable))).map((c) => c.id);
+  expect(rows.map((r) => r.id)).toEqual(expected);
+  // ქულის კლებით; უხილავები ბოლოს
+  for (let i = 1; i < rows.length; i++) expect(byId[rows[i - 1].id].content_score).toBeGreaterThanOrEqual(byId[rows[i].id].content_score);
+  const firstInvisible = rows.findIndex((r) => !byId[r.id].reachable);
+  expect(firstInvisible).toBeGreaterThan(0);
+  expect(rows.slice(firstInvisible).every((r) => !byId[r.id].reachable)).toBe(true);
+  expect(rows.filter((r) => !byId[r.id].reachable)).toHaveLength(9);
+  for (const r of rows) {
+    expect(r.img, r.id).toBeTruthy();
+    expect(r.lazy).toBe('lazy');
+    expect(Math.round(r.w)).toBe(40);
+    expect(Math.round(r.h)).toBe(40);
+    expect(r.italic).toBe('normal');
+    expect(r.nameWeight).toBeGreaterThanOrEqual(700);
+    expect(r.role).toBeTruthy();
+    // ვისაც სურათი აქვს — ნამდვილი ფოტო, დანარჩენს სილუეტი
+    if (byId[r.id].image) expect(r.img, r.id).toBe(byId[r.id].image);
+    else expect(r.img, r.id).toBe('assets/silhouette.svg');
+  }
+  expect(rows.filter((r) => r.img !== 'assets/silhouette.svg').length).toBeGreaterThanOrEqual(3);
+  // ყველა ფოტო ჩაიტვირთა (lazy — ვასქროლავთ ბოლომდე)
+  await menu.evaluate((m) => { m.scrollTop = m.scrollHeight; });
+  await expect.poll(() => menu.locator('img').evaluateAll((els) => els.filter((e) => !(e.complete && e.naturalWidth > 0)).length)).toBe(0);
+  await menu.evaluate((m) => { m.scrollTop = 0; });
+  await page.waitForTimeout(150);
   await page.screenshot({ path: `${SHOTS}/02-others-menu.png` });
+  await menu.screenshot({ path: `${SHOTS}/R2-06-dropdown-thumbnails.png` });
+  // ჩატიდან გახსნილი სიაც (ყველა, მიმდინარის გარდა) — შუქრის რიგიც ფოტოთი
   await page.keyboard.press('Escape');
   await expect(menu).toBeHidden();
+  await page.locator('#frames .frame[data-id="tina"]').click();
+  await expect(page.locator('#chat.shown')).toHaveCount(1);
+  await page.locator('#chat-others').click();
+  await expect(menu.locator('.menu-item[data-id="shukri"] img')).toHaveAttribute('src', 'assets/characters/shukri.jpg');
+  await expect(menu.locator('.menu-item[data-id="tina"]')).toHaveCount(0);
 });
 
 test('ზედა ზოლი: სეზონის ხე (ტექსტის გარეშე), ბზარი, ეგზემპლარები (tooltip), შენობა №1, ბალანსი; დაფა roll call-ით', async ({ page }) => {
@@ -68,7 +147,7 @@ test('ზედა ზოლი: სეზონის ხე (ტექსტ�
   await expect(page.locator('#crack-val')).toHaveText('1/5');
   await expect(page.locator('#copies-val')).toHaveText('3/3');
   await expect(page.locator('#cycle-val')).toHaveText('1');
-  await expect(page.locator('#tokens-val')).toContainText('ტოკ.');
+  await expect(page.locator('#stat-tokens')).toContainText('ტოკენები:');
   await expect(page.locator('#mock-banner')).toContainText('settings.json → gemini.api_key');
   await expect(page.locator('#rollcall li')).toHaveCount(6);
   await expect(page.locator('#rollcall li').first()).toHaveText('შოთა მივლინებაშია');
