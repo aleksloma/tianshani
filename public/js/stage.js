@@ -79,14 +79,41 @@ export function parseStage(text) {
   return merged.filter((s) => s.text !== '');
 }
 
+/**
+ * საუბრის ტექსტი ხაზებად (Round 2 §8: ყოველი წინადადება ახალ ხაზზე, როგორც სცენარში).
+ * ცარიელი ხაზები ქრება; ხაზის თავ-ბოლოს სივრცეები იჭრება.
+ */
+export function speechLines(text) {
+  return String(text).split(/\n+/).map((l) => l.trim()).filter(Boolean);
+}
+
 /** DOM რენდერი (ბრაუზერში): bubble-ის შიგთავსი სეგმენტებად. textContent — არასდროს innerHTML. */
 export function renderSegments(container, text) {
   const frag = document.createDocumentFragment();
   for (const s of parseStage(text)) {
-    const span = document.createElement('span');
-    span.className = s.type === 'stage' ? `stage${s.block ? ' block' : ''}` : 'speech';
-    span.textContent = s.text;
-    frag.append(span);
+    if (s.type === 'stage') {
+      const span = document.createElement('span');
+      span.className = `stage${s.block ? ' block' : ''}`;
+      span.textContent = s.text;
+      frag.append(span);
+      continue;
+    }
+    // საუბარი: ახალი ხაზი → ცალკე ხაზი (მცირე დაშორებით); ხაზის გარეშე — ჩვეულებრივი inline span
+    const lines = speechLines(s.text);
+    const hasBreak = /\n/.test(s.text);
+    if (!hasBreak) {
+      const span = document.createElement('span');
+      span.className = 'speech';
+      span.textContent = s.text;
+      frag.append(span);
+      continue;
+    }
+    for (const l of lines) {
+      const span = document.createElement('span');
+      span.className = 'speech line';
+      span.textContent = l;
+      frag.append(span);
+    }
   }
   container.replaceChildren(frag);
 }

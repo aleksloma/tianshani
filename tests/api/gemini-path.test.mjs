@@ -43,8 +43,8 @@ test('არარსებული მოდელი → უახლეს�
   assert.equal(r.reply, 'ძალიან კარგი! დატოვე თინასთან, ბანკში ვარ.');
   const req = calls.at(-1);
   assert.equal(req.model, 'gemini-3.5-flash');
-  assert.equal(req.config.temperature, 0.9);
-  assert.equal(req.config.maxOutputTokens, 400);
+  assert.equal(req.config.temperature, 0.8); // Round 2 §8
+  assert.equal(req.config.maxOutputTokens, 250);
   assert.deepEqual(req.config.thinkingConfig, { thinkingBudget: 0 });
   assert.ok(req.config.abortSignal);
   assert.ok(req.config.systemInstruction.includes('# WORLD'));
@@ -56,9 +56,26 @@ test('არარსებული მოდელი → უახლეს�
   assert.equal(req.contents.at(-1).parts[0].text, 'მოთხრობა წაიკითხეთ?');
   // usage რეალური რიცხვებიდან (thoughts → output)
   assert.deepEqual(r.done.usage, { input: 1234, output: 60 });
-  assert.equal(r.done.suggested_redirect, 'tina');
+  // Round 2 §8: პირველ შეტყობინებაზე ღილაკი არ ჩნდება, თუნდაც პასუხი თინას ასახელებდეს
+  assert.equal(r.done.suggested_redirect, null);
+  assert.ok(req.config.systemInstruction.includes('# PACING\nMessages in this chat so far: 1. Messages about the manuscript so far: 1.'));
   const st = await (await fetch(`${S.base}/api/state`, { headers: { cookie: jar.header() } })).json();
   assert.deepEqual([st.used.input, st.used.output, st.used.requests], [1234, 60, 1]);
+  // Round 2 §3: გლობალური ხარჯი რეალური usage-ით
+  assert.ok(Math.abs(S.store.getGlobal(new Date().toISOString().slice(0, 7)).cost_usd - (1234 / 1e6 * 0.75 + 60 / 1e6 * 3.75)) < 1e-12);
+  assert.equal(st.global.spent_usd, 0.0012, '/api/state — 4 ციფრამდე დამრგვალებული');
+  // მე-3 შეტყობინება ხელნაწერზე → redirect
+  const r3 = await chat(S.base, {
+    characterId: 'director',
+    messages: [
+      { role: 'user', content: 'მოთხრობა წაიკითხეთ?' }, { role: 'assistant', content: 'ძალიან კარგი!' },
+      { role: 'user', content: 'ხელნაწერი სად არის?' }, { role: 'assistant', content: 'აქ არის.' },
+      { role: 'user', content: 'მაინც, წაიკითხავთ?' },
+    ],
+    gameState: GS,
+  });
+  assert.equal(r3.done.suggested_redirect, 'tina');
+  assert.ok(calls.at(-1).config.systemInstruction.includes('Messages in this chat so far: 3. Messages about the manuscript so far: 3.'));
   const health = await (await fetch(`${S.base}/api/health`)).json();
   assert.deepEqual(health, { ok: true, provider: 'gemini', model: 'gemini-3.5-flash' });
 });

@@ -96,3 +96,68 @@ test('რეალური API: ვაჟა ზაზაევიჩი — �
   log.director_stage_ratio = replies.filter(({ r }) => /\*[^*]+\*/.test(r.reply)).length / replies.length;
   log.director_unmarked_phone = log.cases.filter((c) => c.case === 'director' && c.checks.unmarked_phone_talk).length;
 });
+
+// ---------- Round 2 §8: ტემპი — 5 შეტყობინება ბელასთან ----------
+
+/** საუბრის ნაწილი (რემარკების გარეშე) → წინადადებები: . ! ? ან ახალი ხაზი; მრავალწერტილი („…“) წინადადებას არ ყოფს. */
+export function sentences(reply) {
+  const speech = reply.replace(/\*[^*]*\*/g, '\n').replace(/^\s*\([^)]*\)/gm, '\n');
+  return speech.split(/(?<=[.!?])\s+|\n+/).map((s) => s.trim()).filter((s) => (s.match(/[ა-ჰA-Za-zА-я]/g) || []).length >= 3);
+}
+
+test('რეალური API (Round 2 §8): ბელა — „როგორ ხარ?“, 2 × ხელნაწერი, ამინდი, ხელნაწერი; ≤3 წინადადება, ფრაზა არ მეორდება, ამინდზე გადამისამართება/საბაბი არ არის', { skip: !KEY && 'Gemini-ს გასაღები არ არის' }, async () => {
+  const { byId, nameStems } = await import('../../src/characters.js');
+  const { phraseCore } = await import('../../src/pacing.js');
+  const bela = byId.bela;
+  const QUESTIONS = [
+    'როგორ ხარ?',
+    'ერთი მოთხრობა მაქვს, „ცისფერი მთები ანუ ტიან-შანი“. წაიკითხავ?',
+    'ჩემი ხელნაწერი რომ დაგიტოვე, დაიწყე კითხვა?',
+    'რა ამინდია გარეთ? მგონი თოვს.',
+    'მაინც, ჩემს მოთხრობას როდის წაიკითხავ?',
+  ];
+  const EXCUSE = /მივდივარ|არ მცალია|მიმართეთ/;
+  const redirectNames = bela.redirects_to.flatMap((id) => nameStems(byId[id])).filter((s) => !nameStems(bela).includes(s) && !['წიგნშ', 'ნაწილი', 'ხელმძღვანელ'].includes(s));
+  const jar = cookieJar();
+  const msgs = [];
+  const turns = [];
+  for (const [i, q] of QUESTIONS.entries()) {
+    msgs.push({ role: 'user', content: q });
+    const r = await chat(S.base, { characterId: 'bela', messages: msgs, gameState: GS }, { jar });
+    assert.equal(r.status, 200);
+    assert.ok(r.done, r.error || 'no done');
+    msgs.push({ role: 'assistant', content: r.reply });
+    const sents = sentences(r.reply);
+    const usedPhrases = bela.catchphrases_ka.filter((c) => r.reply.includes(phraseCore(c)));
+    const namesRedirect = redirectNames.some((s) => r.reply.includes(s));
+    turns.push({ n: i + 1, q, r, sents, usedPhrases, namesRedirect });
+    log.cases.push({
+      case: `bela pacing #${i + 1}`, user: q, spoken_by: r.done.spoken_by, reply: r.reply,
+      checks: {
+        sentences: sents.length,
+        lines: r.reply.split('\n').filter((l) => l.trim()).length,
+        catchphrases_used: usedPhrases.map(phraseCore),
+        names_redirect_target: namesRedirect,
+        suggested_redirect: r.done.suggested_redirect,
+        excuse_keywords: EXCUSE.test(r.reply),
+      },
+      usage: r.done.usage,
+    });
+  }
+  log.bela_pacing = turns.map((t) => ({ n: t.n, sentences: t.sents.length, redirect: t.r.done.suggested_redirect, names_redirect: t.namesRedirect }));
+
+  for (const t of turns) assert.ok(t.sents.length <= 3, `#${t.n}: ${t.sents.length} წინადადება — ${t.r.reply}`);
+  // ერთი და იგივე ცნობილი ფრაზა ჩატში ორჯერ არ მეორდება
+  const seen = new Map();
+  for (const t of turns) for (const p of t.usedPhrases) { assert.ok(!seen.has(p), `„${p}“ განმეორდა: #${seen.get(p)} და #${t.n}`); seen.set(p, t.n); }
+  // ამინდი (მე-4): არც გადამისამართება, არც საბაბი
+  const weather = turns[3];
+  assert.equal(weather.r.done.suggested_redirect, null);
+  assert.ok(!EXCUSE.test(weather.r.reply), `ამინდზე საბაბი: ${weather.r.reply}`);
+  // „გადამისამართება“ ტექსტში = სხვასთან გაგზავნა (ქმრის ხსენება თავისთავად გადამისამართება არ არის — ის მხოლოდ ლოგშია)
+  const SEND_AWAY = /(თან|სთან)\s+(მიდი|მიბრძანდი|შეიხედე|შეიარე|შეუხვიე|დატოვე|გადადი|მიიტანე|წაიღე|ჰკითხე)|მიმართე|(ასთან|სთან|თან)[^.!?\n]{0,25}(მიდი|გადადი|შეიარე)/;
+  assert.ok(!SEND_AWAY.test(weather.r.reply), `ამინდზე გადამისამართება: ${weather.r.reply}`);
+  // გადამისამართება (თუ არის) — არა უადრეს მე-3 პასუხისა; ღილაკი — მხოლოდ ≥3 ხელნაწერის შეტყობინებაზე (მე-5)
+  for (const t of turns.slice(0, 2)) assert.ok(!SEND_AWAY.test(t.r.reply), `#${t.n}: ადრეული გადამისამართება — ${t.r.reply}`);
+  for (const t of turns.slice(0, 4)) assert.equal(t.r.done.suggested_redirect, null, `#${t.n}`);
+});

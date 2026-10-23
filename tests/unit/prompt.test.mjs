@@ -9,10 +9,12 @@ const cfg = {
 };
 const GS = { season: 'winter', crackStage: 2, lostCopies: 2, cycle: 1 };
 
-test('ზოგადი ინსტრუქცია: 15–25 წესი, ენის/სიგრძის/ხელნაწერის/AI წესები', () => {
+test('ზოგადი ინსტრუქცია: 15–25 წესი, ენის/ტემპის/ხელნაწერის/AI წესები', () => {
   assert.ok(GENERAL_RULES_EN.length >= 15 && GENERAL_RULES_EN.length <= 25, String(GENERAL_RULES_EN.length));
   const all = GENERAL_RULES_EN.join('\n');
-  for (const needle of ['LANGUAGE', 'LENGTH', 'NEVER read the manuscript', 'Shukri', 'Mikho', 'Soso', 'AI', 'calm', 'ONE famous catchphrase', 'Time loops', 'season']) {
+  // Round 2 §8: ხარისხი, PACING, REDIRECTS LATER, OFF-TOPIC, FORMAT (\n)
+  for (const needle of ['LANGUAGE', 'Write correct, natural Georgian', 'PACING', 'ONE idea per reply', 'REDIRECTS AND "NO TIME" COME LATER',
+    'OFF-TOPIC', 'FORMAT', 'NEW LINE (\\n)', 'NEVER read the manuscript', 'Shukri', 'Mikho', 'Soso', 'AI', 'calm', 'ONE famous catchphrase', 'Time loops', 'season']) {
     assert.ok(all.includes(needle), needle);
   }
 });
@@ -22,7 +24,7 @@ test('ხილული პერსონაჟი: სამყარო + �
   assert.ok(s.includes(world.setting_en));
   assert.ok(s.includes(world.setting_ka));
   assert.ok(s.includes(world.core_rules_en[0]));
-  assert.ok(s.includes('ძალიან კარგი!'));                     // shared idiom / catchphrase
+  assert.ok(s.includes('ძალიან კარგი!'));                     // დირექტორის catchphrase (shared-იდან Round 2-ში ამოღებულია)
   assert.ok(s.includes('wrong_title_praise'));               // evasion taxonomy
   assert.ok(s.includes(byId.director.system_prompt_en));
   assert.ok(s.includes(byId.director.persona_ka.speech_style));

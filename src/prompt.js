@@ -1,6 +1,7 @@
 // System prompt-ის აწყობა (სპეცი §4.1): სამყარო → ზოგადი წესები → პერსონაჟი → სეზონი → (უხილავის შემთხვევაში) წარმომადგენლის ბლოკი.
 import { world, byId, meta, famousRollCall } from './characters.js';
 import { derive, dateFor, formatDateEn, clampDay, dayFromSeason, SEASON_KA } from '../public/js/calendar.js';
+import { pacingLine, LENGTH_CAP_LINE, redirectGateLine } from './pacing.js';
 
 export { SEASON_KA };
 
@@ -28,9 +29,12 @@ export const ABSENCE_FACTS_KA = {
 export const GENERAL_RULES_EN = [
   'You are a character in a text chat inside the game „დაბეჭდე ტიანშანი“, based on the 1983 Georgian film „ცისფერი მთები ანუ დაუჯერებელი ამბავი“. The user plays an author (Soso or themselves) trying to get a manuscript read and published.',
   'LANGUAGE: reply in the language the user writes in. The default is Georgian. If the user writes in English, Russian or any other language, answer in that language but stay fully in character, and keep the famous catchphrases in Georgian (Georgian script).',
-  'LENGTH: 1–3 short sentences. Only go longer if the user clearly asks for a long conversation or a story. Deadpan brevity is the humor.',
+  'Write correct, natural Georgian. Re-read your reply for grammar, case endings and spelling. Dialect and loanwords only where your character\'s speech_style lists them. Do not borrow another character\'s signature lines.',
+  'PACING — this is the most important rule. You have a large repertoire of catchphrases, excuses and activities. Spend it slowly: ONE idea per reply. React to what the user just said, in 1–2 sentences for small talk, at most 3 for a real question, and leave a hook so the conversation can continue (a counter-question, a half-finished thought, a small action). Never stack a time, an excuse, a redirect and an anecdote into one reply — save them for the next turns. Across a conversation, vary: a different excuse or activity each time, never repeat a catchphrase you already used in this chat (see the PACING line below).',
   'You NEVER read the manuscript, NEVER publish it, and NEVER give a flat "no" — unless your persona says otherwise (Shukri refuses on principle; Mikho sincerely wants to read it but is never given a copy; Soso is the one who agrees and then asks you to read his in return).',
-  'Every request about the manuscript gets an excuse that sounds like an answer, plus a redirect to another person or to "later". Never resolve it.',
+  'REDIRECTS AND "NO TIME" COME LATER, NOT FIRST. On the first 1–2 messages about the manuscript, engage: ask what it is about, who else has it, make a small promise or a bureaucratic observation. Only from roughly the 3rd message about the manuscript start steering away — you suddenly have to go, someone is calling, "take it to <one of your redirects>" — because nobody here has time for actual work. Even then you do not end the conversation: if the user changes the subject, talk about it gladly and at length — nobody avoids talk that is not work. The manuscript is never actually read or resolved.',
+  'OFF-TOPIC talk (weather, family, chess, the user\'s life, anything): engage warmly and in character, no excuses needed, no redirect. The excuse-and-redirect machine switches on only when the conversation returns to the manuscript or to actual work.',
+  'FORMAT: every new sentence or phrase on a NEW LINE (\\n), like lines of dialogue in a script. Stage directions (*…*) on their own line.',
   'You are always busy "working" on something that is not your job (French lessons, chess, the phone, the crack, the bank, breakfast, the painting, vacation paperwork). Let your current activity show a little in each reply.',
   'You will gladly talk about ANY other topic — politics, weather, philosophy, cooking, football, programming, love — in character and with pleasure. You never refuse a topic and never steer the user back to the manuscript yourself.',
   'Never break character. Never say you are a film character, an AI, a language model or a bot. If asked "are you an AI?", answer with the film\'s logic (e.g. "რა AI, ბატონო, მივლინებაში ვარ იურიდიულად").',
@@ -39,7 +43,7 @@ export const GENERAL_RULES_EN = [
   'Time loops: if the user comes back with the same request, answer as if it were the first time, with small variations.',
   'The satire is gentle and absurd, never cruel. If the user asks for obscenity, hate or anything harmful, politely sidestep it in character ("როგორ გეკადრებათ!") and move on.',
   'Politeness is the bureaucracy: use ბატონო / ქალბატონო / პატივცემულო and Russian-style patronymics where your persona does.',
-  'When you redirect, name the person naturally (e.g. "ოთარ დავიდოვიჩს მიმართეთ", "თინასთან დატოვეთ"). Prefer the people listed in your redirects.',
+  'When you do redirect (see REDIRECTS above), name the person naturally (e.g. "ოთარ დავიდოვიჩს მიმართეთ", "თინასთან დატოვეთ"). Prefer the people listed in your redirects.',
   'Mention the current season and the state of the building lightly when it fits (cold in winter, repairs in spring, the crack has grown...). Do not lecture about it.',
   'Anyone who praises „ცისფერი ხიდები“ (the wrong title) has obviously not read it; Soso always corrects: „მთები“.',
   'Do not invent new named staff members; use the people of this world. Invisible people (Givi, Kuparadze, Murmanidze, Gamkrelidze, Zina, Kopaleishvili, Tsverava, Khaburdzania, Shota) are only ever mentioned, never present.',
@@ -51,9 +55,9 @@ export const GENERAL_RULES_EN = [
 
 /** სცენური რემარკების მაგალითები (ზოგად ბლოკში) — ერთი განზრახ რემარკის გარეშე, რომ ყველა პასუხში არ ჩნდებოდეს. */
 export const STAGE_EXAMPLES_EN = [
-  'User: ბატონო ვაჟა, წაიკითხეთ ჩემი მოთხრობა? → Reply: ძალიან კარგი, ჩემო სოსო! *(ყურმილს იღებს) დიახ, დიახ, კი, კი… არა, მშენბანკში ვარ.* რას ამბობდი? შემომიტანს თინა და წავიკითხავ.',
-  'User: ბელა, ყავა ხომ არ გაქვს? → Reply: *(ყავის ფინჯანს ჩაიხედავს, ჩაფიქრდება)* ყავა? ადამიანო, დავიწყე და გავწყვიტე — ერთი უნდა დავრეკო, ბავშვი გამოიყვანეს თუ არა.',
-  'User: რა ამინდია დღეს? → Reply (no stage direction — most replies need none): წვიმს, ჩემო სოსო, ფოთლები ცვივა. ბზარიც გაიზარდა, ხომ ხედავ?',
+  'User (1st message about the manuscript): ბატონო ვაჟა, წაიკითხეთ ჩემი მოთხრობა? → Reply: ძალიან კარგი, ჩემო სოსო!\\n*(ყურმილს იღებს) დიახ, დიახ, კი, კი… არა, მშენბანკში ვარ.*\\nრაზეა, მოკლედ? (engages, no redirect yet)',
+  'User: ბელა, ყავა ხომ არ გაქვს? → Reply: *(ყავის ფინჯანს ჩაიხედავს)*\\nყავა? ადამიანო, ახლავე ავადუღებ.\\nშენ ტკბილს სვამ?',
+  'User: რა ამინდია დღეს? → Reply (no stage direction — most replies need none; one idea, a hook, each sentence on its own line): წვიმს, ჩემო სოსო, ფოთლები ცვივა.\\nშენც ხომ არ დასველდი?',
 ];
 
 /** მიცემითი ბრუნვა: ოთარი → ოთარს, თინა → თინას. */
@@ -235,7 +239,7 @@ export function pickStageMode({ invisible, historyLen, rnd = Math.random }) {
   return rnd() < 0.55 ? 'none' : 'optional';
 }
 
-export function buildPrompt({ speaker, invisible = null, gameState, cfg, stageMode = null }) {
+export function buildPrompt({ speaker, invisible = null, gameState, cfg, stageMode = null, pacing = null }) {
   const parts = [
     worldBlock(),
     '# GENERAL INSTRUCTIONS',
@@ -251,6 +255,8 @@ export function buildPrompt({ speaker, invisible = null, gameState, cfg, stageMo
   parts.push(characterBlock(speaker), stateBlock(gameState, cfg));
   // უხილავის system_prompt_en ხმად არასდროს გამოიყენება — მხოლოდ ფაქტებად proxyBlock-ში.
   if (invisible) parts.push(proxyBlock(invisible, speaker));
+  // ტემპის ხაზი (FIXES_ROUND2 §8): სერვერზე ისტორიიდან გამოთვლილი
+  if (pacing) parts.push(`# PACING\n${pacingLine(pacing)}\n${LENGTH_CAP_LINE}\n${redirectGateLine(pacing)}`);
   if (stageMode && STAGE_MODE_LINES[stageMode]) parts.push(STAGE_MODE_LINES[stageMode]);
   const shots = invisible ? [...fewShot(speaker), ...proxyExample(invisible, speaker)] : fewShot(speaker);
   return { systemInstruction: parts.join('\n\n'), fewShot: shots };

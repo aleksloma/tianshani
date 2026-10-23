@@ -20,11 +20,13 @@ test('GET /api/characters: 29 პერსონაჟი, 12 კედელზ
   assert.ok(!raw.includes('system_prompt_en') && !raw.includes('You are '), 'სრული პრომპტები კლიენტთან არ მიდის');
   assert.ok(!raw.includes('test-admin-pass'), 'ადმინის პაროლი არ ჩანს');
   assert.ok(!('gemini' in j.config) && !('admin' in j.config) && !('logging' in j.config), 'საიდუმლო კონფიგი არ ჩანს');
-  // Round 1 §4: დღეებზე დაფუძნებული დრო
+  // Round 1 §4 + Round 2 §5: დღეებზე დაფუძნებული დრო, +20 დღე ყოველ გაცვლაზე
   assert.equal(j.config.game.start_date, '1983-09-01');
   assert.equal(j.config.game.days_per_season, 90);
-  assert.equal(j.config.game.days_per_character_switch, 20);
-  assert.equal(j.config.game.days_per_exchange, 0);
+  assert.equal(j.config.game.days_per_character_switch, 0);
+  assert.equal(j.config.game.days_per_exchange, 20);
+  // Round 2 §7: ფონი ეტაპების მიხედვით (არარსებული ფაილი → null)
+  assert.deepEqual(j.wall_backgrounds, ['assets/wall.jpg', null, null, null, null]);
   assert.ok(!('_comment' in j.config.game));
   assert.deepEqual(j.config.game.seasons, ['autumn', 'winter', 'spring', 'summer']);
   assert.equal(j.config.wall.layout_seed, 1983);
@@ -49,17 +51,34 @@ test('POST /api/chat: SSE delta-ები და done (usage, remaining, suggest
   assert.ok(jar.get('tianshani_cid'), 'httpOnly cookie დაყენდა');
 });
 
-test('suggested_redirect: ხელნაწერზე საუბრისას ხშირად ბრუნდება და ყოველთვის redirects_to-დანაა', async () => {
-  let hits = 0;
-  for (let i = 0; i < 12; i++) {
-    const r = await chat(S.base, {
+test('suggested_redirect (Round 2 §8): ხელნაწერზე 1–2 შეტყობინებაზე არასდროს; მე-3-დან ბრუნდება და redirects_to-დანაა', async () => {
+  const targets = ['kopaleishvili', 'director', 'grisha'];
+  // პირველი/მეორე შეტყობინება ხელნაწერზე → არასდროს (პასუხი შეიძლება ასახელებდეს კიდეც)
+  for (let i = 0; i < 6; i++) {
+    const r1 = await chat(S.base, { characterId: 'otari', messages: [{ role: 'user', content: `მოთხრობა წაიკითხეთ? (${i})` }], gameState: GS });
+    assert.equal(r1.done.suggested_redirect, null, `1: ${r1.reply}`);
+    const r2 = await chat(S.base, {
       characterId: 'otari',
-      messages: [{ role: 'user', content: `მოთხრობა წაიკითხეთ? (${i})` }],
+      messages: [{ role: 'user', content: 'ხელნაწერი მოგიტანეთ' }, { role: 'assistant', content: 'მოიტა.' }, { role: 'user', content: `წაიკითხეთ? (${i})` }],
       gameState: GS,
     });
-    if (r.done.suggested_redirect) { hits++; assert.ok(['kopaleishvili', 'director', 'grisha'].includes(r.done.suggested_redirect)); }
+    assert.equal(r2.done.suggested_redirect, null, `2: ${r2.reply}`);
   }
-  assert.ok(hits >= 3, `hits=${hits}`);
+  // მესამე შეტყობინება ხელნაწერზე → mock სახელით გადაამისამართებს
+  let hits = 0;
+  for (let i = 0; i < 6; i++) {
+    const r = await chat(S.base, {
+      characterId: 'otari',
+      messages: [
+        { role: 'user', content: 'ხელნაწერი მოგიტანეთ' }, { role: 'assistant', content: 'მოიტა.' },
+        { role: 'user', content: 'წაიკითხეთ?' }, { role: 'assistant', content: 'ჯერ არა.' },
+        { role: 'user', content: `ჩემი მოთხრობა სად არის? (${i})` },
+      ],
+      gameState: GS,
+    });
+    if (r.done.suggested_redirect) { hits++; assert.ok(targets.includes(r.done.suggested_redirect), r.done.suggested_redirect); }
+  }
+  assert.ok(hits >= 4, `hits=${hits}`);
 });
 
 test('უხილავი (გივი): პასუხობს წარმომადგენელი, არასდროს გივი; სხვადასხვა წარმომადგენელი', async () => {
