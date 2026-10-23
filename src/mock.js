@@ -18,6 +18,30 @@ const PAINTING_LINES = {
   mikho: 'ჩამოვარდა… მარტო ხომ ვერ ავწევ.',
 };
 
+// სცენური რემარკები (*…*) — პერსონაჟის რეალური საქმიანობიდან; ტესტები ამოწმებენ, რომ .stage ელემენტები ჩანს და * არ ჩანს
+const STAGE_LINES = {
+  director: '*(ყურმილს იღებს) დიახ, დიახ, კი, კი, გისმენთ… არა, შენ არა, ყურმილს ვეუბნები.*',
+  vaso: '*(სურათს ახედავს, მაგიდას სულს უბერავს)*',
+  marksheideri: '*(კედელს თითით ეხება, ბზარს აკვირდება)*',
+  irodioni: '*(სეიფს ხელს უტყაპუნებს)*',
+  tamari: '*(სიგარეტს ეძებს, თავზე ხელს იდებს)*',
+  grisha: '*(უწყისებს ფურცლავს)*',
+  mikho: '*(კიბეს მხარზე იდებს)*',
+  bela: '*(ყურმილს აიღებს) ალო, ბავშვი გამოიყვანეთ? კარგი, კარგი.*',
+  tina: '*(ტელეფონი რეკავს) დიახ, გისმენთ. არა, არ არი.*',
+  otari: '*(შაბიამნის ტომრებს გვერდით გადადებს, ხელებს ერთმანეთზე დაიბერტყავს)*',
+  shukri: '*(ნაბდის ქუდს ისწორებს, წიგნს მაგიდის ქვეშ მალავს)*',
+  two_big_men: '*(კარზე აკაკუნებენ, გასაღებების რგოლს ატრიალებენ)*',
+};
+const STAGE_PROXY = '*(დერეფანში გამოდის, კარს უყურებს)*';
+
+/** რემარკა მოსაუბრისთვის; თუ ცხრილში არ არის — persona_ka.real_activity-დან. */
+export function stageFor(speaker) {
+  if (STAGE_LINES[speaker.id]) return STAGE_LINES[speaker.id];
+  const act = (speaker.persona_ka?.real_activity || '').split(/[,.;]/)[0].trim();
+  return act ? `*(${act})*` : '*(ფანჯარაში იყურება)*';
+}
+
 // არაქართულ შეტყობინებაზე — პასუხი იმავე ენაზე, ცნობილი ფრაზა ქართულად რჩება
 const FOREIGN = {
   en: (name) => `Excuse me, I am terribly busy right now — ${name} has a lot of work, you understand. Leave it here, we will see later.`,
@@ -54,10 +78,21 @@ export function composeMockReply({ speaker, invisible, userText, historyLen, gam
   const parts = [];
 
   if (invisible) {
+    // წარმომადგენელი (Round 1 §3): მხოლოდ უხილავზე, მესამე პირში — სად არის, რატომ არ არის, სად წავიდეს მომხმარებელი.
+    // წარმომადგენლის საკუთარ „ხელნაწერზე რეაქციას“ აქ არ ვამატებთ — სწორედ ეს აბნევდა მომხმარებელს.
+    if (historyLen < 2) parts.push(STAGE_PROXY);
     const absence = (ABSENCE_FACTS_KA[invisible.id] || `${invisible.short_name_ka} არ არის.`).split(';')[0].trim();
-    if (lang === 'ka' || lang === 'unknown') parts.push(`${absence}.`.replace(/\.\.$/, '.'));
-    else parts.push((FOREIGN_ABSENT[lang] || FOREIGN_ABSENT.other)(enShort(invisible)));
+    if (lang !== 'ka' && lang !== 'unknown') {
+      parts.push((FOREIGN_ABSENT[lang] || FOREIGN_ABSENT.other)(enShort(invisible)));
+      return parts.join(' ');
+    }
+    parts.push(`${absence}.`.replace(/\.\.$/, '.'), `${invisible.short_name_ka} ისევ არ ჩანს — დაელოდეთ, ან სხვას ჰკითხეთ.`);
+    if ((h & 1) === 0) parts.push(pick(SEASON_LINES[gameState.season] || [], h >>> 5));
+    const doors = (speaker.redirects_to || []).filter((id) => byId[id] && byId[id].reachable && id !== invisible.id);
+    parts.push(doors.length ? `${dative(byId[pick(doors, h >>> 9)].short_name_ka)} მიმართეთ.` : 'ხელნაწერი თინასთან დატოვეთ.');
+    return parts.filter(Boolean).join(' ');
   }
+  parts.push(stageFor(speaker));
 
   if (lang !== 'ka' && lang !== 'unknown') {
     parts.push((FOREIGN[lang] || FOREIGN.other)(enShort(speaker)));
@@ -96,8 +131,9 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 /**
  * იგივე ინტერფეისი, რაც gemini.streamChat: async generator → { delta } ... ბოლოს { usage }.
  */
-export async function* mockStream({ systemInstruction, contents, speaker, invisible, userText, gameState, signal }) {
-  const historyLen = contents.length;
+export async function* mockStream({ systemInstruction, contents, speaker, invisible, userText, gameState, signal, historyLen: convLen }) {
+  // საუბრის სიგრძე few-shot-ის გარეშე (წინა შეტყობინებების რაოდენობა); ძველი გამოძახებისთვის — contents.length
+  const historyLen = Number.isInteger(convLen) ? convLen : contents.length;
   const text = composeMockReply({ speaker, invisible, userText, historyLen, gameState });
   const delay = Number(process.env.MOCK_DELAY_MS ?? 25);
   // სიტყვა + მისი მომდევნო სივრცე ერთ delta-დ

@@ -79,6 +79,16 @@
   line-height: 1.2;
 }
 .chat-head p { margin: 2px 0 0; font-size: 12.5px; color: var(--ink-soft); }
+/* წარმომადგენელი სათაურში: ~~უხილავი~~ **პასუხობს** + ქვესათაური */
+#chat-name .who.proxied .real { font-size: 1.2em; font-weight: 800; color: var(--accent, #1e3a5a); }
+#chat-name .who.proxied s.struck { font-size: 0.85em; }
+.chat-sub {
+  margin-top: 3px !important;
+  font-size: 12px !important;
+  color: #8a3a2b !important;
+  font-style: italic;
+}
+.chat-sub[hidden] { display: none; }
 .close {
   flex: none;
   width: 34px; height: 34px;
@@ -107,7 +117,57 @@ s.struck::after {
   transform: rotate(-7deg);
   border-radius: 2px;
 }
-.who .real { font-weight: 700; }
+.who .real { font-weight: 700; color: var(--accent, #1e3a5a); }
+.who.proxied { display: inline-flex; align-items: center; gap: 3px; }
+.who .thumb {
+  width: 24px; height: 24px;
+  border-radius: 50%;
+  object-fit: cover;
+  object-position: 50% 20%;
+  border: 1.5px solid var(--accent, #1e3a5a);
+  background: #e6e0cf;
+  margin-right: 2px;
+  filter: sepia(0.3) contrast(0.9);
+}
+
+/* ცენტრალურ სილუეტზე: „პასუხობს: X“ ბეჯი პატარა პორტრეტით */
+.proxy-badge {
+  position: absolute;
+  right: 6%;
+  bottom: 18%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: 4px 6px 5px;
+  background: rgba(245, 238, 219, 0.92);
+  border: 2px solid var(--accent, #1e3a5a);
+  border-radius: 4px;
+  box-shadow: 2px 4px 10px rgba(0, 0, 0, 0.35);
+  transform: rotate(3deg);
+}
+.proxy-badge .thumb {
+  width: 56px; height: 56px;
+  border-radius: 3px;
+  object-fit: cover;
+  object-position: 50% 20%;
+  border: 1px solid rgba(42, 38, 34, 0.4);
+  filter: sepia(0.3) contrast(0.9);
+  background: #e6e0cf;
+}
+.proxy-badge .cap { font-size: 11px; font-weight: 700; color: var(--accent, #1e3a5a); white-space: nowrap; }
+
+/* სცენური რემარკები — სცენარის სტილში: სხვა შრიფტი, დახრილი, ჩამქრალი ყავისფერი, ოდნავ პატარა */
+.bubble .stage {
+  font-family: var(--font-title);
+  font-stretch: 80%;
+  font-style: italic;
+  font-size: 0.92em;
+  color: #7a6a58;
+  letter-spacing: 0.01em;
+}
+.bubble .stage.block { display: block; margin: 1px 0 3px; }
+.bubble .stage.block + .speech { display: block; }
 
 .chat-log {
   flex: 1 1 auto;

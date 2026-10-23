@@ -12,41 +12,41 @@ import { composeMockReply, dative } from '../../src/mock.js';
 import { toGeminiContents } from '../../src/gemini.js';
 import { byId } from '../../src/characters.js';
 
-const G = { exchanges_per_season: 2, seasons: ['autumn', 'winter', 'spring', 'summer'], crack_stages: 5, copies: 3 };
+// Round 1: სეზონებს დღეები მართავს. days_per_exchange > 0 → შეტყობინებებიც ამოძრავებს დროს (ძველი „exchanges_per_season“-ის ექვივალენტი).
+const G = { days_per_season: 90, days_per_exchange: 45, days_per_character_switch: 20, seasons: ['autumn', 'winter', 'spring', 'summer'], crack_stages: 5, copies: 3 };
 
-test('სეზონები: ყოველ N გაცვლაზე → შემდეგი სეზონი, ბზარი +1, ეგზემპლარი −1', () => {
-  let s = initialState(1, G.seasons);
+test('სეზონები days_per_exchange-ით: ყოველ 2 გაცვლაზე (45 დღე) → შემდეგი სეზონი, ბზარი +1, ეგზემპლარი −1, ბოლოს ჩამონგრევა', () => {
+  let s = { ...initialState(1), season: 'autumn', crackStage: 0, lostCopies: 0 };
   let r = applyExchange(s, G, 'director');
-  assert.equal(r.event, null);
+  assert.deepEqual(r.events, []);
   assert.equal(r.state.exchanges, 1);
+  assert.equal(r.state.day, 45);
   assert.deepEqual(r.state.visited, ['director']);
   r = applyExchange(r.state, G, 'vaso');
-  assert.equal(r.event, 'season');
+  assert.deepEqual(r.events, [{ type: 'season', season: 'winter' }]);
   assert.equal(r.state.season, 'winter');
   assert.equal(r.state.crackStage, 1);
   assert.equal(r.state.lostCopies, 1);
-  assert.equal(r.state.exchanges, 0);
+  assert.equal(r.state.exchanges, 2, 'exchanges სტატისტიკისთვის აღარ ნულდება');
   s = r.state;
   for (const expected of ['spring', 'summer']) {
     s = applyExchange(s, G, 'tina').state;
     r = applyExchange(s, G, 'tina');
-    assert.equal(r.event, 'season');
-    assert.equal(r.state.season, expected);
+    assert.deepEqual(r.events, [{ type: 'season', season: expected }]);
     s = r.state;
   }
   assert.equal(s.lostCopies, 3);
   assert.equal(s.crackStage, 3);
-  // ზაფხულის ბოლო → ჩამონგრევა
   s = applyExchange(s, G, 'tina').state;
   r = applyExchange(s, G, 'tina');
-  assert.equal(r.event, 'collapse');
-  assert.equal(r.state.crackStage, 4);
+  assert.deepEqual(r.events, [{ type: 'collapse' }]);
   const n = nextCycle(r.state, G);
-  assert.deepEqual({ ...n, visited: [] }, { cycle: 2, season: 'autumn', exchanges: 0, crackStage: 0, lostCopies: 0, paintingFallen: false, visited: [] });
-  // ჩამოვარდნილი სურათი სეზონებს შორის რჩება, ახალ შენობაში ბრუნდება
-  const fallen = applyExchange({ ...initialState(1, G.seasons), paintingFallen: true }, G, 'vaso').state;
-  assert.equal(fallen.paintingFallen, true);
-  assert.equal(nextCycle({ ...fallen, cycle: 1 }, G).paintingFallen, false);
+  assert.equal(n.cycle, 2);
+  assert.equal(n.day, 0);
+  assert.equal(n.season, 'autumn');
+  assert.equal(n.crackStage, 0);
+  assert.equal(n.lostCopies, 0);
+  assert.equal(n.paintingFallen, false, 'ახალ შენობაში სურათი ისევ ეკიდება');
 });
 
 test('periodKey: monthly → YYYY-MM, lifetime → all', () => {
@@ -101,7 +101,8 @@ test('mock: ქართულად ქართულზე, ინგლი�
   const ka = composeMockReply({ speaker: byId.director, invisible: null, userText: 'მოთხრობა წაიკითხეთ?', historyLen: 0, gameState: gs });
   assert.equal(guessLang(ka), 'ka');
   const en = composeMockReply({ speaker: byId.tina, invisible: null, userText: 'Hello, is the director in?', historyLen: 0, gameState: gs });
-  assert.ok(en.startsWith('Excuse me'));
+  assert.ok(en.includes('Excuse me'));
+  assert.ok(en.startsWith('*('), 'Round 1: mock პასუხი რემარკით იწყება');
   assert.ok(/[Ⴀ-ჿ]/.test(en), 'ცნობილი ფრაზა ქართულად რჩება');
   const absent = composeMockReply({ speaker: byId.two_big_men, invisible: byId.givi, userText: 'გივი აქ არის?', historyLen: 0, gameState: gs });
   assert.ok(absent.includes('გივი ოთახში არ არის'));
