@@ -56,7 +56,7 @@ npm start
 | `DB_PATH` | რეკომენდებული | SQLite ფაილის გზა persistent disk-ზე, მაგ. `/var/data/tianshani.db` |
 
 - **Build:** `npm ci` · **Start:** `npm start` · Node ≥ 20 (`package.json → engines`).
-- სხვა პარამეტრები (ლიმიტები, მოდელი, სეზონის სიგრძე) აიღება `settings.example.json`-იდან; შესაცვლელად ჰოსტინგზე შეგიძლიათ `settings.json` ფაილიც შექმნათ, ან `SETTINGS_PATH`-ით სხვა ფაილზე მიუთითოთ.
+- სხვა პარამეტრები (ლიმიტები, მოდელი, შიდა კალენდარი: `game.start_date`, `game.days_per_season`, `game.days_per_character_switch`, `game.days_per_exchange`) აიღება `settings.example.json`-იდან; შესაცვლელად ჰოსტინგზე შეგიძლიათ `settings.json` ფაილიც შექმნათ, ან `SETTINGS_PATH`-ით სხვა ფაილზე მიუთითოთ.
 - **SQLite და ეფემერული დისკი:** Render/Railway/Fly-ის სტანდარტულ ინსტანსებზე ფაილური სისტემა ყოველ deploy-ზე/გადატვირთვაზე იშლება — `data/tianshani.db` (ლოგები, ტოკენების აღრიცხვა, ადმინის სესიები) დაიკარგება. ამიტომ მიაბით persistent disk/volume და `DB_PATH` მასზე მიუთითეთ (Render: Disk → `/var/data`, Railway: Volume, Fly: `fly volumes create` + mount).
 - მაგალითი (Render Web Service): Runtime Node, Build `npm ci`, Start `npm start`, Environment: `GEMINI_API_KEY`, `ADMIN_PASSWORD`, `DB_PATH=/var/data/tianshani.db`, Disk mount path `/var/data`.
 - `better-sqlite3` Linux-ზე prebuilt binary-ს იყენებს; build tools საჭირო არ არის.
