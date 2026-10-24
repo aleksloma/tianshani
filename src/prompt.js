@@ -88,7 +88,6 @@ export const SHAPE_EXAMPLES = [
 
 /** მაგალითები პრომპტის ტექსტად (\n — ლიტერალურად, როგორც მოდელს ვთხოვთ). */
 export const SHAPE_EXAMPLES_EN = SHAPE_EXAMPLES.map((ex) => `${ex.turns.map((t) => `User: ${t.user} → Reply: ${t.reply.replace(/\n/g, '\\n')}`).join(' | next turn — ')} (${ex.note})`);
-export const STAGE_EXAMPLES_EN = SHAPE_EXAMPLES_EN; // ძველი სახელი (Round 1–3 ტესტები)
 
 // ---------- Round 3 §1: მომხმარებლის სახელი ----------
 

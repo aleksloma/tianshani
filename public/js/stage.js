@@ -90,7 +90,10 @@ export function speechLines(text) {
 /** DOM რენდერი (ბრაუზერში): bubble-ის შიგთავსი სეგმენტებად. textContent — არასდროს innerHTML. */
 export function renderSegments(container, text) {
   const frag = document.createDocumentFragment();
-  for (const s of parseStage(text)) {
+  const segs = parseStage(text);
+  const inlineStage = (s) => s && s.type === 'stage' && !s.block;
+  for (let i = 0; i < segs.length; i++) {
+    const s = segs[i];
     if (s.type === 'stage') {
       const span = document.createElement('span');
       span.className = `stage${s.block ? ' block' : ''}`;
@@ -108,12 +111,18 @@ export function renderSegments(container, text) {
       frag.append(span);
       continue;
     }
-    for (const l of lines) {
+    // Round 5 §3: რემარკა ხაზის შუაში (*…*) მეზობელ სიტყვებთან ერთ ხაზზე რჩება — მისი მოსაზღვრე ხაზის ნაწილი inline-ია
+    const glueFirst = inlineStage(segs[i - 1]) && !/^\s*\n/.test(s.text);
+    const glueLast = inlineStage(segs[i + 1]) && !/\n\s*$/.test(s.text);
+    lines.forEach((l, k) => {
       const span = document.createElement('span');
-      span.className = 'speech line';
-      span.textContent = l;
+      const before = k === 0 && glueFirst;
+      const after = k === lines.length - 1 && glueLast;
+      span.className = before || after ? 'speech' : 'speech line';
+      // სივრცე რემარკის მხარეს რჩება (speechLines-ის trim-მა მოაშორა)
+      span.textContent = `${before ? ' ' : ''}${l}${after ? ' ' : ''}`;
       frag.append(span);
-    }
+    });
   }
   container.replaceChildren(frag);
 }

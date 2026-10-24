@@ -4,6 +4,7 @@ import { getChat, saveChat, clearChat, getUserName } from './storage.js';
 import { renderSegments } from './stage.js';
 import { sizeClass } from './layout.js';
 import { fitText } from './wall.js';
+import { parseSseChunk, tokensFromDone } from './sse.js';
 
 const TYPING = ['…ფიქრობს', '…ტელეფონზეა', '…საუზმობს', '…რეზოლუციას წერს', '…ბზარს უყურებს', '…ყურმილს იღებს'];
 const TYPING_ABSENT = ['…კარს აკაკუნებენ', '…ვიღაც მოდის დერეფანში', '…ხაზი დაკავებულია', '…დაელოდეთ'];
@@ -454,10 +455,8 @@ export function createChat({ byId, api, getConfig, getGameState, onExchange, onO
         while ((i = buf.indexOf('\n\n')) >= 0) {
           const chunk = buf.slice(0, i);
           buf = buf.slice(i + 2);
-          const line = chunk.split('\n').find((l) => l.startsWith('data:'));
-          if (!line) continue;
-          let ev;
-          try { ev = JSON.parse(line.slice(5).trim()); } catch { continue; }
+          const ev = parseSseChunk(chunk); // უცნობი ველები იგნორირდება (Round 5 §3)
+          if (!ev) continue;
           if (ev.delta) {
             reply += ev.delta;
             if (!bubble) {
@@ -514,7 +513,8 @@ export function createChat({ byId, api, getConfig, getGameState, onExchange, onO
     if (m.redirect) { const b = redirectButton(m.redirect); if (b) row.append(b); }
     if (live()) { setSpeaker(id, done.spoken_by); scrollDown(); }
     // მთვლელი, თარიღი და (საჭიროებისას) ინტერტიტრი — ერთად, პასუხის დასრულებისთანავე (Round 2 §1, §5)
-    if (done.remaining) onTokens({ remaining: done.remaining, limits: done.limits, period: done.period, resets_at: done.resets_at, avg_input_per_request: done.avg_input_per_request });
+    const tokens = tokensFromDone(done);
+    if (tokens) onTokens(tokens);
     busy.delete(id);
     updateBusy();
     if (live()) current.exchanges += 1; // დახურვისას დრო მიდის მხოლოდ თუ ამ საუბარში გაცვლა შედგა (Round 3 §2)

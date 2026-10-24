@@ -224,3 +224,84 @@ test('§2 განულება ღია ჩატისას: ჩატი
   expect((await treeState(page)).date).toBe('1 სექტემბერი');
   await expect(page.locator('#intertitle')).toBeHidden();
 });
+
+// ---------- §3 რემარკა ხაზის შუაში ----------
+
+test('§3 რემარკა წინადადების შუაში (*…*) — რემარკის სტილით, იმავე ხაზზე; ხაზის დასაწყისში — ცალკე ხაზზე; ვარსკვლავი არ ჩანს', async ({ page }) => {
+  const body = sse(
+    ['*(ტელეფონში)* დიახ, გისმენთ…\n', 'ვაჟა ზაზაევიჩი *(ყურმილს ', 'ფარავს)* ერთი წუთით გავიდა.'],
+    { usage: { input: 1, output: 1 }, remaining: { input: 9, output: 9 }, suggested_redirect: null, spoken_by: 'tina', spoken_by_name: 'თინა', proofread: 'skipped', cached_tokens: 0, future_field: { x: [1] } },
+  );
+  await page.route('**/api/chat', (route) => route.fulfill({ status: 200, contentType: 'text/event-stream', body }));
+  await openWall(page);
+  await openFrame(page, 'tina');
+  await page.locator('#chat-input').fill('დირექტორი აქ არის?');
+  await page.locator('#chat-input').press('Enter');
+  await expect(page.locator('#chat-log .msg.char:not(.streaming)')).toHaveCount(1);
+  const bubble = page.locator('#chat-log .msg.char .bubble');
+  await expect(bubble).not.toContainText('*');
+  const stages = bubble.locator('.stage');
+  await expect(stages).toHaveText(['ტელეფონში', 'ყურმილს ფარავს']);
+  const info = await bubble.evaluate((b) => {
+    // ხაზის ფრაგმენტები (getClientRects): გრძელი span შეიძლება ორ ხაზზე გადავიდეს — ვადარებთ მის პირველ/ბოლო ხაზს
+    const st = (el) => {
+      const s = getComputedStyle(el);
+      const r = [...el.getClientRects()];
+      return { display: s.display, italic: s.fontStyle, family: s.fontFamily, color: s.color, top: r[0].top, bottom: r.at(-1).bottom, firstBottom: r[0].bottom, lastBottom: r.at(-1).bottom };
+    };
+    const [lead, inline] = b.querySelectorAll('.stage');
+    const speech = [...b.querySelectorAll('.speech')];
+    return { lead: st(lead), inline: st(inline), leadBlock: lead.classList.contains('block'), inlineBlock: inline.classList.contains('block'), speech: speech.map(st), speechText: speech.map((s) => s.textContent) };
+  });
+  // ორივე — რემარკის სტილი (დახრილი, სხვა შრიფტი, ჩამქრალი ფერი)
+  for (const s of [info.lead, info.inline]) {
+    expect(s.italic).toBe('italic');
+    expect(s.family).not.toBe(info.speech[0].family);
+    expect(s.color).not.toBe(info.speech[0].color);
+  }
+  expect(info.leadBlock).toBe(true);
+  expect(info.lead.display).toBe('block');
+  expect(info.inlineBlock).toBe(false);
+  expect(info.inline.display).toBe('inline');
+  // შუა რემარკა მეზობელ სიტყვებთან („ვაჟა ზაზაევიჩი“ … „ერთი წუთით გავიდა.“) ერთ ხაზზეა; პირველი ხაზი — ცალკე
+  const [first, before, last] = info.speech;
+  expect(info.speechText.map((x) => x.trim())).toEqual(['დიახ, გისმენთ…', 'ვაჟა ზაზაევიჩი', 'ერთი წუთით გავიდა.']);
+  expect(Math.abs(info.inline.firstBottom - last.firstBottom)).toBeLessThanOrEqual(6);
+  expect(Math.abs(info.inline.firstBottom - before.lastBottom)).toBeLessThanOrEqual(6);
+  expect(first.lastBottom).toBeLessThanOrEqual(before.top + 2);
+  await bubble.screenshot({ path: `${SHOTS}/R5-04-inline-stage.png` });
+});
+
+// ---------- §3 დარჩენილი კითხვები ----------
+
+test('§3 „დარჩა … კითხვა“ ყოველი პასუხის შემდეგ ახლდება done-ის usage/საშუალოთი (route: 60 000/5 000 → 10, 54 000/6 000 → 9)', async ({ page }) => {
+  const replies = [
+    { remaining: { input: 60000, output: 400000 }, avg_input_per_request: 5000 },
+    { remaining: { input: 54000, output: 399000 }, avg_input_per_request: 6000 },
+  ];
+  let n = 0;
+  await page.route('**/api/chat', (route) => {
+    const r = replies[Math.min(n++, replies.length - 1)];
+    return route.fulfill({ status: 200, contentType: 'text/event-stream', body: sse(['კი ბატონო.'], { usage: { input: 6000, output: 10 }, limits: { input: 500000, output: 500000 }, period: 'monthly', resets_at: '2026-11-01T00:00:00.000Z', spoken_by: 'tina', ...r }) });
+  });
+  await openWall(page);
+  await openFrame(page, 'tina');
+  const tip = page.locator('#tokens-tip');
+  await send(page, 'პირველი');
+  await expect(page.locator('#stat-tokens')).toHaveAttribute('data-left', '10');
+  await expect(tip).toContainText('დარჩა დაახლოებით 10 კითხვა');
+  await send(page, 'მეორე');
+  await expect(page.locator('#stat-tokens')).toHaveAttribute('data-left', '9');
+  await expect(tip).toContainText('დარჩა 9 კითხვა');
+  await expect(tip).not.toContainText('დაახლოებით');
+});
+
+test('§3 mock სერვერი: 3 პასუხის შემდეგ შეფასება ამ ბრაუზერის ნამდვილი საშუალოთია (/api/state-ის avg_input_per_request)', async ({ page }) => {
+  await openWall(page);
+  await openFrame(page, 'otari');
+  for (const q of ['გამარჯობათ', 'როგორ ბრძანდებით?', 'ხელნაწერი წაიკითხეთ?']) await send(page, q);
+  const state = await (await page.request.get('/api/state', { headers: { 'X-Client-Id': await storage(page, 'tianshani.client_id') } })).json();
+  expect(state.avg_input_per_request).toBeGreaterThan(0);
+  const expected = await page.evaluate(async ({ rem, avg }) => (await import('/js/format.js')).questionsLeft(rem, avg).n, { rem: state.remaining.input, avg: state.avg_input_per_request });
+  await expect(page.locator('#stat-tokens')).toHaveAttribute('data-left', String(expected));
+});

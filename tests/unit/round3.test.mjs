@@ -6,7 +6,7 @@ import { computeLayout, findOverlaps, rectsOverlap, sizeClass, NARROW_PROFILES, 
 import { usedPercent, formatPercentKa, percentLevel, tokensTipLine } from '../../public/js/format.js';
 
 // ---------- §1 ----------
-import { buildPrompt, userBlock, cleanUserName, isSoso, GENERAL_RULES_EN, STAGE_EXAMPLES_EN } from '../../src/prompt.js';
+import { buildPrompt, userBlock, cleanUserName, isSoso, GENERAL_RULES_EN, SHAPE_EXAMPLES_EN } from '../../src/prompt.js';
 import { byId } from '../../src/characters.js';
 import { composeMockReply } from '../../src/mock.js';
 
@@ -24,7 +24,7 @@ test('§1 პრომპტი: სახელი და წესი სი�
   assert.ok(GENERAL_RULES_EN[0].includes('new author bringing their own manuscript'));
   assert.ok(!GENERAL_RULES_EN[0].includes('Soso or themselves'));
   // მაგალითებში მომხმარებელს „სოსოს“ აღარ ეძახიან
-  assert.ok(!STAGE_EXAMPLES_EN.join('\n').includes('ჩემო სოსო'));
+  assert.ok(!SHAPE_EXAMPLES_EN.join('\n').includes('ჩემო სოსო'));
   assert.ok(!GENERAL_RULES_EN.join('\n').includes('ხო, სოსო'));
 });
 
@@ -114,7 +114,7 @@ test('§4 არარსებული სიტყვები (ვჭედ�
   walk(JSON.parse(fs.readFileSync(new URL('../../src/data/voice_extras.json', import.meta.url), 'utf8')));
   walk(MOCK_STRINGS);
   walk(ABSENCE_FACTS_KA);
-  walk(STAGE_EXAMPLES_EN);
+  walk(SHAPE_EXAMPLES_EN);
   walk(GENERAL_RULES_EN);
   assert.ok(strings.length > 500, String(strings.length));
   const hits = strings.filter((s) => findNonWords(s).length);
