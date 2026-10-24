@@ -21,8 +21,8 @@
 
   "limits": {
     "_comment": "ტოკენების ლიმიტი თითო ბრაუზერზე (client_id). period: monthly (YYYY-MM) ან lifetime. max_requests_per_minute — მარტივი rate limit ბოტებისგან. max_message_chars — ერთი შეტყობინების მაქსიმალური სიგრძე.",
-    "per_client_input_tokens": 2000000,
-    "per_client_output_tokens": 2000000,
+    "per_client_input_tokens": 500000,
+    "per_client_output_tokens": 500000,
     "period": "monthly",
     "max_requests_per_minute": 20,
     "max_message_chars": 2000

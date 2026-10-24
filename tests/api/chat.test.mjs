@@ -46,7 +46,8 @@ test('POST /api/chat: SSE delta-ები და done (usage, remaining, suggest
   assert.ok(r.done);
   assert.equal(r.done.spoken_by, 'director');
   assert.ok(r.done.usage.input > 0 && r.done.usage.output > 0);
-  assert.ok(r.done.remaining.input < 2_000_000);
+  assert.ok(r.done.remaining.input < S.cfg.limits.per_client_input_tokens);
+  assert.deepEqual(r.done.limits, { input: S.cfg.limits.per_client_input_tokens, output: S.cfg.limits.per_client_output_tokens });
   assert.ok('suggested_redirect' in r.done);
   if (r.done.suggested_redirect) assert.ok(['tina', 'vaso', 'otari'].includes(r.done.suggested_redirect));
   assert.ok(jar.get('tianshani_cid'), 'httpOnly cookie დაყენდა');
@@ -136,7 +137,9 @@ test('GET /api/state: ბალანსი და პერიოდი', async
   const j = await (await fetch(`${S.base}/api/state`)).json();
   assert.equal(j.period, 'monthly');
   assert.match(j.period_key, /^\d{4}-\d{2}$/);
-  assert.deepEqual(j.limits, { input: 2_000_000, output: 2_000_000 });
+  // Round 3 §8: ლიმიტი კონფიგიდან (settings.example.json → 500 000), არა ლიტერალი
+  assert.deepEqual(j.limits, { input: S.cfg.limits.per_client_input_tokens, output: S.cfg.limits.per_client_output_tokens });
+  assert.deepEqual(j.limits, { input: 500_000, output: 500_000 }, 'settings.example.json-ის ნაგულისხმევი');
   assert.equal(j.mock, true);
 });
 

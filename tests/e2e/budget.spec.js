@@ -90,13 +90,14 @@ test('§2 ბრაუზერის ლიმიტი: ნამდვილ�
   try {
     await openFrame(page, 'otari');
     // ლიმიტი ამოიწურა (სხვა ჩანართში დახარჯა) — გვერდმა ჯერ არ იცის; სერვერი 429-ს დააბრუნებს
-    store.addUsage(cid, monthKey(), 2_000_000, 0);
+    const lim = (await (await page.request.get('/api/state')).json()).limits; // Round 3 §8: ლიმიტი კონფიგიდან
+    store.addUsage(cid, monthKey(), lim.input, 0);
     const resP = page.waitForResponse((r) => r.url().endsWith('/api/chat'));
     await page.locator('#chat-input').fill('ოთარ დავიდოვიჩ, წაიკითხეთ?');
     await page.locator('#chat-input').press('Enter');
     const res = await resP;
     expect(res.status()).toBe(429);
-    expect(await res.json()).toEqual({ error: 'client_limit', message: 'ბიუჯეტში გარღვევა გვაქვს, თვის ბოლომდე დავიცადოთ.', resets_at: nextMonthISO(), code: 'limit', remaining: { input: 0, output: 2_000_000 } });
+    expect(await res.json()).toEqual({ error: 'client_limit', message: 'ბიუჯეტში გარღვევა გვაქვს, თვის ბოლომდე დავიცადოთ.', resets_at: nextMonthISO(), code: 'limit', remaining: { input: 0, output: lim.output } });
 
     const modal = page.locator('#limit-modal');
     await expect(modal).toBeVisible();
@@ -159,7 +160,8 @@ test('§2 done.exhausted: ბოლო პასუხმა ამოწურ�
   await openWall(page);
   const cid = await clientIdOf(page);
   try {
-    store.addUsage(cid, monthKey(), 2_000_000 - 10, 0); // ერთი მოთხოვნა კიდევ გავა
+    const lim = (await (await page.request.get('/api/state')).json()).limits;
+    store.addUsage(cid, monthKey(), lim.input - 10, 0); // ერთი მოთხოვნა კიდევ გავა
     await openFrame(page, 'bela');
     await sendNoWait(page, 'ბელა, როგორ ხარ?');
     await expect(page.locator('#limit-modal')).toBeVisible();
