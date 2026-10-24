@@ -88,14 +88,18 @@ test('§1 „საშვი“: პირველ ვიზიტზე ბა
   const card = page.locator('#pass-card');
   await expect(card).toBeVisible();
   await expect(card).toContainText('გამომცემლობის საშვი');
-  await expect(page.locator('#pass-title')).toHaveText('როგორ გქვიათ?');
+  await expect(page.locator('#pass-title')).toHaveText('თქვენი სახელი'); // Round 4 §1
+  await expect(page.locator('#pass-input')).toHaveAttribute('placeholder', 'სახელი');
   await expect(page.locator('#pass-input')).toHaveAttribute('maxlength', '40');
   await expect(page.locator('#pass-enter')).toHaveText('შესვლა');
   await expect(page.locator('#pass-soso')).toHaveText('სოსო ვარ');
   // არა მოდალი: ფონი არ ბნელდება, ფანჯარა არ იბლოკება, ჩარჩოები არ იძვრის
   await expect(page.locator('#chat-backdrop')).toBeHidden();
   await expect(page.locator('#limit-backdrop')).toBeHidden();
-  await expect(page.locator('#user-name')).toHaveText('—');
+  // Round 4 §1: სახელის გარეშე — „თქვენი სახელი ✎“ („ავტორი:“ არ ჩანს)
+  expect((await page.locator('#user-chip').innerText()).replace(/\s+/g, ' ').trim()).toBe('თქვენი სახელი ✎'); // ხილული ტექსტი
+  await expect(page.locator('#user-chip .uc-label')).toBeHidden();
+  await page.screenshot({ path: `${SHOTS}/R4-01-name-card.png` });
   const before = (await frameRects(page)).frames.map((f) => [f.id, Math.round(f.x), Math.round(f.y)]);
   await page.screenshot({ path: `${SHOTS}/R3-01-name-card.png` });
 

@@ -189,10 +189,12 @@ async function main() {
 
   $('others-btn').addEventListener('click', (e) => menu.toggle(e.currentTarget, { variant: 'wall' }));
 
-  // --- ავტორის სახელი (Round 3 §1): პირველ ვიზიტზე „საშვი“; ზოლში „ავტორი: ნინო ✎“ — დაჭერით იცვლება ---
+  // --- ავტორის სახელი (Round 3 §1): პირველ ვიზიტზე „საშვი“; ზოლში „ავტორი: ნინო ✎“ — დაჭერით იცვლება.
+  //     Round 4 §1: სახელის გარეშე — „თქვენი სახელი ✎“ (არა „ავტორი: —“) ---
   function renderUser() {
     const n = getUserName();
-    $('user-name').textContent = n || '—';
+    $('user-name').textContent = n || 'თქვენი სახელი';
+    $('user-chip').classList.toggle('unnamed', !n);
     $('user-chip').setAttribute('aria-label', n ? `ავტორი: ${n}. სახელის შეცვლა` : 'სახელის მითითება');
     chat.refreshUser();
   }
