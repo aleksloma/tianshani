@@ -97,16 +97,6 @@ export function tokensTipLine(p, period, resetsAt, left = null) {
   return parts.join(' · ');
 }
 
-// ---------- Round 4 §8: ჩატის პირველი ხაზი ----------
-
-/** დეტერმინისტული არჩევანი ციკლით + id-ით (FNV-1a) — ერთ შენობაში ყოველთვის ერთი და იგივე, ახალ შენობაში სხვა. */
-export function pickOpener(list, cycle, id) {
-  if (!Array.isArray(list) || !list.length) return null;
-  let h = 2166136261;
-  for (const ch of `${Number(cycle) || 1}:${id}`) { h ^= ch.codePointAt(0); h = Math.imul(h, 16777619); }
-  return list[(h >>> 0) % list.length];
-}
-
 /** tooltip-ის პერიოდის ხაზი. */
 export function periodLine(period, resetsAt) {
   if (period === 'lifetime') return 'ერთჯერადი ლიმიტი';

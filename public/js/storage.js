@@ -66,7 +66,33 @@ function fallbackUuid() {
 }
 
 // --- საუბრები: { [characterId]: [{role, content, ts, spoken_by?, redirect?}] } ---
-export function getChats() { return getJSON(KEYS.chats, {}) || {}; }
+
+/**
+ * Round 5 §1 (მიგრაცია): Round 4-ის სკრიპტული პირველი ხაზი (`scripted: true`) ამოღებულია.
+ * აბრუნებს ახალ ობიექტს მის გარეშე; პერსონაჟი, ვისაც სხვა არაფერი დარჩა, ქრება. ნაგავზე არ ვარდება.
+ */
+export function stripScripted(chats) {
+  if (!chats || typeof chats !== 'object' || Array.isArray(chats)) return {};
+  const out = {};
+  for (const [id, msgs] of Object.entries(chats)) {
+    if (!Array.isArray(msgs)) continue;
+    const kept = msgs.filter((m) => m && typeof m === 'object' && m.scripted !== true);
+    if (kept.length) out[id] = kept;
+  }
+  return out;
+}
+
+/** ჩატვირთვისას ერთხელ: tianshani.chats ფიზიკურად იწმინდება (ჩაიწერება მხოლოდ თუ რამე შეიცვალა). true → შეიცვალა. */
+export function migrateChats() {
+  const raw = getJSON(KEYS.chats, null);
+  if (raw == null) return false;
+  const clean = stripScripted(raw);
+  if (JSON.stringify(clean) === JSON.stringify(raw)) return false;
+  setJSON(KEYS.chats, clean);
+  return true;
+}
+
+export function getChats() { return stripScripted(getJSON(KEYS.chats, {})); }
 export function getChat(id) { return getChats()[id] || []; }
 export function saveChat(id, messages) {
   const all = getChats();

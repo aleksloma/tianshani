@@ -1,5 +1,5 @@
 // აპლიკაციის ჩატვირთვა: მონაცემები, კედელი, ჩატი, კალენდარი და ხე, ტოკენების მთვლელი, ლიმიტის ფანჯარა.
-import { clientId, storageAvailable, clearAllChats, setJSON, KEYS, getUserName } from './storage.js';
+import { clientId, storageAvailable, clearAllChats, setJSON, KEYS, getUserName, migrateChats } from './storage.js';
 import { createNameCard } from './userName.js';
 import { createWall, createOthersMenu, renderRollCall } from './wall.js';
 import { createChat } from './chat.js';
@@ -24,6 +24,7 @@ function api(path, opts = {}) {
 const $ = (id) => document.getElementById(id);
 
 async function main() {
+  migrateChats(); // Round 5 §1: ძველი `scripted: true` შეტყობინებები tianshani.chats-იდან იშლება
   const [data, state] = await Promise.all([
     api('/api/characters').then((r) => r.json()),
     api('/api/state').then((r) => r.json()).catch(() => null),

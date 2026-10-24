@@ -7,7 +7,7 @@ import { questionsLeft, questionsLeftText, tokensTipLine, limitBody, AVG_INPUT_F
 
 // ---------- §4 ----------
 import { GENERAL_RULES_EN, buildPrompt, georgianScriptPhrases } from '../../src/prompt.js';
-import { byId } from '../../src/characters.js';
+import { byId, characters } from '../../src/characters.js';
 
 test('§4 ენის წესი: უცხოენოვან პასუხში ფრაზები ქართული დამწერლობით, ტრანსლიტერაციის გარეშე; რემარკა — პასუხის ენაზე', () => {
   const lang = GENERAL_RULES_EN.find((r) => r.startsWith('LANGUAGE:'));
@@ -25,44 +25,6 @@ test('§4 ენის წესი: უცხოენოვან პასუ
   const stage = GENERAL_RULES_EN.find((r) => r.startsWith('STAGE DIRECTIONS:'));
   assert.ok(stage.includes('in the language of the reply (Georgian by default)'));
   assert.ok(!stage.includes('Stage directions are in Georgian,'), 'წინააღმდეგობა აღარ არის');
-});
-
-// ---------- §8 ჩატის პირველი ხაზი ----------
-import { characters, openersFor } from '../../src/characters.js';
-import { pickOpener } from '../../public/js/format.js';
-import { parseStage } from '../../public/js/stage.js';
-import { findNonWords } from '../../src/georgian.js';
-import { forbiddenDialectFor } from '../../src/proofread.js';
-
-test('§8 პირველი ხაზები: ყველას 3+, თითო ≤ 3 ხაზი, ქართულად, „ტოკენ“/ლათინური/არარსებული სიტყვა არ არის; სხვისი კილო არა', () => {
-  for (const c of characters) {
-    const list = openersFor(c);
-    assert.ok(list.length >= 3, `${c.id}: ${list.length}`);
-    for (const o of list) {
-      const lines = o.text.split('\n').filter((l) => l.trim());
-      assert.ok(lines.length >= 1 && lines.length <= 3, `${c.id}: ${o.text}`);
-      assert.ok(/[ა-ჰ]/.test(o.text) && !/[A-Za-z]/.test(o.text), `${c.id}: ${o.text}`);
-      assert.ok(!/ტოკენ|სოსო,|ჩემო სოსო/.test(o.text), `${c.id}: ${o.text}`);
-      assert.deepEqual(findNonWords(o.text), []);
-      // * დაბალანსებულია, რემარკა სწორად იპარსება
-      assert.equal((o.text.match(/\*/g) || []).length % 2, 0, `${c.id}: ${o.text}`);
-      assert.ok(parseStage(o.text).some((s) => s.type === 'speech'), `${c.id}: საუბარი არ არის`);
-      for (const w of forbiddenDialectFor(c)) assert.ok(!new RegExp(`(^|[^ა-ჰ])${w}([^ა-ჰ]|$)`).test(o.text), `${c.id}: ${w}`);
-    }
-    if (!c.reachable) {
-      assert.ok(list.every((o) => o.spoken_by && o.spoken_by !== c.id), `${c.id}: წარმომადგენელი`);
-      assert.ok(list.every((o) => /არ არის|დაკავებულია|დაკეტილია|არ დადის|ჯარშია|მივლინებაშია|კომისარიატშია/.test(o.text)), c.id);
-    }
-  }
-});
-
-test('§8 არჩევანი დეტერმინისტულია: იგივე ციკლი + id → იგივე; ციკლები შორის იცვლება', () => {
-  const list = [{ text: 'a' }, { text: 'b' }, { text: 'c' }];
-  assert.equal(pickOpener(list, 1, 'vaso'), pickOpener(list, 1, 'vaso'));
-  const seen = new Set([1, 2, 3, 4, 5, 6].map((cy) => pickOpener(list, cy, 'vaso').text));
-  assert.ok(seen.size >= 2, [...seen].join());
-  assert.equal(pickOpener([], 1, 'x'), null);
-  assert.equal(pickOpener(undefined, 1, 'x'), null);
 });
 
 // ---------- §9 დიალოგის ფორმა ----------

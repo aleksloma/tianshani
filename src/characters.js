@@ -5,12 +5,6 @@ import path from 'node:path';
 import { ROOT } from './config.js';
 
 const DATA = JSON.parse(fs.readFileSync(path.join(ROOT, 'characters.json'), 'utf8'));
-// Round 4 §8: ჩატის პირველი ხაზი (LLM-ის გარეშე)
-const OPENERS = (() => {
-  try {
-    return JSON.parse(fs.readFileSync(path.join(ROOT, 'src', 'data', 'openers.json'), 'utf8')).characters || {};
-  } catch { return {}; }
-})();
 const VOICE_EXTRAS = (() => {
   try {
     return JSON.parse(fs.readFileSync(path.join(ROOT, 'src', 'data', 'voice_extras.json'), 'utf8')).characters || {};
@@ -182,39 +176,6 @@ export function pickProxy(invisibleId, preferred = null, rnd = Math.random) {
   return list[Math.floor(rnd() * list.length)];
 }
 
-/** უხილავის „ადგილზე არ არის“ ფაქტი (პირველი წინადადება) — წარმომადგენლის პირველი ხაზისთვის. */
-const ABSENT_LINES = {
-  givi: 'გივი ოთახში არ არის',
-  kuparadze: 'ყუფარაძე ხაზზე დაკავებულია',
-  murmanidze: 'მურმანიძის კარი დაკეტილია',
-  gamkrelidze: 'გამყრელიძე ადგილზე არ არის — მხოლოდ მისი დასკვნა გვაქვს',
-  zina: 'ზინა ბუღალტერიაში არ არის',
-  kopaleishvili: 'კოპალეიშვილი კომისარიატშია',
-  tsverava: 'წვერავა ჯარშია',
-  khaburdzania: 'ხაბურძანია არ დადის',
-  shota: 'შოთა მივლინებაშია',
-};
-
-/**
- * Round 4 §8: ჩატის პირველი ხაზები [{ text, spoken_by? }].
- * ხილულს — src/data/openers.json (ან სარეზერვოდ: მისალმება + ცნობილი ფრაზა); უხილავს — წარმომადგენელი ამბობს, რომ ის არ არის.
- */
-export function openersFor(c) {
-  if (!c.reachable) {
-    const proxy = (proxyMap[c.id] || DEFAULT_PROXIES)[0];
-    const fact = ABSENT_LINES[c.id] || `${c.short_name_ka} ადგილზე არ არის`;
-    return [
-      { text: `*(დერეფანში გამოდის)*\n${fact}.\nდაელოდეთ.`, spoken_by: proxy },
-      { text: `${fact}.\nდაბრძანდით, დაელოდეთ.`, spoken_by: proxy },
-      { text: `*(კარს უყურებს)*\n${fact}, ჯერ არ ჩანს.`, spoken_by: proxy },
-    ];
-  }
-  const own = OPENERS[c.id];
-  if (Array.isArray(own) && own.length) return own.map((text) => ({ text }));
-  const greet = world.shared_idiom_ka?.greeting_ritual?.[2] || 'როგორ ბრძანდებით?';
-  return (c.catchphrases_ka || []).slice(0, 3).map((p) => ({ text: `${p}\n${greet}` }));
-}
-
 /** სია UI-სთვის — სრულ პრომპტებს კლიენტს არ ვუგზავნით. */
 export function publicList(wallCount = 12) {
   const wallIds = new Set(wallCharacters(wallCount).map((c) => c.id));
@@ -233,6 +194,5 @@ export function publicList(wallCount = 12) {
     importance: c.importance,
     redirects_to: c.redirects_to || [],
     proxies: c.reachable ? undefined : proxyMap[c.id],
-    openers: openersFor(c), // Round 4 §8
   }));
 }

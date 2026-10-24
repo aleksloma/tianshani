@@ -151,7 +151,8 @@ export function createApp(cfg) {
 
     // ისტორიის ნორმალიზაცია + ბოლო N
     const clean = messages
-      .filter((m) => m && typeof m.content === 'string' && ['user', 'assistant'].includes(m.role))
+      // Round 5 §1: ძველი სკრიპტული პირველი ხაზი (Round 4, `scripted: true`) მოდელს არასდროს ეგზავნება
+      .filter((m) => m && m.scripted !== true && typeof m.content === 'string' && ['user', 'assistant'].includes(m.role))
       .map((m) => ({ role: m.role, content: m.content.slice(0, cfg.limits.max_message_chars * 2) }))
       .slice(-cfg.chat.history_window);
     const last = clean[clean.length - 1];

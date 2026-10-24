@@ -43,14 +43,6 @@ test('§8 Host ჰედერი გვერდში ვერ „ჩაი�
   assert.ok(body.includes('<meta property="og:image" content="/assets/og.jpg">'), 'host არ გამოდგა → შედარებითი მისამართი');
 });
 
-test('§8 /api/characters: ყველას აქვს openers (უხილავს — წარმომადგენლის ხაზი spoken_by-ით)', async () => {
-  const j = await (await fetch(`${S.base}/api/characters`)).json();
-  for (const c of j.characters) {
-    assert.ok(Array.isArray(c.openers) && c.openers.length >= 3, c.id);
-    if (!c.reachable) assert.ok(c.openers.every((o) => c.proxies.includes(o.spoken_by)), c.id);
-  }
-});
-
 test('§3 avg_input_per_request: < 3 მოთხოვნაზე null, მერე ამ ბრაუზერის ნამდვილი საშუალო (/api/state და done)', async () => {
   const jar = cookieJar();
   const state = async () => (await fetch(`${S.base}/api/state`, { headers: { cookie: jar.header() } })).json();

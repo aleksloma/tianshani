@@ -10,51 +10,7 @@ async function talkAndClose(page, id, text) {
   await expect(page.locator('#chat')).toBeHidden();
 }
 
-// ---------- §8 ჩატის პირველი ხაზი, Enter / Shift+Enter ----------
-
-test('§8 ახალ ჩატში პერსონაჟი თვითონ იწყებს: ერთი სკრიპტული ბუშტი, სერვერთან მოთხოვნის გარეშე; გაგზავნისას სერვერს არ ეგზავნება', async ({ page }) => {
-  const calls = [];
-  page.on('request', (r) => { if (r.url().endsWith('/api/chat')) calls.push(r); });
-  await openWall(page);
-  await openFrame(page, 'director');
-  const opener = page.locator('#chat-log .msg.char.scripted');
-  await expect(opener).toHaveCount(1);
-  await expect(page.locator('#chat-log .msg')).toHaveCount(1); // მეტი არაფერი (არც „დაიწყეთ საუბარი…“)
-  await expect(opener.locator('.who')).toHaveText('ვაჟა ზაზაევიჩი');
-  expect(await opener.locator('.bubble').textContent()).not.toContain('*');
-  await page.waitForTimeout(300);
-  expect(calls).toHaveLength(0);
-  const stored = (await page.evaluate(() => JSON.parse(localStorage.getItem('tianshani.chats')))).director;
-  expect(stored).toHaveLength(1);
-  expect(stored[0]).toMatchObject({ role: 'assistant', scripted: true });
-  const data = await (await page.request.get('/api/characters')).json();
-  expect(data.characters.find((c) => c.id === 'director').openers.map((o) => o.text)).toContain(stored[0].content);
-  await page.screenshot({ path: `${SHOTS}/R4-08-opening-line.png` });
-  // გაგზავნა: სერვერს მხოლოდ მომხმარებლის შეტყობინება მიდის
-  const req = page.waitForRequest((r) => r.url().endsWith('/api/chat'));
-  await send(page, 'გამარჯობათ!');
-  expect((await req).postDataJSON().messages).toEqual([{ role: 'user', content: 'გამარჯობათ!' }]);
-  // ხელახლა გახსნა / გადატვირთვა — იგივე ხაზი (დეტერმინისტული), ისტორიაში ერთხელ
-  await page.reload();
-  await page.waitForFunction(() => window.tianshani?.ready === true);
-  await openFrame(page, 'director');
-  await expect(page.locator('#chat-log .msg.char.scripted')).toHaveCount(1);
-  await expect(page.locator('#chat-log .msg.char.scripted .bubble')).toHaveText(await opener.locator('.bubble').textContent() || /./);
-  // ისტორიის გასუფთავება → ისევ პირველი ხაზი
-  await page.locator('#chat-clear').click();
-  await expect(page.locator('#chat-log .msg')).toHaveCount(1);
-  await expect(page.locator('#chat-log .msg.char.scripted')).toHaveCount(1);
-});
-
-test('§8 უხილავი (გივი): პირველ ხაზს წარმომადგენელი ამბობს — „~~გივი~~ X“', async ({ page }) => {
-  await openWall(page);
-  await page.locator('#others-btn').click();
-  await page.locator('#others-menu .menu-item[data-id="givi"]').click();
-  const opener = page.locator('#chat-log .msg.char.scripted');
-  await expect(opener).toHaveCount(1);
-  await expect(opener.locator('s.struck')).toHaveText('გივი');
-  await expect(opener.locator('.bubble')).toContainText('გივი ოთახში არ არის');
-});
+// ---------- §8 Enter / Shift+Enter (სკრიპტული პირველი ხაზი Round 5 §1-ით ამოღებულია) ----------
 
 test('§8 Enter აგზავნის; Shift+Enter — ახალი ხაზი, გაგზავნის გარეშე', async ({ page }) => {
   await openWall(page);

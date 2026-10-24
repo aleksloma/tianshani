@@ -158,11 +158,13 @@ test('§5 ჩატი ჩანს: ჩარჩო → sheet (opacity 1, ე�
   // გვერდი sheet-ის ქვეშ არ სქროლავს
   expect(await page.evaluate(() => getComputedStyle(document.documentElement).overflow)).toBe('hidden');
 
-  // Round 4 §8: პირველი ხაზი უკვე ჩანს; მობილურზე მთავარი მოქმედება — „გაგზავნა“ ღილაკი
-  await expect(page.locator('#chat-log .msg.char.scripted')).toHaveCount(1);
+  // Round 5 §1: ახალი ჩატი ცარიელია (მხოლოდ მინიშნება); მობილურზე მთავარი მოქმედება — „გაგზავნა“ ღილაკი
+  await expect(page.locator('#chat-log .msg.char')).toHaveCount(0);
+  await expect(page.locator('#chat-log .msg.hint')).toBeVisible();
+  await page.screenshot({ path: `${SHOTS}/R5-01-empty-chat-${tag()}.png` });
   await page.locator('#chat-input').fill('გამარჯობა, როგორ ხართ?');
   await page.locator('#chat-send').tap();
-  await expect(page.locator('#chat-log .msg.char:not(.streaming):not(.scripted)')).toHaveCount(1, { timeout: 15_000 });
+  await expect(page.locator('#chat-log .msg.char:not(.streaming)')).toHaveCount(1, { timeout: 15_000 });
   await expect(page.locator('#chat-send')).toBeEnabled();
   const bubble = page.locator('#chat-log .msg.char .bubble').last();
   await expect(bubble).toBeVisible();
