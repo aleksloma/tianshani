@@ -81,6 +81,11 @@ export function applyChatClose(state, cfgRaw, characterId, exchangesInChat = 0) 
   return { state: withDerived({ ...state, day: r.day }, cfg), events: toEvents(r) };
 }
 
+/** Round 5 §2: „ყველაფრის განულება“ — ახალი შენობა თავიდან: ციკლი 1, დღე 0 (შემოდგომა), არავინ ნანახი. */
+export function freshState(cfgRaw) {
+  return withDerived(initialState(1), cfgRaw);
+}
+
 /** ჩამონგრევის შემდეგ: ახალი შენობა, ახალი ციკლი, დღე 0, სურათი ისევ ეკიდება. */
 export function nextCycle(state, cfgRaw) {
   return withDerived({ ...initialState(state.cycle + 1), visited: state.visited }, cfgRaw);

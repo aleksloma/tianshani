@@ -102,6 +102,8 @@
         <button type="button" id="pass-soso" class="pass-link">სოსო ვარ</button>
       </div>
     </form>
+    <!-- Round 5 §2: ყველა საუბრის და შენობის განულება (სახელი და ბრაუზერის ID რჩება) -->
+    <button type="button" id="reset-all" class="reset-link">ყველაფრის განულება</button>
     <div class="pass-stamp" aria-hidden="true">№ 1983</div>
     <button type="button" id="pass-close" class="pass-close" aria-label="დახურვა">✕</button>
   </section>
@@ -110,6 +112,16 @@
   <div id="copy-note" class="copy-note" role="status" hidden>
     <div class="pin" aria-hidden="true"></div>
     <p id="copy-note-text"></p>
+  </div>
+
+  <!-- Round 5 §2: „ყველაფრის განულება“ — დადასტურების ფურცელი (იგივე ქაღალდი, რაც ეგზემპლარის ფურცელს აქვს) -->
+  <div id="reset-note" class="copy-note reset-note" role="alertdialog" aria-labelledby="reset-note-text" hidden>
+    <div class="pin" aria-hidden="true"></div>
+    <p id="reset-note-text">წავშალოთ ყველა საუბარი და დავიწყოთ თავიდან?</p>
+    <div class="reset-actions">
+      <button type="button" id="reset-yes">დიახ</button>
+      <button type="button" id="reset-no">არა</button>
+    </div>
   </div>
 
   <!-- „ესაუბრე სხვას“ სია -->

@@ -44,6 +44,7 @@ export function createChat({ byId, api, getConfig, getGameState, onExchange, onO
 
   let current = null;     // { id, portrait, source, exchanges } — მხოლოდ მეხსიერებაში, არასდროს ინახება
   let session = 0;        // ღია ჩატის „ვერსია“ — სტრიმი ძველ ჩატს DOM-ში აღარ წერს
+  let epoch = 0;          // Round 5 §2: „ყველაფრის განულების“ შემდეგ ძველი სტრიმი ისტორიაში/კალენდარში აღარ წერს
   const busy = new Set(); // პერსონაჟები, ვისთანაც პასუხი მიდის
 
   // ---------- წარმომადგენელი ----------
@@ -391,6 +392,7 @@ export function createChat({ byId, api, getConfig, getGameState, onExchange, onO
     if (text.length > max) { systemNote(`შეტყობინება ძალიან გრძელია (მაქს. ${max} სიმბოლო).`); return; }
 
     const mySession = session;
+    const myEpoch = epoch;
     const live = () => current?.id === id && session === mySession;
     busy.add(id);
     updateBusy();
@@ -488,6 +490,12 @@ export function createChat({ byId, api, getConfig, getGameState, onExchange, onO
       error = e.message || MSG_API_ERROR;
     }
 
+    if (epoch !== myEpoch) { // ყველაფერი განულდა, სანამ პასუხი მოდიოდა — ის აღარსად ინახება
+      row.remove();
+      busy.delete(id);
+      updateBusy();
+      return;
+    }
     if (error || !done) {
       row.remove();
       if (live()) systemNote(error || MSG_API_ERROR);
@@ -550,5 +558,11 @@ export function createChat({ byId, api, getConfig, getGameState, onExchange, onO
     lockScroll(r.mobile);
   });
 
-  return { open, close, switchTo, refreshUser, isOpen: () => Boolean(current), currentId: () => current?.id || null };
+  /** Round 5 §2: „ყველაფრის განულება“ — ღია ჩატი იხურება (დროის გარეშე), მიმდინარე სტრიმები აღარაფერს ინახავს. */
+  async function forgetAll() {
+    epoch += 1;
+    await close({ instant: true, silent: true });
+  }
+
+  return { open, close, switchTo, refreshUser, forgetAll, isOpen: () => Boolean(current), currentId: () => current?.id || null };
 }

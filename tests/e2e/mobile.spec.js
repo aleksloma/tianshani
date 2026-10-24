@@ -183,3 +183,35 @@ test('§5 ჩატი ჩანს: ჩარჩო → sheet (opacity 1, ე�
   expect(after.visible).toBe(true);
   expect(await page.evaluate(() => getComputedStyle(document.documentElement).overflow)).not.toBe('hidden');
 });
+
+test('Round 5 §2: „ყველაფრის განულება“ ტელეფონზე/პლანშეტზე — ბმული ბარათზე, ფურცელი ეკრანში ეტევა, შეხებით მუშაობს', async ({ page }) => {
+  await openWall(page);
+  const id = (await visibleFrameIds(page))[0];
+  await page.locator(`#frames .frame[data-id="${id}"]`).tap();
+  await send(page, 'გამარჯობა');
+  await page.locator('#chat-close').tap();
+  await expect(page.locator('#chat')).toBeHidden();
+  expect(Object.keys(await page.evaluate(() => JSON.parse(localStorage.getItem('tianshani.chats'))))).toEqual([id]);
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await page.locator('#user-chip').tap();
+  await expect(page.locator('#reset-all')).toBeVisible();
+  await page.waitForTimeout(300);
+  await page.locator('#pass-card').screenshot({ path: `${SHOTS}/R5-02a-name-card-reset-link-${tag()}.png` });
+  await page.locator('#reset-all').tap();
+  const note = page.locator('#reset-note');
+  await expect(note).toBeVisible();
+  await page.waitForTimeout(400);
+  const nb = await note.boundingBox();
+  const vp = page.viewportSize();
+  expect(nb.x).toBeGreaterThanOrEqual(0);
+  expect(nb.x + nb.width).toBeLessThanOrEqual(vp.width);
+  await page.screenshot({ path: `${SHOTS}/R5-02-reset-confirm-${tag()}.png` });
+  await page.locator('#reset-yes').tap();
+  await expect(note).toBeHidden();
+  expect(await page.evaluate(() => JSON.parse(localStorage.getItem('tianshani.chats')))).toEqual({});
+  expect(await page.evaluate(() => JSON.parse(localStorage.getItem('tianshani.user_name')))).toBe('ნინო');
+  await expect(page.locator('#season-tip-date')).toHaveText('1 სექტემბერი');
+  await settle(page);
+  expectNoOverlaps(await frameRects(page), 0);
+  await page.screenshot({ path: `${SHOTS}/R5-03-header-after-reset-${tag()}.png`, clip: { x: 0, y: 0, width: vp.width, height: 160 } });
+});

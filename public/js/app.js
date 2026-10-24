@@ -4,8 +4,9 @@ import { createNameCard } from './userName.js';
 import { createWall, createOthersMenu, renderRollCall } from './wall.js';
 import { createChat } from './chat.js';
 import {
-  loadState, saveState, applyCharacterOpen, applyExchange, applyChatClose, nextCycle, showIntertitle, collapseScene, LOST_COPY_NOTES,
+  loadState, saveState, applyCharacterOpen, applyExchange, applyChatClose, nextCycle, freshState, showIntertitle, collapseScene, LOST_COPY_NOTES,
 } from './game.js';
+import { createResetControl } from './reset.js';
 import { withDefaults, dateFor, formatDateKa, SEASON_KA, derive, dayFromSeason } from './calendar.js';
 import { createCopyNote } from './copyNote.js';
 import { treeMarkup, updateTree } from './tree.js';
@@ -220,6 +221,20 @@ async function main() {
   $('user-chip').addEventListener('click', () => (nameCard.isOpen() ? nameCard.close() : nameCard.open()));
   renderUser();
 
+  // --- Round 5 §2: „ყველაფრის განულება“ — საუბრები და შენობა თავიდან; სახელი, client_id და სერვერის მთვლელები რჩება ---
+  async function resetAll() {
+    await chat.forgetAll();
+    copyNote.hide();
+    clearAllChats();
+    game = freshState(gameCfg);
+    saveState(game);
+    wall.setPaintingFallen(false);
+    wall.setSeed(cfg.wall.layout_seed + game.cycle);
+    background.set(game.crackStage, { instant: true });
+    renderStatus();
+  }
+  const resetControl = createResetControl({ onConfirm: resetAll, beforeOpen: () => nameCard.close() });
+
   // ფონტები ჩაიტვირთა → ზომები შეიძლება შეიცვალა
   wall.render();
   document.fonts?.ready.then(() => wall.render());
@@ -237,6 +252,8 @@ async function main() {
     modal,
     background,
     nameCard,
+    resetControl,
+    resetAll,
     ready: true,
   };
   document.body.classList.add('ready');

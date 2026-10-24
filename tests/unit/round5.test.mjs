@@ -2,6 +2,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { stripScripted, migrateChats, getChats, getJSON, setJSON, KEYS } from '../../public/js/storage.js';
+import { freshState, initialState } from '../../public/js/game.js';
 
 // ---------- §1 მიგრაცია ----------
 
@@ -44,4 +45,19 @@ test('§1 migrateChats: tianshani.chats ფიზიკურად იწმი
   // ისტორია არ არსებობს → არაფერი იწერება
   setJSON(KEYS.chats, null);
   assert.equal(migrateChats(), false);
+});
+
+// ---------- §2 ახალი შენობა ----------
+
+test('§2 freshState: შენობა №1, დღე 0, შემოდგომა, ბზარი 0, ეგზემპლარი არ დაკარგულა, არავინ ნანახი', () => {
+  const s = freshState({ days_per_season: 90 });
+  assert.equal(s.cycle, 1);
+  assert.equal(s.day, 0);
+  assert.equal(s.season, 'autumn');
+  assert.equal(s.crackStage, 0);
+  assert.equal(s.lostCopies, 0);
+  assert.deepEqual(s.visited, []);
+  assert.equal(s.lastCharacterId, null);
+  assert.equal(s.exchanges, 0);
+  assert.deepEqual(Object.keys(initialState(1)).every((k) => k in s), true);
 });
