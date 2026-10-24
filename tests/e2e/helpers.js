@@ -179,4 +179,10 @@ export async function sseDone(response) {
 /** ტოკენების ინდიკატორი (Round 3 §3): დახარჯული შემავალის % (დაუმრგვალებელი — data-value). */
 export const pctShown = (page) => page.locator('#tokens-pct').evaluate((el) => Number(el.dataset.value));
 
+/** Round 6 §1: ახალი/გასუფთავებული ჩატი — შეტყობინებების ზონაში არც ერთი ელემენტი და არც ერთი სიმბოლო. */
+export async function expectEmptyLog(page) {
+  await expect.poll(() => page.locator('#chat-log').evaluate((el) => ({ children: el.childElementCount, text: el.innerText.trim() })))
+    .toEqual({ children: 0, text: '' });
+}
+
 export const storage = (page, key) => page.evaluate((k) => JSON.parse(localStorage.getItem(k) || 'null'), key);

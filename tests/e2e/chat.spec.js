@@ -1,6 +1,6 @@
 // ჩატი: ცენტრში მოსვლა, სტრიმინგი, ისტორია (გადატვირთვა, ცალკე პერსონაჟები), უხილავები, ენა, გადამისამართება, შეცდომები.
 import { test, expect } from '@playwright/test';
-import { openWall, openFrame, openFromMenu, send, storage, pctShown, SHOTS } from './helpers.js';
+import { openWall, openFrame, openFromMenu, send, storage, pctShown, expectEmptyLog, SHOTS } from './helpers.js';
 
 test('ჩარჩო → ცენტრში → ჩატი; პასუხი სტრიმით; ისტორია გადატვირთვას უძლებს; Esc აბრუნებს', async ({ page }) => {
   await openWall(page);
@@ -44,17 +44,15 @@ test('ჩარჩო → ცენტრში → ჩატი; პასუ�
   await openFrame(page, 'director');
   await expect(page.locator('#chat-log .msg.user')).toHaveCount(1);
   await expect(page.locator('#chat-log .msg.char')).toHaveCount(1);
-  await expect(page.locator('#chat-log .msg.hint')).toHaveCount(0);
+  await expect(page.locator('#chat-log .msg')).toHaveCount(2);
   await page.locator('#chat-close').click();
   await expect(page.locator('#chat')).toBeHidden();
 
   // მეორე პერსონაჟი — ცალკე, ცარიელი ისტორია
   await openFrame(page, 'vaso');
   await expect(page.locator('#chat-log .msg.user')).toHaveCount(0);
-  await expect(page.locator('#chat-log .msg.char')).toHaveCount(0);
-  await expect(page.locator('#chat-log .msg.hint')).toBeVisible(); // Round 5 §1: ისევ „დაიწყეთ საუბარი…“
+  await expectEmptyLog(page); // Round 6 §1: ცარიელი — ტექსტის გარეშე
   await send(page, 'როგორ ხართ, ბატონო ვასო?');
-  await expect(page.locator('#chat-log .msg.hint')).toHaveCount(0);
   const all = await storage(page, 'tianshani.chats');
   expect(Object.keys(all).sort()).toEqual(['director', 'vaso']);
   expect(all.vaso).toHaveLength(2);
@@ -93,11 +91,9 @@ test('ისტორიის გასუფთავება ამ პე�
   await expect(page.locator('#chat-log .msg.user')).toHaveCount(1);
   await page.locator('#chat-clear').click();
   await expect(page.locator('#chat-log .msg.user')).toHaveCount(0);
-  // Round 5 §1: გასუფთავების შემდეგ ჩატი მართლა ცარიელია — მხოლოდ მინიშნება, ისტორიაში არაფერი
+  // Round 5/6 §1: გასუფთავების შემდეგ ჩატი მართლა ცარიელია — არც ტექსტი, ისტორიაში არაფერი
   expect((await storage(page, 'tianshani.chats')).bela).toBeUndefined();
-  await expect(page.locator('#chat-log .msg.char')).toHaveCount(0);
-  await expect(page.locator('#chat-log .msg')).toHaveCount(1);
-  await expect(page.locator('#chat-log .msg.hint')).toBeVisible();
+  await expectEmptyLog(page);
 });
 
 test('უხილავი (გივი): სილუეტი ცენტრში, პასუხობს წარმომადგენელი — „~~გივი~~ X“ ყოველ ბუშტზე', async ({ page }) => {

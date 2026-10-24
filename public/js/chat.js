@@ -178,18 +178,10 @@ export function createChat({ byId, api, getConfig, getGameState, onExchange, onO
 
   function scrollDown() { log.scrollTop = log.scrollHeight; }
 
-  /** ისტორია; ცარიელ ჩატში — მხოლოდ მოკლე მინიშნება (Round 5 §1: პერსონაჟი პირველი არ იწყებს). */
+  /** ისტორია. ცარიელ ჩატში შეტყობინებების ზონა ცარიელია — არანაირი ტექსტი (Round 6 §1). */
   function renderLog(id) {
     const msgs = getChat(id);
     log.replaceChildren(...msgs.map((m) => messageNode(id, m)));
-    if (!msgs.length) {
-      const hint = document.createElement('div');
-      hint.className = 'msg hint';
-      hint.textContent = byId[id].reachable
-        ? 'დაიწყეთ საუბარი. ხელნაწერზეც შეგიძლიათ ჰკითხოთ — ან ნებისმიერ სხვა რამეზე.'
-        : 'კარზე დააკაკუნეთ. იქნებ ვინმემ გიპასუხოთ.';
-      log.append(hint);
-    }
     requestAnimationFrame(scrollDown);
   }
 
@@ -401,7 +393,6 @@ export function createChat({ byId, api, getConfig, getGameState, onExchange, onO
     const msgs = getChat(id);
     msgs.push({ role: 'user', content: text, ts: Date.now() });
     saveChat(id, msgs);
-    log.querySelector('.msg.hint')?.remove();
     log.append(messageNode(id, msgs[msgs.length - 1]));
 
     // „წერს…“ ინდიკატორი

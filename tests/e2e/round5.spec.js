@@ -1,11 +1,8 @@
 // Round 5 (FIXES_ROUND5.md) — დესკტოპი: §1 ცარიელი ჩატი + მიგრაცია, §2 „ყველაფრის განულება“, §3 რემარკა ხაზის შუაში, დარჩენილი კითხვები.
 import { test, expect } from '@playwright/test';
 import {
-  openWall, openFrame, openFromMenu, send, storage, treeState, frameRects, expectNoOverlaps, settle, SHOTS,
+  openWall, openFrame, openFromMenu, send, storage, treeState, frameRects, expectNoOverlaps, settle, expectEmptyLog, SHOTS,
 } from './helpers.js';
-
-const HINT = 'დაიწყეთ საუბარი. ხელნაწერზეც შეგიძლიათ ჰკითხოთ — ან ნებისმიერ სხვა რამეზე.';
-const HINT_ABSENT = 'კარზე დააკაკუნეთ. იქნებ ვინმემ გიპასუხოთ.';
 
 /** localStorage-ის ერთჯერადი თესვა (გადატვირთვაზე აღარ) — key → value. */
 const seedStorage = (page, entries) => page.addInitScript((e) => {
@@ -28,41 +25,36 @@ const sse = (deltas, done) => deltas.map((d) => `data: ${JSON.stringify({ delta:
 
 // ---------- §1 ცარიელი ჩატი ----------
 
-test('§1 ახალი ჩატი ცარიელია: მხოლოდ „დაიწყეთ საუბარი…“, სერვერთან მოთხოვნა არ არის, ისტორიაში არაფერი; გასუფთავება → ისევ ცარიელი', async ({ page }) => {
+test('§1 + Round 6 §1: ახალი ჩატი სრულად ცარიელია (არც ბუშტი, არც ტექსტი), სერვერთან მოთხოვნა არ არის, ისტორიაში არაფერი; გასუფთავება → ისევ ცარიელი', async ({ page }) => {
   const calls = [];
   page.on('request', (r) => { if (r.url().endsWith('/api/chat')) calls.push(r); });
   await openWall(page);
   await openFrame(page, 'director');
-  await expect(page.locator('#chat-log .msg')).toHaveCount(1);
-  await expect(page.locator('#chat-log .msg.hint')).toHaveText(HINT);
-  await expect(page.locator('#chat-log .msg.char')).toHaveCount(0);
+  await expectEmptyLog(page);
   await page.waitForTimeout(300);
   expect(calls).toHaveLength(0);
   expect(await storage(page, 'tianshani.chats')).toBeNull();
-  await page.screenshot({ path: `${SHOTS}/R5-01-empty-chat-desktop.png` });
+  await page.screenshot({ path: `${SHOTS}/R6-01-empty-chat-desktop.png` });
 
-  // პირველი შეტყობინება → სერვერს მხოლოდ ის მიდის, მინიშნება ქრება
+  // პირველი შეტყობინება → სერვერს მხოლოდ ის მიდის
   const req = page.waitForRequest((r) => r.url().endsWith('/api/chat'));
   await send(page, 'გამარჯობათ!');
   expect((await req).postDataJSON().messages).toEqual([{ role: 'user', content: 'გამარჯობათ!' }]);
-  await expect(page.locator('#chat-log .msg.hint')).toHaveCount(0);
   // „ისტორიის გასუფთავება“ → მართლა ცარიელი
   await page.locator('#chat-clear').click();
-  await expect(page.locator('#chat-log .msg')).toHaveCount(1);
-  await expect(page.locator('#chat-log .msg.hint')).toHaveText(HINT);
+  await expectEmptyLog(page);
   expect((await storage(page, 'tianshani.chats')).director).toBeUndefined();
   // ხელახლა გახსნა — ისევ ცარიელი (ბუშტი არ „ითესება“)
   await page.keyboard.press('Escape');
   await expect(page.locator('#chat')).toBeHidden();
   await openFrame(page, 'director');
-  await expect(page.locator('#chat-log .msg.char')).toHaveCount(0);
+  await expectEmptyLog(page);
 });
 
-test('§1 უხილავი (გივი): ცარიელ ჩატში მხოლოდ „კარზე დააკაკუნეთ…“, ბუშტი არ არის', async ({ page }) => {
+test('§1 + Round 6 §1: უხილავი (გივი): ცარიელ ჩატში არც ბუშტი, არც ტექსტი', async ({ page }) => {
   await openWall(page);
   await openFromMenu(page, 'givi');
-  await expect(page.locator('#chat-log .msg')).toHaveCount(1);
-  await expect(page.locator('#chat-log .msg.hint')).toHaveText(HINT_ABSENT);
+  await expectEmptyLog(page);
 });
 
 test('§1 + Round 3 §2: გახსნა-დახურვა შეტყობინების გარეშე დროს არ წევს (სკრიპტული ხაზი აღარ არის, რომ „გაცვლად“ ჩაითვალოს)', async ({ page }) => {
@@ -107,8 +99,7 @@ test('§1 მიგრაცია: ძველი `scripted: true` შეტ�
   expect(JSON.stringify(sent)).not.toContain('ჩემო კარგო, რა გაქვს');
   await page.keyboard.press('Escape');
   await openFromMenu(page, 'givi');
-  await expect(page.locator('#chat-log .msg.char')).toHaveCount(0);
-  await expect(page.locator('#chat-log .msg.hint')).toHaveText(HINT_ABSENT);
+  await expectEmptyLog(page);
 });
 
 // ---------- §2 ყველაფრის განულება ----------
@@ -193,10 +184,9 @@ test('§2 „ყველაფრის განულება“: ორი 
   expectNoOverlaps(await frameRects(page), 0);
   await page.screenshot({ path: `${SHOTS}/R5-03-header-after-reset.png`, clip: { x: 0, y: 0, width: 1366, height: 200 } });
 
-  // ისტორია მართლა ცარიელია: ჩატი — მხოლოდ მინიშნება
+  // ისტორია მართლა ცარიელია: ჩატში არაფერია
   await openFrame(page, 'tina');
-  await expect(page.locator('#chat-log .msg')).toHaveCount(1);
-  await expect(page.locator('#chat-log .msg.hint')).toBeVisible();
+  await expectEmptyLog(page);
   // გადატვირთვის შემდეგაც
   await page.reload();
   await page.waitForFunction(() => window.tianshani?.ready === true);

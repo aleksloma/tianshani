@@ -348,7 +348,6 @@ s.struck::after {
   transform: rotate(-1deg);
   background: rgba(255, 240, 230, 0.6);
 }
-.msg.hint { align-self: center; max-width: 92%; font-size: 13px; color: var(--ink-soft); font-style: italic; text-align: center; }
 
 .chat-form {
   display: flex;
