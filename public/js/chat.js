@@ -464,6 +464,11 @@ export function createChat({ byId, api, getConfig, getGameState, onExchange, onO
             renderSegments(bubble, reply); // სტრიმინგზეც: გაუხსნელი * → რემარკა ბოლომდე, ვარსკვლავი არ ციმციმებს
             if (live()) scrollDown();
           }
+          // Round 3 §4: კორექტურის შედეგი — იგივე ბუშტი, ჩუმად (ხელახალი სტრიმის/ციმციმის გარეშე, ერთი replaceChildren)
+          if (typeof ev.replace === 'string' && ev.replace) {
+            reply = ev.replace;
+            if (bubble) renderSegments(bubble, reply);
+          }
           if (ev.error) error = ev.error;
           if (ev.done) done = ev;
         }

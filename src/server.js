@@ -17,6 +17,8 @@ import {
 import { detectRedirect } from './redirect.js';
 import { pacingState } from './pacing.js';
 import { mockStream } from './mock.js';
+import { shouldProofread, proofread, proofreadMaxTokens } from './proofread.js';
+import { findNonWords } from './georgian.js';
 import { geminiStream, resolveModel, currentModel } from './gemini.js';
 import { log, logExchange } from './logger.js';
 import { adminRouter } from './admin.js';
@@ -175,9 +177,12 @@ export function createApp(cfg) {
       : clean;
     const contents = [...fewShot, ...convo];
 
-    // 3) რეზერვი: ბოლო მოთხოვნამ ბიუჯეტი არ უნდა გადააჭარბოს (პრომპტი + max_output_tokens უარეს შემთხვევაში)
-    const promptTokens = estimateTokens(systemInstruction) + contents.reduce((n, m) => n + estimateTokens(m.content), 0);
-    const reserve = reserveUsd({ promptTokens, maxOutputTokens: cfg.gemini.max_output_tokens, prices: cfg.budget });
+    // 3) რეზერვი: ბოლო მოთხოვნამ ბიუჯეტი არ უნდა გადააჭარბოს (პრომპტი + max_output_tokens უარეს შემთხვევაში;
+    //    კორექტურა — დაახლ. +600 შემავალი + პასუხის სიგრძე და 1.5× გამომავალი, Round 3 §4)
+    const maxOut = cfg.gemini.max_output_tokens;
+    const pr = !cfg.gemini.mock && cfg.gemini.proofread !== false;
+    const promptTokens = estimateTokens(systemInstruction) + contents.reduce((n, m) => n + estimateTokens(m.content), 0) + (pr ? 600 + maxOut : 0);
+    const reserve = reserveUsd({ promptTokens, maxOutputTokens: pr ? maxOut + proofreadMaxTokens(maxOut) : maxOut, prices: cfg.budget });
     if (wouldOvershoot(gNow, reserve)) {
       log.warn(`[budget] მოთხოვნა უარყოფილია: ხარჯი $${gNow.spent_usd.toFixed(4)} + რეზერვი $${reserve.toFixed(4)} ≥ $${gNow.budget_usd}`);
       return res.status(429).json(limitBody('global_budget', gNow.resets_at));
@@ -220,15 +225,36 @@ export function createApp(cfg) {
     }
     clearTimeout(timer);
 
+    // Round 3 §4: კორექტურა — პასუხი უკვე სრულად ჩანს; თუ შესწორდა, ბოლო ივენთი { replace } ჩუმად ცვლის ბუშტის ტექსტს.
+    // ტოკენები ლიმიტსა და ბიუჯეტში ითვლება; შეცდომისას ორიგინალი რჩება.
+    let original = null;
+    if (shouldProofread(cfg, reply) && !ac.signal.aborted) {
+      try {
+        const p = await proofread({ cfg, text: reply, speaker, replyTokens: usage.output, signal: ac.signal });
+        usage = { ...usage, input: usage.input + p.usage.input, output: usage.output + p.usage.output, proofread: p.usage };
+        if (p.text && p.text !== reply) {
+          send({ replace: p.text });
+          original = reply;
+          reply = p.text;
+        } else if (!p.text) log.warn(`[proofread] ${speaker.id}: შესწორება უარყოფილია (${p.reason}) — რჩება ორიგინალი`);
+      } catch (e) {
+        log.warn(`[proofread] ${speaker.id}: ${e?.message || e} — რჩება ორიგინალი`);
+      }
+    }
+    const bad = findNonWords(reply);
+    if (bad.length) log.warn(`[georgian] ${speaker.id}: არარსებული სიტყვა პასუხში: ${bad.join(', ')}`);
+
     store.addUsage(clientId, bal.period_key, usage.input, usage.output);
     // გლობალური ხარჯი — რეალური usageMetadata-დან (mock-ში ყალბი usage-დან)
     store.addGlobal(gNow.period_key, usage.input, usage.output, costUsd(usage.input, usage.output, cfg.budget));
-    logExchange(store, cfg, { clientId, characterId: target.id, spokenBy: speaker.id, userText: last.content, reply, usage, gameState, userName });
+    logExchange(store, cfg, { clientId, characterId: target.id, spokenBy: speaker.id, userText: last.content, reply, usage, gameState, userName, original });
 
     const after = balance(store, cfg, clientId);
     send({
       done: true,
-      usage,
+      usage: { input: usage.input, output: usage.output }, // კორექტურის ტოკენების ჩათვლით
+      cached_tokens: usage.cached || 0, // Round 3 §7: იმპლიციტური ქეში (გასაზომად)
+      proofread: original ? 'changed' : (usage.proofread ? 'unchanged' : 'skipped'),
       remaining: after.remaining,
       limits: after.limits,
       period: after.period,

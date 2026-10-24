@@ -35,6 +35,12 @@ const STAGE_LINES = {
 };
 const STAGE_PROXY = '*(დერეფანში გამოდის, კარს უყურებს)*';
 
+/** ყველა ჩაშენებული ქართული ფრაზა (Round 3 §4: unit ტესტი ამოწმებს, რომ არარსებული სიტყვა არ გვხვდება). */
+export const MOCK_STRINGS = [
+  ...Object.values(SEASON_LINES).flat(), ...CRACK_LINES, NEW_BUILDING, ...Object.values(PAINTING_LINES),
+  ...Object.values(STAGE_LINES), STAGE_PROXY,
+];
+
 /** რემარკა მოსაუბრისთვის; თუ ცხრილში არ არის — persona_ka.real_activity-დან. */
 export function stageFor(speaker) {
   if (STAGE_LINES[speaker.id]) return STAGE_LINES[speaker.id];

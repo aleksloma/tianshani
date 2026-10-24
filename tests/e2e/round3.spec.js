@@ -1,6 +1,59 @@
 // Round 3 (FIXES_ROUND3.md) — დესკტოპი: §1 ავტორის სახელი.
 import { test, expect } from '@playwright/test';
-import { openWall, openFrame, send, storage, frameRects, settle, SHOTS } from './helpers.js';
+import { openWall, openFrame, send, storage, frameRects, settle, e2eStore, SHOTS } from './helpers.js';
+
+// ---------- §4 კორექტურა: { replace } — ბუშტი ჩუმად იცვლება ----------
+
+test('§4 { replace }: ბუშტი სრულად იკითხება, მერე იგივე ბუშტში ჩუმად ჩანაცვლდება; ისტორიაში შესწორებული ტექსტია', async ({ page }) => {
+  const ORIG = ['*(სურათს ახედავს)*\n', 'მე აქ ვჭედავარ ', 'ოცდაშვიდი წელიწადი!'];
+  const FIXED = '*(სურათს ახედავს)*\nმე აქ ვზივარ ოცდაშვიდი წელიწადი!';
+  const body = ORIG.map((d) => `data: ${JSON.stringify({ delta: d })}\n\n`).join('')
+    + `data: ${JSON.stringify({ replace: FIXED })}\n\n`
+    + `data: ${JSON.stringify({ done: true, usage: { input: 10, output: 10 }, remaining: { input: 499990, output: 499990 }, limits: { input: 500000, output: 500000 }, suggested_redirect: null, spoken_by: 'vaso', spoken_by_name: 'ვასო', proofread: 'changed' })}\n\n`;
+  await page.route('**/api/chat', (route) => route.fulfill({ status: 200, contentType: 'text/event-stream', body }));
+  await openWall(page);
+  await openFrame(page, 'vaso');
+  // ბუშტების რაოდენობა და DOM კვანძი უცვლელია (ხელახალი სტრიმი/ახალი ბუშტი არ ჩნდება)
+  const watch = page.evaluate(() => new Promise((resolve) => {
+    const log = document.getElementById('chat-log');
+    const seen = new Set();
+    const obs = new MutationObserver(() => { for (const b of log.querySelectorAll('.msg.char .bubble')) seen.add(b); });
+    obs.observe(log, { subtree: true, childList: true, characterData: true });
+    setTimeout(() => { obs.disconnect(); resolve(seen.size); }, 1500);
+  }));
+  await send(page, 'როგორ ხართ?');
+  const bubble = page.locator('#chat-log .msg.char .bubble');
+  await expect(bubble).toHaveCount(1);
+  await expect(bubble).toContainText('ვზივარ');
+  await expect(bubble).not.toContainText('ვჭედავარ');
+  expect(await bubble.textContent()).not.toContain('*');
+  await expect(bubble.locator('.stage')).toHaveText('სურათს ახედავს');
+  expect(await watch).toBe(1);
+  await expect(page.locator('#chat-log .msg.char.streaming')).toHaveCount(0);
+  const chats = await storage(page, 'tianshani.chats');
+  expect(chats.vaso.at(-1).content).toBe(FIXED);
+});
+
+test('§4 ადმინი: „შესწორებული პასუხები“ — ორიგინალი და შესწორებული გვერდიგვერდ, შეცვლილი სიტყვა მონიშნულია', async ({ page }) => {
+  const store = e2eStore();
+  store.touchClient('11111111-2222-4333-8444-555555555555', 'e2e', '127.0.0.1');
+  store.logMessage({ client_id: '11111111-2222-4333-8444-555555555555', character_id: 'vaso', spoken_by: 'vaso', role: 'assistant', user_name: 'ნინო', content: 'მე აქ ვზივარ ოცდაშვიდი წელიწადი!', proofread_original: 'მე აქ ვჭედავარ ოცდაშვიდი წელიწადი!', proofread_changed: 1 });
+  await page.goto('/admin');
+  await page.locator('#pw').fill('e2e-admin-pass');
+  await page.locator('#login-form button').click();
+  await expect(page.locator('#app')).toBeVisible();
+  await expect(page.locator('#proofread-count')).toHaveText(/\(\d+\)/);
+  await page.locator('#proofread-toggle').click();
+  const panel = page.locator('#proofread-panel');
+  await expect(panel).toBeVisible();
+  const row = panel.locator('.pr-row').first();
+  await expect(row.locator('.pr-col.orig .text')).toHaveText('მე აქ ვჭედავარ ოცდაშვიდი წელიწადი!');
+  await expect(row.locator('.pr-col.fixed .text')).toHaveText('მე აქ ვზივარ ოცდაშვიდი წელიწადი!');
+  await expect(row.locator('.pr-col.orig mark')).toHaveText('ვჭედავარ');
+  await expect(row.locator('.pr-col.fixed mark')).toHaveText('ვზივარ');
+  await expect(row).toContainText('ნინო');
+  await panel.screenshot({ path: `${SHOTS}/R3-04-admin-proofread.png` });
+});
 
 // ---------- §1 სახელი ----------
 

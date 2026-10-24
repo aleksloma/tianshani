@@ -1,4 +1,6 @@
 // ადმინ-გვერდი: შესვლა, ბრაუზერების სია, საუბრები პერსონაჟებად, ლიმიტის განულება, ექსპორტი.
+import { diffWords } from './diff.js';
+
 const $ = (id) => document.getElementById(id);
 const fmt = new Intl.NumberFormat('ka-GE');
 const SEASON_KA = { autumn: 'შემოდგომა', winter: 'ზამთარი', spring: 'გაზაფხული', summer: 'ზაფხული' };
@@ -26,7 +28,32 @@ function showLogin() { $('app').hidden = true; $('login').hidden = false; $('pw'
 async function showApp() {
   $('login').hidden = true;
   $('app').hidden = false;
-  await Promise.all([loadStats(), loadClients()]);
+  await Promise.all([loadStats(), loadClients(), loadProofread()]);
+}
+
+// ---------- Round 3 §4: შესწორებული პასუხები ----------
+
+function diffNode(parts) {
+  const d = el('div', { class: 'text' });
+  for (const p of parts) d.append(p.changed && p.w.trim() ? el('mark', { text: p.w }) : document.createTextNode(p.w));
+  return d;
+}
+
+async function loadProofread() {
+  const data = await api('/api/admin/proofread?limit=200');
+  $('proofread-count').textContent = data.total ? `(${data.total})` : '';
+  const list = $('proofread-list');
+  if (!data.rows.length) { list.replaceChildren(el('p', { class: 'muted', text: 'ჯერ არცერთი პასუხი არ შესწორებულა.' })); return; }
+  list.replaceChildren(...data.rows.map((m) => {
+    const { left, right } = diffWords(m.proofread_original, m.content);
+    const who = m.spoken_by && m.spoken_by !== m.character_id ? `${m.character_name} → ${m.spoken_by_name}` : m.character_name;
+    return el('article', { class: 'pr-row', 'data-id': String(m.id) },
+      el('div', { class: 'meta' }, el('strong', { text: who }), el('span', { text: when(m.created_at) }),
+        el('span', { class: 'badge', text: m.user_name ? `${m.user_name} · ${m.client_id.slice(0, 8)}` : m.client_id.slice(0, 8) })),
+      el('div', { class: 'pr-cols' },
+        el('div', { class: 'pr-col orig' }, el('div', { class: 'pr-h', text: 'ორიგინალი' }), diffNode(left)),
+        el('div', { class: 'pr-col fixed' }, el('div', { class: 'pr-h', text: 'შესწორებული' }), diffNode(right))));
+  }));
 }
 
 async function loadStats() {
@@ -124,8 +151,11 @@ function renderConversation(g) {
         el('span', { text: when(m.created_at) }),
         el('span', { class: 'badge', text: `${SEASON_KA[m.season] || m.season || '—'} · შენობა №${m.cycle ?? '—'}` }),
         m.lang_guess ? el('span', { class: 'badge', text: m.lang_guess }) : null,
+        m.proofread_changed ? el('span', { class: 'badge pr', text: 'შესწორებული' }) : null,
         m.role === 'user' ? el('span', { text: `in: ${m.input_tokens}` }) : el('span', { text: `out: ${m.output_tokens}` })),
-      el('div', { class: 'text', text: m.content }));
+      el('div', { class: 'text', text: m.content }),
+      // Round 3 §4: კორექტურამდე რა დაწერა მოდელმა
+      m.proofread_changed ? el('details', { class: 'pr-orig' }, el('summary', { text: 'ორიგინალი (კორექტურამდე)' }), el('div', { class: 'text', text: m.proofread_original })) : null);
   }));
 }
 
@@ -140,6 +170,12 @@ $('login-form').addEventListener('submit', async (e) => {
   if (!res.ok) { $('login-error').textContent = j.error || 'შეცდომა.'; return; }
   $('pw').value = '';
   showApp();
+});
+$('proofread-toggle').addEventListener('click', async () => {
+  const panel = $('proofread-panel');
+  panel.hidden = !panel.hidden;
+  $('proofread-toggle').setAttribute('aria-expanded', String(!panel.hidden));
+  if (!panel.hidden) { await loadProofread(); panel.scrollIntoView({ block: 'start', behavior: 'smooth' }); }
 });
 $('logout').addEventListener('click', async () => { await fetch('/api/admin/logout', { method: 'POST', credentials: 'same-origin' }); showLogin(); });
 $('search').addEventListener('input', () => { clearTimeout(searchTimer); searchTimer = setTimeout(loadClients, 250); });

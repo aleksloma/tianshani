@@ -86,6 +86,78 @@ test('§2 applyChatClose: შეტყობინების გარეშ�
   assert.equal(applyChatClose(s0, withDefaults({ days_per_chat_close: 0 }), 'x', 2).state.day, 0);
 });
 
+// ---------- §4 ----------
+import { NON_WORDS, findNonWords } from '../../src/georgian.js';
+import { allowlistFor, proofreadInstruction, shouldProofread, acceptCorrection, FILM_LEXICON } from '../../src/proofread.js';
+import { MOCK_STRINGS } from '../../src/mock.js';
+import { ABSENCE_FACTS_KA } from '../../src/prompt.js';
+import { diffWords } from '../../public/js/diff.js';
+
+test('§4 არარსებული სიტყვები (ვჭედავარ…) არც მონაცემებში, არც mock-ში, არც პრომპტის მაგალითებში არ გვხვდება', () => {
+  assert.ok(NON_WORDS.includes('ვჭედავარ'));
+  const strings = [];
+  const walk = (v) => { if (typeof v === 'string') strings.push(v); else if (v && typeof v === 'object') Object.values(v).forEach(walk); };
+  walk(JSON.parse(fs.readFileSync(new URL('../../characters.json', import.meta.url), 'utf8')));
+  walk(JSON.parse(fs.readFileSync(new URL('../../src/data/voice_extras.json', import.meta.url), 'utf8')));
+  walk(MOCK_STRINGS);
+  walk(ABSENCE_FACTS_KA);
+  walk(STAGE_EXAMPLES_EN);
+  walk(GENERAL_RULES_EN);
+  assert.ok(strings.length > 500, String(strings.length));
+  const hits = strings.filter((s) => findNonWords(s).length);
+  assert.deepEqual(hits, []);
+  assert.deepEqual(findNonWords('მე აქ ვჭედავარ ოცდაშვიდი წელიწადი'), ['ვჭედავარ']);
+});
+
+test('§4 დაშვებულთა სია პერსონაჟზეა: თამარს — ბოშო/რავა/ქე, ვასოს — არა; ყველას — რუსიციზმები, ბიუროკრატია, ფილმის ტერმინები', () => {
+  const tam = allowlistFor(byId.tamari);
+  for (const w of ['ბოშო', 'რავა', 'ქე', 'ისთევლე', 'ნელთბილად']) assert.ok(tam.includes(w), w);
+  const vaso = allowlistFor(byId.vaso);
+  for (const w of ['რავა', 'ბოშო', 'ქე', 'ნელთბილად']) assert.ok(!vaso.includes(w), `ვასოს არ ეკუთვნის: ${w}`);
+  assert.ok(vaso.includes('ოცდაშვიდი') && vaso.includes('კაცო'));
+  for (const c of [byId.tamari, byId.vaso, byId.director, byId.tina]) {
+    const a = allowlistFor(c);
+    for (const w of ['პაპკა', 'კაპრემონტი', 'ზავხოზი', 'რეზოლუცია', 'სესხბანკი', 'მშენბანკი', 'მარკშეიდერი', 'თინა']) assert.ok(a.includes(w), `${c.id}: ${w}`);
+  }
+  assert.ok(FILM_LEXICON.includes('მოტობურთი'));
+  const ins = proofreadInstruction(tam);
+  assert.ok(ins.startsWith('Proofread this Georgian text. Fix only spelling, grammar, case endings and non-existent words.'));
+  assert.ok(ins.includes('stage directions in asterisks, line breaks and meaning exactly as they are. Return only the corrected text.'));
+  assert.ok(ins.includes('ბოშო'));
+});
+
+test('§4 როდის ეშვება კორექტურა: არა mock-ში, არა proofread:false-ზე, არა < 3 სიტყვაზე, არა არაქართულზე', () => {
+  const on = { gemini: { mock: false, proofread: true } };
+  assert.equal(shouldProofread(on, 'მე აქ ვზივარ ოცდაშვიდი წელიწადი!'), true);
+  assert.equal(shouldProofread({ gemini: { mock: false } }, 'მე აქ ვზივარ ოცდაშვიდი წელიწადი!'), true, 'დეფოლტი ჩართულია');
+  assert.equal(shouldProofread({ gemini: { mock: true, proofread: true } }, 'მე აქ ვზივარ ოცდაშვიდი წელიწადი!'), false);
+  assert.equal(shouldProofread({ gemini: { mock: false, proofread: false } }, 'მე აქ ვზივარ ოცდაშვიდი წელიწადი!'), false);
+  assert.equal(shouldProofread(on, 'ძალიან კარგი!'), false);
+  assert.equal(shouldProofread(on, 'Excuse me, I am terribly busy right now.'), false);
+});
+
+test('§4 კორექტორის პასუხის გადამოწმება: ``` და ბრჭყალები იშლება; რემარკები/ხაზები/სიგრძე უნდა ემთხვეოდეს', () => {
+  const orig = '*(სურათს ახედავს)*\nმე აქ ვჭედავარ ოცდაშვიდი წელიწადი!\nგაიტანეთ!';
+  const fixed = '*(სურათს ახედავს)*\nმე აქ ვზივარ ოცდაშვიდი წელიწადი!\nგაიტანეთ!';
+  assert.equal(acceptCorrection(orig, fixed), fixed);
+  assert.equal(acceptCorrection(orig, `\`\`\`\n${fixed}\n\`\`\``), fixed);
+  assert.equal(acceptCorrection(orig, `„${fixed}“`), fixed);
+  assert.equal(acceptCorrection(orig, fixed.replace(/\*/g, '')), null, 'რემარკა დაიკარგა');
+  assert.equal(acceptCorrection(orig, fixed.replace(/\n/g, ' ')), null, 'ხაზები გაერთიანდა');
+  assert.equal(acceptCorrection(orig, 'კი.'), null, 'ძალიან მოკლე');
+  assert.equal(acceptCorrection(orig, `${fixed}\n${fixed}\n${fixed}`), null);
+  assert.equal(acceptCorrection(orig, ''), null);
+  assert.equal(acceptCorrection(orig, undefined), null);
+});
+
+test('§4 ადმინის სიტყვების დიფი: მხოლოდ შეცვლილი სიტყვა მოინიშნება', () => {
+  const { left, right } = diffWords('მე აქ ვჭედავარ ოცდაშვიდი წელიწადი!', 'მე აქ ვზივარ ოცდაშვიდი წელიწადი!');
+  assert.deepEqual(left.filter((p) => p.changed && p.w.trim()).map((p) => p.w), ['ვჭედავარ']);
+  assert.deepEqual(right.filter((p) => p.changed && p.w.trim()).map((p) => p.w), ['ვზივარ']);
+  assert.equal(left.map((p) => p.w).join(''), 'მე აქ ვჭედავარ ოცდაშვიდი წელიწადი!');
+  assert.equal(right.map((p) => p.w).join(''), 'მე აქ ვზივარ ოცდაშვიდი წელიწადი!');
+});
+
 // ---------- §3 ----------
 
 test('§3 პროცენტი: ერთი ათწილადი, ქართული მძიმე, 0–100-ში', () => {

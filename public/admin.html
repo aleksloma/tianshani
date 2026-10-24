@@ -33,6 +33,7 @@
         <p class="muted" id="mode-line"></p>
       </div>
       <div class="actions">
+        <button id="proofread-toggle" class="btn ghost" type="button" aria-expanded="false" aria-controls="proofread-panel">შესწორებული პასუხები <span id="proofread-count"></span></button>
         <a id="export-all" class="btn" href="/api/admin/export">ექსპორტი (JSON)</a>
         <button id="logout" class="btn ghost" type="button">გასვლა</button>
       </div>
@@ -53,6 +54,13 @@
       </div>
       <div class="bar big"><i id="b-bar"></i></div>
       <p class="muted" id="b-meta"></p>
+    </section>
+
+    <!-- Round 3 §4: კორექტურით შეცვლილი პასუხები — ორიგინალი | შესწორებული -->
+    <section class="folder proofread-panel" id="proofread-panel" aria-label="შესწორებული პასუხები" hidden>
+      <div class="folder-tab">შესწორებული პასუხები</div>
+      <p class="muted">ქართული კორექტურის მეორე გავლამ (gemini.proofread) ეს პასუხები შეცვალა. მარცხნივ — მოდელის ორიგინალი, მარჯვნივ — რაც მომხმარებელმა ნახა; შეცვლილი სიტყვები მონიშნულია.</p>
+      <div id="proofread-list" class="proofread-list"></div>
     </section>
 
     <section class="stats" id="stats" aria-label="ჯამური სტატისტიკა"></section>

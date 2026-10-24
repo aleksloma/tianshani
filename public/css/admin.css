@@ -134,3 +134,20 @@ button:focus-visible, .btn:focus-visible, input:focus-visible { outline: 2px sol
 .cmsg .text { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 14px; }
 .badge { padding: 0 6px; border: 1px solid rgba(42, 38, 34, 0.35); border-radius: 8px; }
 s.struck { text-decoration-color: var(--red); text-decoration-thickness: 2px; }
+.uname { color: var(--blue); }
+
+/* Round 3 §4: შესწორებული პასუხები — ორიგინალი | შესწორებული */
+.proofread-panel { margin-bottom: 18px; }
+.proofread-panel[hidden] { display: none; }
+.proofread-list { display: grid; gap: 10px; max-height: 70vh; overflow: auto; }
+.pr-row { padding: 8px 10px; background: #fffdf6; border-left: 3px solid #b8860b; }
+.pr-row .meta { font-size: 11px; color: var(--ink-soft); display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 6px; }
+.pr-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.pr-col .pr-h { font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-soft); margin-bottom: 2px; }
+.pr-col .text { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 14px; }
+.pr-col.orig mark { background: rgba(192, 57, 43, 0.22); text-decoration: line-through; text-decoration-color: var(--red); }
+.pr-col.fixed mark { background: rgba(61, 107, 79, 0.25); }
+.badge.pr { border-color: #b8860b; color: #7a5800; }
+.pr-orig { margin-top: 4px; font-size: 13px; color: var(--ink-soft); }
+.pr-orig summary { cursor: pointer; }
+@media (max-width: 860px) { .pr-cols { grid-template-columns: 1fr; } }

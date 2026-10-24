@@ -106,6 +106,33 @@ export async function* geminiStream({ cfg, systemInstruction, contents, signal }
       input: usage?.promptTokenCount ?? 0,
       // „ფიქრის“ ტოკენებიც გამომავალად ითვლება (ასე ითვლის ბილინგიც)
       output: (usage?.candidatesTokenCount ?? 0) + (usage?.thoughtsTokenCount ?? 0),
+      // Round 3 §7: იმპლიციტური ქეშიდან მოსული ტოკენები (promptTokenCount-ში უკვე შედის) — მხოლოდ გასაზომად
+      cached: usage?.cachedContentTokenCount ?? 0,
     },
+  };
+}
+
+/**
+ * არასტრიმინგული გამოძახება (Round 3 §4 — კორექტურა): აბრუნებს { text, finishReason, usage }.
+ * thinking_budget იგივე წესით, რაც სტრიმინგში (მოდელი თუ არ იღებს — მეორე ცდა მის გარეშე).
+ */
+export async function geminiGenerate({ cfg, systemInstruction, contents, temperature = 0, maxOutputTokens, signal }) {
+  const model = await resolveModel(cfg);
+  const base = { systemInstruction, temperature, maxOutputTokens, abortSignal: signal };
+  const tb = cfg.gemini.thinking_budget;
+  const config = tb === null || tb === undefined ? base : { ...base, thinkingConfig: { thinkingBudget: tb } };
+  let res;
+  try {
+    res = await getClient(cfg).models.generateContent({ model, contents: toGeminiContents(contents), config });
+  } catch (e) {
+    if (config !== base && /thinking/i.test(String(e.message))) {
+      res = await getClient(cfg).models.generateContent({ model, contents: toGeminiContents(contents), config: base });
+    } else throw e;
+  }
+  const u = res?.usageMetadata || {};
+  return {
+    text: typeof res?.text === 'string' ? res.text : '',
+    finishReason: res?.candidates?.[0]?.finishReason || null,
+    usage: { input: u.promptTokenCount ?? 0, output: (u.candidatesTokenCount ?? 0) + (u.thoughtsTokenCount ?? 0) },
   };
 }

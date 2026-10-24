@@ -30,7 +30,8 @@ const fake = {
 
 let S;
 before(async () => {
-  S = await startTestServer({ gemini: { api_key: 'fake-key-for-tests', mock: false, model: 'gemini-3.8-flash' } });
+  // კორექტურა (Round 3 §4) ცალკე ფაილშია (proofread.test.mjs) — აქ მთავარი გზის ფორმა მოწმდება
+  S = await startTestServer({ gemini: { api_key: 'fake-key-for-tests', mock: false, model: 'gemini-3.8-flash', proofread: false } });
   _setClientForTests(fake);
 });
 after(async () => { await S.close(); });

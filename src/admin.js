@@ -82,6 +82,20 @@ export function adminRouter(cfg, store) {
     });
   });
 
+  /** Round 3 §4: „შესწორებული პასუხები“ — ორიგინალი და კორექტურის შემდეგ, გვერდიგვერდ (ახლიდან ძველისკენ). */
+  r.get('/proofread', (req, res) => {
+    const limit = Math.min(500, Math.max(1, Number.parseInt(req.query.limit, 10) || 100));
+    const total = db.prepare('SELECT COUNT(*) AS n FROM messages WHERE proofread_changed = 1').get().n;
+    const rows = db.prepare(`SELECT m.id, m.client_id, m.character_id, m.spoken_by, m.user_name, m.content, m.proofread_original, m.created_at
+      FROM messages m WHERE m.proofread_changed = 1 ORDER BY m.id DESC LIMIT ?`).all(limit)
+      .map((m) => ({
+        ...m,
+        character_name: byId[m.character_id]?.short_name_ka || m.character_id,
+        spoken_by_name: m.spoken_by ? (byId[m.spoken_by]?.short_name_ka || m.spoken_by) : null,
+      }));
+    res.json({ total, rows });
+  });
+
   /** მიმდინარე თვის გლობალური მთვლელის განულება (ბრაუზერების მთვლელები უცვლელი რჩება). */
   r.post('/budget/reset', (req, res) => {
     const removed = store.resetGlobal(globalPeriodKey());

@@ -97,6 +97,39 @@ test('რეალური API: ვაჟა ზაზაევიჩი — �
   log.director_unmarked_phone = log.cases.filter((c) => c.case === 'director' && c.checks.unmarked_phone_talk).length;
 });
 
+// ---------- Round 3 §4 + §1: კორექტურა (ვასო ×3, თამარი ×2), სახელით მიმართვა ----------
+
+test('რეალური API (Round 3 §4): ვასო ×3, თამარი ×2 — ორიგინალი/შესწორებული წყვილები; საბოლოო პასუხში არარსებული სიტყვა არ არის; „ნინო“ — არა „სოსო“', { skip: !KEY && 'Gemini-ს გასაღები არ არის' }, async () => {
+  const { findNonWords } = await import('../../src/georgian.js');
+  const Q = [
+    ['vaso', 'როგორ ხართ, ბატონო ვასო? რას შვრებით დღეს?'],
+    ['vaso', 'ეს სურათი რამდენი ხანია აქ კიდია?'],
+    ['vaso', 'ჩემს მოთხრობას როდის წაიკითხავთ?'],
+    ['tamari', 'ქალბატონო თამარ, როგორ ბრძანდებით?'],
+    ['tamari', 'ჰონორარი როდის იქნება, ხომ არ იცით?'],
+  ];
+  log.proofread = [];
+  for (const [id, q] of Q) {
+    const jar = cookieJar();
+    const r = await chat(S.base, { characterId: id, messages: userMsg(q), gameState: GS, userName: 'ნინო' }, { jar });
+    assert.equal(r.status, 200);
+    assert.ok(r.done, r.error || 'no done');
+    const replaced = r.events.find((e) => typeof e.replace === 'string')?.replace || null;
+    const final = replaced || r.reply;
+    const row = S.store.db.prepare("SELECT content, proofread_original, proofread_changed FROM messages WHERE client_id = ? AND role = 'assistant' ORDER BY id DESC LIMIT 1").get(jar.get('tianshani_cid'));
+    log.proofread.push({
+      character: id, user: q, original: r.reply, proofread: replaced, changed: Boolean(replaced), status: r.done.proofread,
+      usage: r.done.usage, cached_tokens: r.done.cached_tokens,
+      checks: { non_words: findNonWords(final), mentions_name: final.includes('ნინო'), calls_soso: /ჩემო სოსო|,\s*სოსო[,!?.]/.test(final) },
+    });
+    assert.ok(['changed', 'unchanged'].includes(r.done.proofread), `კორექტურა არ შესრულდა: ${r.done.proofread}`);
+    assert.deepEqual(findNonWords(final), [], final);
+    assert.equal(row.content, final, 'ლოგში — საბოლოო ტექსტი');
+    if (replaced) { assert.equal(row.proofread_original, r.reply); assert.equal(row.proofread_changed, 1); }
+    assert.doesNotMatch(final, /ჩემო სოსო/, `მომხმარებელს სოსოს ეძახის: ${final}`);
+  }
+});
+
 // ---------- Round 2 §8: ტემპი — 5 შეტყობინება ბელასთან ----------
 
 /** საუბრის ნაწილი (რემარკების გარეშე) → წინადადებები: . ! ? ან ახალი ხაზი; მრავალწერტილი („…“) წინადადებას არ ყოფს. */
