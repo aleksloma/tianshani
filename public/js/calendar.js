@@ -8,9 +8,11 @@ export const SEASON_KA = { autumn: 'შემოდგომა', winter: 'ზ�
 const DEFAULTS = {
   seasons: ['autumn', 'winter', 'spring', 'summer'],
   days_per_season: 90,
-  // Round 2 §5: დრო მიდის ყოველ დასრულებულ შეტყობინება-პასუხზე (20 დღე), პერსონაჟის გადართვაზე — არა
+  // Round 3 §2: დრო მიდის მხოლოდ საუბრის დახურვისას (+20 დღე, თუ საუბარში ერთი შეტყობინება მაინც იყო) — საუბრის შუაში არასდროს.
+  // დანარჩენი ორი კონფიგურირებადია, მაგრამ ნულია.
+  days_per_chat_close: 20,
   days_per_character_switch: 0,
-  days_per_exchange: 20,
+  days_per_exchange: 0,
   start_date: '1983-09-01',
   crack_stages: 5,
   copies: 3,
@@ -19,7 +21,7 @@ const DEFAULTS = {
 /** კონფიგის ნორმალიზაცია დეფოლტებით (ძველი settings.json-ის ან ნაკლული ველების შემთხვევაშიც მუშაობს). */
 export function withDefaults(cfg = {}) {
   const out = { ...DEFAULTS, ...(cfg || {}) };
-  for (const k of ['days_per_season', 'days_per_character_switch', 'days_per_exchange', 'crack_stages', 'copies']) {
+  for (const k of ['days_per_season', 'days_per_chat_close', 'days_per_character_switch', 'days_per_exchange', 'crack_stages', 'copies']) {
     const n = Number(out[k]);
     out[k] = Number.isFinite(n) && n >= 0 ? Math.floor(n) : DEFAULTS[k];
   }

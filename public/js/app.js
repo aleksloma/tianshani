@@ -4,7 +4,7 @@ import { createNameCard } from './userName.js';
 import { createWall, createOthersMenu, renderRollCall } from './wall.js';
 import { createChat } from './chat.js';
 import {
-  loadState, saveState, applyCharacterOpen, applyExchange, nextCycle, showIntertitle, collapseScene, LOST_COPY_NOTES,
+  loadState, saveState, applyCharacterOpen, applyExchange, applyChatClose, nextCycle, showIntertitle, collapseScene, LOST_COPY_NOTES,
 } from './game.js';
 import { withDefaults, dateFor, formatDateKa, SEASON_KA } from './calendar.js';
 import { treeMarkup, updateTree } from './tree.js';
@@ -135,7 +135,7 @@ async function main() {
         setTimeout(() => { renderStatus(); background.set(game.crackStage); }, 300); // ფონი და ხე შავი ეკრანის მიღმა იცვლება
         await p;
       } else if (ev.type === 'collapse') {
-        await chat.close({ instant: true });
+        await chat.close({ instant: true, silent: true });
         await collapseScene();
         game = nextCycle(game, gameCfg);
         saveState(game);
@@ -159,7 +159,7 @@ async function main() {
     await playEvents(events);
   }
 
-  /** პასუხი დასრულდა — +days_per_exchange დღე (Round 2: 20); თარიღი და მთვლელი ერთად განახლდება. */
+  /** პასუხი დასრულდა — exchanges++ (სტატისტიკა); დრო მხოლოდ თუ days_per_exchange > 0 (Round 3: 0). */
   async function onExchange(id) {
     const { state: s, events } = applyExchange(game, gameCfg, id);
     game = { ...s, paintingFallen: game.paintingFallen };
@@ -167,8 +167,20 @@ async function main() {
     await playEvents(events);
   }
 
+  /**
+   * Round 3 §2: საუბარი დაიხურა (პანელი უკვე დაკეტილია, ჩარჩო კედელზეა) → +days_per_chat_close დღე, თუ გაცვლა შედგა.
+   * tooltip-ის თარიღი მაშინვე ახლდება; სეზონის/ჩამონგრევის ეფექტები — მის მერე. true → შენობა ჩამოინგრა.
+   */
+  async function onClosed(id, exchanges) {
+    const { state: s, events } = applyChatClose(game, gameCfg, id, exchanges);
+    game = { ...s, paintingFallen: game.paintingFallen };
+    saveState(game);
+    $('season-tip-date').textContent = formatDateKa(dateFor(gameCfg, game.day));
+    return playEvents(events);
+  }
+
   chat = createChat({
-    byId, api, wall, menu, buildFrame, onExchange, onOpened,
+    byId, api, wall, menu, buildFrame, onExchange, onOpened, onClosed,
     getConfig: () => cfg,
     getGameState: () => game,
     onTokens: renderTokens,

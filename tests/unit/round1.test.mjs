@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import {
   derive, advanceDays, totalDays, dateFor, formatDateKa, formatDateEn, clampDay, dayFromSeason, withDefaults,
 } from '../../public/js/calendar.js';
-import { applyCharacterOpen, applyExchange, nextCycle, initialState, withDerived, saveState, loadState } from '../../public/js/game.js';
+import { applyCharacterOpen, applyExchange, applyChatClose, nextCycle, initialState, withDerived, saveState, loadState } from '../../public/js/game.js';
 import { parseStage } from '../../public/js/stage.js';
 import { mixColor } from '../../public/js/tree.js';
 import { characters, byId, world } from '../../src/characters.js';
@@ -17,11 +17,12 @@ const CFG = { game: G };
 
 // ---------- §4 კალენდარი ----------
 
-test('დეფოლტები (Round 2 §5): 1983-09-01, 90 დღე სეზონი, 0 დღე გადასვლაზე, 20 დღე გაცვლაზე, 360 დღე ციკლი', () => {
+test('დეფოლტები (Round 3 §2): 1983-09-01, 90 დღე სეზონი, 20 დღე საუბრის დახურვაზე, 0 გადასვლაზე და გაცვლაზე, 360 დღე ციკლი', () => {
   assert.equal(G.start_date, '1983-09-01');
   assert.equal(G.days_per_season, 90);
+  assert.equal(G.days_per_chat_close, 20);
   assert.equal(G.days_per_character_switch, 0);
-  assert.equal(G.days_per_exchange, 20);
+  assert.equal(G.days_per_exchange, 0);
   assert.equal(totalDays(G), 360);
 });
 
@@ -83,15 +84,16 @@ test('Round 2: პერსონაჟის გახსნა დროს �
   assert.deepEqual(r.state.visited, ['director', 'vaso']);
 });
 
-test('Round 2: ყოველი გაცვლა = +20 დღე; 1 → 21 სექტემბერი, 5 → ზამთარი, 18 → ჩამონგრევა', () => {
-  let s = withDerived(initialState(1), G);
+test('Round 2 რეჟიმი კონფიგით (days_per_exchange: 20): ყოველი გაცვლა = +20 დღე; 1 → 21 სექტემბერი, 5 → ზამთარი, 18 → ჩამონგრევა', () => {
+  const G20 = withDefaults({ days_per_exchange: 20 });
+  let s = withDerived(initialState(1), G20);
   const seen = [];
   let collapseAt = null;
   for (let i = 1; i <= 18; i++) {
-    const r = applyExchange(s, G, 'tina');
+    const r = applyExchange(s, G20, 'tina');
     s = r.state;
     for (const e of r.events) { if (e.type === 'season') seen.push([i, e.season]); else collapseAt = i; }
-    if (i === 1) assert.equal(formatDateKa(dateFor(G, s.day)), '21 სექტემბერი');
+    if (i === 1) assert.equal(formatDateKa(dateFor(G20, s.day)), '21 სექტემბერი');
     if (i === 4) assert.equal(s.season, 'autumn');
     if (i === 5) { assert.equal(s.season, 'winter'); assert.equal(s.crackStage, 1); assert.equal(s.lostCopies, 1); }
   }
@@ -125,7 +127,7 @@ test('ძველი რეჟიმი კონფიგით: days_per_char
 
 test('ჩამონგრევა დღე 360-ზე → nextCycle: ციკლი+1, დღე 0', () => {
   const s = withDerived({ ...initialState(1), day: 350, lastCharacterId: 'a' }, G);
-  const r = applyExchange(s, G, 'a');
+  const r = applyChatClose(s, G, 'a', 1);
   assert.deepEqual(r.events, [{ type: 'collapse' }]);
   const n = nextCycle(r.state, G);
   assert.equal(n.cycle, 2);

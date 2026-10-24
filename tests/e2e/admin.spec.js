@@ -28,7 +28,9 @@ test('/admin: არასწორი პაროლი → შეცდომ
   await expect(item).toBeVisible();
   await expect(item).toContainText('შეტყობინება: 2');
   await item.click();
-  await expect(page.locator('#detail-title')).toHaveText(cid);
+  await expect(page.locator('#detail-title')).toHaveText(`ნინო — ${cid}`); // Round 3 §1: სახელი კლიენტის გვერდით
+  await expect(item.locator('.uname')).toHaveText('ნინო · ');
+  await expect(page.locator('#conversation .cmsg.user strong').first()).toHaveText('მომხმარებელი (ნინო)');
   const tabs = page.locator('#char-tabs button');
   await expect(tabs).toHaveCount(2);
   const names = await tabs.allTextContents();
@@ -38,7 +40,7 @@ test('/admin: არასწორი პაროლი → შეცდომ
   await expect(page.locator('#conversation .cmsg')).toHaveCount(2);
   await expect(page.locator('#conversation .cmsg.assistant s.struck')).toHaveText('კოპალეიშვილი');
   await expect(page.locator('#conversation .cmsg.user .text')).toHaveText('კოპალეიშვილი სად არის?');
-  // Round 2 §5: მეორე შეტყობინება დღე 20-ზე გაიგზავნა (ერთი გაცვლა = +20 დღე) → შემოდგომა; სერვერი სეზონს დღიდან ითვლის
+  // Round 3 §2: მეორე შეტყობინება ოთართან საუბრის დახურვის (+45 დღე) შემდეგ გაიგზავნა → ისევ შემოდგომა; სერვერი სეზონს დღიდან ითვლის
   await expect(page.locator('#conversation .badge').first()).toContainText('შემოდგომა · შენობა №1');
   // Round 2 §3: კლიენტის ხარჯი USD-ში
   await expect(item.locator('.cmeta.cost')).toContainText('$');

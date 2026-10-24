@@ -65,6 +65,17 @@ export function applyExchange(state, cfgRaw, characterId) {
   return { state: withDerived({ ...base, day: r.day }, cfg), events: toEvents(r) };
 }
 
+/**
+ * Round 3 §2: საუბარი დაიხურა (✕, Esc, ჩაბნელებული კედელი, სხვა პერსონაჟზე გადასვლა).
+ * +days_per_chat_close დღე, მაგრამ მხოლოდ თუ ამ საუბარში ერთი გაცვლა მაინც შედგა — გახსნა-დახურვა დროს არ ამატებს.
+ */
+export function applyChatClose(state, cfgRaw, characterId, exchangesInChat = 0) {
+  const cfg = withDefaults(cfgRaw);
+  if (!(exchangesInChat > 0) || cfg.days_per_chat_close <= 0) return { state: withDerived(state, cfg), events: [] };
+  const r = advanceDays(state.day, cfg.days_per_chat_close, cfg);
+  return { state: withDerived({ ...state, day: r.day }, cfg), events: toEvents(r) };
+}
+
 /** ჩამონგრევის შემდეგ: ახალი შენობა, ახალი ციკლი, დღე 0, სურათი ისევ ეკიდება. */
 export function nextCycle(state, cfgRaw) {
   return withDerived({ ...initialState(state.cycle + 1), visited: state.visited }, cfgRaw);

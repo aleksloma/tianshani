@@ -1,8 +1,9 @@
 {
-  "_comment": "E2E ტესტების კონფიგი (საიდუმლოებს არ შეიცავს). დრო — ნაგულისხმევი (Round 2): ყოველი გაცვლა +20 დღე, გახსნა 0 → ზამთარი მე-5 გაცვლაზე.",
+  "_comment": "E2E ტესტების კონფიგი (საიდუმლოებს არ შეიცავს). დრო (Round 3 §2): +45 დღე ყოველი საუბრის დახურვაზე (თუ გაცვლა იყო) → მე-2 დახურვაზე „ზამთარი.“, მე-8-ზე ჩამონგრევა.",
   "server": { "port": 3999, "host": "127.0.0.1" },
   "gemini": { "api_key": "", "mock": true },
   "limits": { "max_requests_per_minute": 1000 },
+  "game": { "days_per_chat_close": 45 },
   "admin": { "password": "e2e-admin-pass" },
   "logging": { "db_path": "test-results/e2e/e2e.db" }
 }

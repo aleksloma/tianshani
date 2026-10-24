@@ -20,11 +20,12 @@ test('GET /api/characters: 29 პერსონაჟი, 12 კედელზ
   assert.ok(!raw.includes('system_prompt_en') && !raw.includes('You are '), 'სრული პრომპტები კლიენტთან არ მიდის');
   assert.ok(!raw.includes('test-admin-pass'), 'ადმინის პაროლი არ ჩანს');
   assert.ok(!('gemini' in j.config) && !('admin' in j.config) && !('logging' in j.config), 'საიდუმლო კონფიგი არ ჩანს');
-  // Round 1 §4 + Round 2 §5: დღეებზე დაფუძნებული დრო, +20 დღე ყოველ გაცვლაზე
+  // Round 1 §4 + Round 3 §2: დღეებზე დაფუძნებული დრო, +20 დღე საუბრის დახურვაზე (გაცვლა/გახსნა — 0)
   assert.equal(j.config.game.start_date, '1983-09-01');
   assert.equal(j.config.game.days_per_season, 90);
+  assert.equal(j.config.game.days_per_chat_close, 20);
   assert.equal(j.config.game.days_per_character_switch, 0);
-  assert.equal(j.config.game.days_per_exchange, 20);
+  assert.equal(j.config.game.days_per_exchange, 0);
   // Round 2 §7: ფონი ეტაპების მიხედვით (არარსებული ფაილი → null)
   assert.deepEqual(j.wall_backgrounds, ['assets/wall.jpg', null, null, null, null]);
   assert.ok(!('_comment' in j.config.game));

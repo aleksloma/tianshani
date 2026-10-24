@@ -56,6 +56,36 @@ test('§1 mock სახელით მიმართავს (რემა�
   assert.ok(!composeMockReply({ speaker: byId.tina, invisible: null, userText: 'გამარჯობა', historyLen: 0, gameState: GS0 }).includes('ნინო'));
 });
 
+// ---------- §2 ----------
+import { applyChatClose, applyExchange, applyCharacterOpen, initialState, withDerived } from '../../public/js/game.js';
+import { withDefaults, dateFor, formatDateKa } from '../../public/js/calendar.js';
+
+test('§2 applyChatClose: შეტყობინების გარეშე დრო არ მიდის; ≥1 გაცვლა → +20; საზღვარი → სეზონი; 350 → ჩამონგრევა', () => {
+  const G = withDefaults({});
+  const s0 = withDerived(initialState(1), G);
+  let r = applyChatClose(s0, G, 'tina', 0);
+  assert.equal(r.state.day, 0);
+  assert.deepEqual(r.events, []);
+  r = applyChatClose(s0, G, 'tina', 3);
+  assert.equal(r.state.day, 20, 'ერთხელ +20, გაცვლების რაოდენობისგან დამოუკიდებლად');
+  assert.equal(formatDateKa(dateFor(G, r.state.day)), '21 სექტემბერი');
+  r = applyChatClose(withDerived({ ...initialState(1), day: 80 }, G), G, 'tina', 1);
+  assert.deepEqual([r.state.day, r.state.season, r.events], [100, 'winter', [{ type: 'season', season: 'winter' }]]);
+  r = applyChatClose(withDerived({ ...initialState(1), day: 350 }, G), G, 'tina', 1);
+  assert.deepEqual(r.events, [{ type: 'collapse' }]);
+  // საუბრის შუაში (გაცვლა/გახსნა) დრო დეფოლტით აღარ მიდის
+  assert.equal(applyExchange(s0, G, 'tina').state.day, 0);
+  assert.equal(applyExchange(s0, G, 'tina').state.exchanges, 1);
+  assert.equal(applyCharacterOpen(s0, G, 'vaso').state.day, 0);
+  // e2e კონფიგი: 45 დღე → მე-2 დახურვაზე ზამთარი
+  const G45 = withDefaults({ days_per_chat_close: 45 });
+  const a = applyChatClose(withDerived(initialState(1), G45), G45, 'x', 1);
+  const b = applyChatClose(a.state, G45, 'y', 1);
+  assert.deepEqual([a.events, b.events], [[], [{ type: 'season', season: 'winter' }]]);
+  // ნულოვანი კონფიგი → დახურვაც არ ამატებს
+  assert.equal(applyChatClose(s0, withDefaults({ days_per_chat_close: 0 }), 'x', 2).state.day, 0);
+});
+
 // ---------- §3 ----------
 
 test('§3 პროცენტი: ერთი ათწილადი, ქართული მძიმე, 0–100-ში', () => {

@@ -30,7 +30,7 @@ export function accentFor(id) {
 const rand = (arr) => arr[Math.floor(Math.random() * arr.length)];
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-export function createChat({ byId, api, getConfig, getGameState, onExchange, onOpened, onTokens, wall, menu, buildFrame, limitModal = null }) {
+export function createChat({ byId, api, getConfig, getGameState, onExchange, onOpened, onClosed = null, onTokens, wall, menu, buildFrame, limitModal = null }) {
   const panel = document.getElementById('chat');
   const backdrop = document.getElementById('chat-backdrop');
   const log = document.getElementById('chat-log');
@@ -42,7 +42,7 @@ export function createChat({ byId, api, getConfig, getGameState, onExchange, onO
   const input = document.getElementById('chat-input');
   const sendBtn = document.getElementById('chat-send');
 
-  let current = null;     // { id, portrait, source } — მხოლოდ მეხსიერებაში, არასდროს ინახება
+  let current = null;     // { id, portrait, source, exchanges } — მხოლოდ მეხსიერებაში, არასდროს ინახება
   let session = 0;        // ღია ჩატის „ვერსია“ — სტრიმი ძველ ჩატს DOM-ში აღარ წერს
   const busy = new Set(); // პერსონაჟები, ვისთანაც პასუხი მიდის
 
@@ -274,7 +274,7 @@ export function createChat({ byId, api, getConfig, getGameState, onExchange, onO
   async function open(id, sourceNode = null) {
     const c = byId[id];
     if (!c) return;
-    if (current) await close({ instant: true });
+    if (current && await close({ instant: true })) return; // დახურვამ შენობა ჩამოანგრია — ახალი ჩატი არ იხსნება
     menu.close();
     session += 1;
     const rects = targetRects();
@@ -301,7 +301,7 @@ export function createChat({ byId, api, getConfig, getGameState, onExchange, onO
     portrait.style.transform = startTransform;
     if (!fromWall) portrait.style.opacity = '0';
     if (fromWall) fromWall.classList.add('lifted'); // ერთადერთი, რაც კედლის ჩარჩოს ემატება — დახურვისას იხსნება
-    current = { id, portrait, source: fromWall };
+    current = { id, portrait, source: fromWall, exchanges: 0 };
 
     document.body.classList.add('chat-open');
     lockScroll(rects.mobile);
@@ -328,10 +328,14 @@ export function createChat({ byId, api, getConfig, getGameState, onExchange, onO
     if (onOpened) await onOpened(id);
   }
 
-  /** დახურვა: პორტრეტი უკან, ზუსტად კედლის ჩარჩოს ადგილას (იგივე ხანგრძლივობა), მერე ჩარჩო ისევ ჩანს. */
-  async function close({ instant = false } = {}) {
-    if (!current) return;
-    const { portrait, source } = current;
+  /**
+   * დახურვა: პორტრეტი უკან, ზუსტად კედლის ჩარჩოს ადგილას (იგივე ხანგრძლივობა), მერე ჩარჩო ისევ ჩანს.
+   * Round 3 §2: პანელი უკვე დაკეტილია, როცა onClosed დროს წაწევს — ინტერტიტრი/ხე/ფონი ჩატის შუაში არასდროს ჩნდება.
+   * silent — დრო არ მიდის (ჩამონგრევის სცენა). აბრუნებს true-ს, თუ დახურვამ შენობა ჩამოანგრია.
+   */
+  async function close({ instant = false, silent = false } = {}) {
+    if (!current) return false;
+    const { portrait, source, id, exchanges } = current;
     current = null;
     session += 1;
     menu.close();
@@ -354,11 +358,13 @@ export function createChat({ byId, api, getConfig, getGameState, onExchange, onO
     panel.classList.remove('closing');
     backdrop.hidden = true;
     subEl.hidden = true;
+    if (silent || !onClosed) return false;
+    return Boolean(await onClosed(id, exchanges));
   }
 
-  /** სხვა პერსონაჟი: ჯერ მიმდინარე ბრუნდება კედელზე, მერე ახალი მოდის ცენტრში. */
+  /** სხვა პერსონაჟი: ჯერ მიმდინარე ბრუნდება კედელზე (და, თუ სეზონი შეიცვალა, ინტერტიტრი), მერე ახალი მოდის ცენტრში. */
   async function switchTo(id) {
-    await close();
+    if (await close()) return; // ჩამონგრევა — ახალ შენობაში თავიდან
     const node = wall.frameNode(id);
     if (node) node.scrollIntoView({ block: 'nearest', behavior: 'instant' });
     await open(id, node);
@@ -496,6 +502,7 @@ export function createChat({ byId, api, getConfig, getGameState, onExchange, onO
     if (done.remaining) onTokens({ remaining: done.remaining, limits: done.limits, period: done.period, resets_at: done.resets_at });
     busy.delete(id);
     updateBusy();
+    if (live()) current.exchanges += 1; // დახურვისას დრო მიდის მხოლოდ თუ ამ საუბარში გაცვლა შედგა (Round 3 §2)
     if (done.exhausted && limitModal) limitModal.block('client_limit', done.resets_at ?? null);
     await onExchange(id);
   }

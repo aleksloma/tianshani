@@ -1,6 +1,6 @@
 // „გრენლანდია“: კედლის ფოტო, ოდნავ გადახრილი ნახატი, დაჭერაზე ჩამოვარდნა და გაქრობა.
 import { test, expect } from '@playwright/test';
-import { openWall, openFrame, frameRects, expectNoOverlaps, storage, settle, SHOTS } from './helpers.js';
+import { openWall, openFrame, frameRects, expectNoOverlaps, storage, settle, send, SHOTS } from './helpers.js';
 
 test('კედლის ფოტო არის ფონი; ნახატი ეკიდება, ოდნავ გადახრილი, არაფერს ფარავს', async ({ page }) => {
   await openWall(page);
@@ -63,8 +63,8 @@ test('ჩამონგრევის შემდეგ ახალ შე�
   await expect(page.locator('#painting')).toBeHidden({ timeout: 5000 });
   await page.locator('#frames .frame[data-id="tina"]').click();
   await expect(page.locator('#chat.shown')).toHaveCount(1);
-  await page.locator('#chat-input').fill('სურათი ჩამოვარდა?');
-  await page.locator('#chat-input').press('Enter'); // ერთი გაცვლა: 340 + 20 → ჩამონგრევა (Round 2 §5)
+  await send(page, 'სურათი ჩამოვარდა?');
+  await page.keyboard.press('Escape'); // დახურვა: 340 + 45 → ჩამონგრევა (Round 3 §2)
   await expect(page.locator('#intertitle p')).toHaveText('შენობა ჩამოინგრა. ახალი შენობა. ყველაფერი თავიდან.', { timeout: 15_000 });
   await expect(page.locator('#intertitle')).toBeHidden({ timeout: 10_000 });
   await expect(page.locator('#painting')).toBeVisible();
