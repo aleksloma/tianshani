@@ -84,6 +84,20 @@ export function createApp(cfg) {
   app.get(adminPath, (req, res) => res.sendFile(path.join(ROOT, 'public', 'admin.html')));
   app.use('/api/admin', adminRouter(cfg, store));
 
+  // --- მთავარი გვერდი (Round 4 §8): Open Graph-ს სრული მისამართები სჭირდება → {{ORIGIN}} იცვლება ---
+  const indexHtml = fs.readFileSync(path.join(publicDir, 'index.html'), 'utf8');
+  /** site.public_url (ან env PUBLIC_URL); თუ არ არის — მოთხოვნის protocol + host (მხოლოდ უსაფრთხო სიმბოლოებით). */
+  const originOf = (req) => {
+    const configured = String(cfg.site?.public_url || '').replace(/\/+$/, '');
+    if (/^https?:\/\/[a-z0-9.\-:[\]]+$/i.test(configured)) return configured;
+    const host = String(req.get('host') || '');
+    return /^[a-z0-9.\-:[\]]+$/i.test(host) ? `${req.protocol}://${host}` : '';
+  };
+  app.get(['/', '/index.html'], (req, res) => {
+    res.setHeader('Cache-Control', 'no-cache');
+    res.type('html').send(indexHtml.replaceAll('{{ORIGIN}}', originOf(req)));
+  });
+
   // --- სტატიკა ---
   // HTML/JS/CSS — ყოველთვის ETag-ით გადამოწმება (deploy-ის შემდეგ ძველი მოდულები არ დარჩეს); სურათები — 1 დღე
   app.use(express.static(path.join(ROOT, 'public'), {

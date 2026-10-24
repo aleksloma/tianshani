@@ -67,6 +67,8 @@ export function loadConfig(overrides = {}) {
   if (env.ADMIN_PASSWORD) cfg.admin.password = env.ADMIN_PASSWORD;
   if (env.DB_PATH) cfg.logging.db_path = env.DB_PATH;
   if (env.GEMINI_MOCK === '1' || env.GEMINI_MOCK === 'true') cfg.gemini.mock = true;
+  cfg.site = cfg.site || {};
+  if (env.PUBLIC_URL) cfg.site.public_url = env.PUBLIC_URL; // Round 4 §8: Open Graph-ის სრული მისამართი
   // --- ბიუჯეტი (FIXES_ROUND2 §3): env, რიცხვები, დეფოლტები ---
   cfg.budget = cfg.budget || {};
   if (env.GLOBAL_MONTHLY_USD !== undefined && env.GLOBAL_MONTHLY_USD !== '') cfg.budget.global_monthly_usd = Number(env.GLOBAL_MONTHLY_USD);

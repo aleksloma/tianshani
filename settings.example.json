@@ -63,6 +63,11 @@
     "background_by_stage": ["assets/wall.jpg", null, null, null, null]
   },
 
+  "site": {
+    "_comment": "public_url — საიტის საჯარო მისამართი (მაგ. https://tianshani.example.ge), გაზიარების (Open Graph) ბმულებისთვის; env PUBLIC_URL გადაფარავს. ცარიელი — მოთხოვნის host-იდან ითვლება.",
+    "public_url": ""
+  },
+
   "admin": {
     "_comment": "password — /admin გვერდის პაროლი (env ADMIN_PASSWORD გადაფარავს). CHANGE_ME-ზე სერვერი გაფრთხილებას დალოგავს. path — ადმინ-გვერდის მისამართი.",
     "password": "CHANGE_ME",
