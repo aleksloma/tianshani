@@ -39,19 +39,44 @@ export function pacingState(history, speaker) {
     const core = phraseCore(c);
     return core.length >= 3 && replies.includes(core);
   });
+  // Round 6 §3: რამდენი პასუხის წინ თქვა ცნობილი ფრაზა (არასდროს — Infinity) — „~3-დან 1“ სერვერზე კონტროლდება
+  const cores = (speaker?.catchphrases_ka || []).map(phraseCore).filter((c) => c.length >= 3);
+  const own = history.filter((m) => m.role === 'assistant');
+  let since = Infinity;
+  for (let i = own.length - 1, k = 0; i >= 0; i--, k++) {
+    if (cores.some((c) => own[i].content.includes(c))) { since = k; break; }
+  }
   return {
     messageCount: users.length,
     manuscriptCount: users.filter((m) => isManuscriptMessage(m.content)).length,
     usedCatchphrases: usedOf(speaker?.catchphrases_ka),
     usedExcuses: usedOf(speaker?.excuse_repertoire_ka), // Round 4 §9: საბაბიც არ მეორდება
+    repliesSinceCatchphrase: since,
   };
+}
+
+/** Round 6 §3: ამ პასუხში ცნობილი ფრაზა დასაშვებია? — მხოლოდ თუ ბოლო ორ პასუხში არ ყოფილა (≈ ყოველ მესამეში მაქსიმუმ ერთი). */
+export function catchphraseAllowed(p) {
+  return !p || !(p.repliesSinceCatchphrase < 2);
+}
+
+export function catchphraseGateLine(p) {
+  return catchphraseAllowed(p)
+    ? 'CATCHPHRASE FOR THIS REPLY: allowed — at most one, and only if its "use only when" note fits this exchange; otherwise none.'
+    : 'CATCHPHRASE FOR THIS REPLY: none — you used one in one of your last two replies. Take beat 2 from what you are doing right now, from the building or from a question back to the user.';
 }
 
 /**
  * სიგრძის ზღვარი ამ პასუხისთვის (Round 4 §9: ორი „ტაქტი“ — პასუხი + ერთი დამახასიათებელი შტრიხი).
  * რემარკა (*…*) არ ითვლება.
  */
-export const LENGTH_CAP_LINE = 'LENGTH FOR THIS REPLY: two beats — 2 sentences by default (one per beat), 3 at most, never just 1. Each line is exactly ONE sentence. The stage direction does not count. Answer only what was asked; do not answer questions that were not asked.';
+/**
+ * Round 6 §3 — ზოგადი წესი საკმარისი არ აღმოჩნდა (რეალური smoke: დირექტორმა ბზარზე პასუხს მოტობურთი მიაყოლა),
+ * ამიტომ ყოველ პასუხზე, PACING-ში (სადაც მოდელი წესებს უკეთ იცავს — Round 2 R2.17), კონკრეტულად ვეუბნებით, როგორ დააკავშიროს.
+ */
+export const BEAT2_LINE = 'BEAT 2 FOR THIS REPLY: it must continue beat 1, visibly. Either start it with a bridge word in the language of your reply (in Georgian: აბა, ისე, თორემ, ოღონდ, მერე, თუმცა, თან, ხომ იცი; in another language, its own equivalent — the reply stays in the user\'s language), or keep the same subject as beat 1 (the same object, person, place or problem), or put a stage direction before it that motivates it. A remark about the motoball, the weather, the lift or lunch is allowed only if beat 1 or the user\'s question led there — never as a jump.';
+
+export const LENGTH_CAP_LINE ='LENGTH FOR THIS REPLY: two beats — 2 sentences by default (one per beat), 3 at most, never just 1. Each line is exactly ONE sentence. The stage direction does not count. Answer only what was asked; do not answer questions that were not asked.';
 
 /** Round 4 §9: შენობის „მარადიული“ ფონური თემები (world.setting_ka-ს მოტივები) — მეორე ტაქტისთვის. */
 export const WORLD_TOUCHES_KA = [
@@ -70,20 +95,24 @@ export const WORLD_TOUCHES_KA = [
  */
 export function touchPool(speaker, pacing) {
   const used = new Set((pacing?.usedCatchphrases || []).map(phraseCore));
-  const phrases = (speaker?.catchphrases_ka || []).map(phraseCore).filter((c) => c.length >= 3 && !used.has(c)).slice(0, 4);
+  // Round 6 §3: ფრაზა — მხოლოდ თავისი „როდის“-ით (catchphrase_triggers.json; არ არის — „იშვიათად“)
+  const phrases = !catchphraseAllowed(pacing) ? [] : (speaker?.catchphrases_ka || [])
+    .filter((p) => { const c = phraseCore(p); return c.length >= 3 && !used.has(c); })
+    .slice(0, 4);
+  const trigger = (p) => speaker?.catchphrase_triggers?.[p] || 'rarely; only if it fits';
   const activity = String(speaker?.persona_ka?.real_activity || '').trim();
   const n = WORLD_TOUCHES_KA.length;
   const start = (pacing?.messageCount || 0) % n;
   const world = [0, 1, 2].map((i) => WORLD_TOUCHES_KA[(start + i) % n]);
   return [
-    ...phrases.map((p) => `„${p}“`),
+    ...phrases.map((p) => `„${phraseCore(p)}“ — use only when: ${trigger(p)}`),
     ...(activity ? [`what you are busy with: ${activity}`] : []),
     ...world,
   ];
 }
 
 export function touchPoolLine(speaker, pacing) {
-  return `TOUCH POOL for beat 2 (pick ONE, or ask a counter-question; it is never more information about the request): [${touchPool(speaker, pacing).join('; ')}]`;
+  return `TOUCH POOL for beat 2 (pick ONE that follows from your beat 1, or ask a counter-question; it is never more information about the request; a catchphrase only if its "use only when" fits this exchange): [${touchPool(speaker, pacing).join('; ')}]`;
 }
 
 /**
@@ -93,6 +122,68 @@ export function touchPoolLine(speaker, pacing) {
 export function countSentences(text) {
   const speech = String(text || '').replace(/\*[^*]*\*?/g, '\n').replace(/^\s*\([^)]*\)/gm, '\n');
   return speech.split(/(?<=[.!?])\s+|\n+/).map((s) => s.trim()).filter((s) => (s.match(/[ა-ჰA-Za-zА-яЁё]/g) || []).length >= 3).length;
+}
+
+// ---------- Round 6 §3: ორი ტაქტის კავშირი (ევრისტიკა ტესტებისთვის — unit და რეალური smoke) ----------
+
+/** „ხიდი“ მეორე ტაქტის დასაწყისში: სპეცის სია (აბა, ისე, თორემ, ოღონდ, მერე, თუმცა, ხომ იცი) + მსგავსი კავშირები. */
+export const BRIDGE_START = /^(აბა|ისე|თორემ|ოღონდ|მერე|თუმცა|ხომ|მაგრამ|და|კი|ჰოდა|ასე რომ|ამიტომ|იმიტომ|რადგან|თანაც|თან|თუ|მაშინ|ჰო|ხო|ანუ|მით უმეტეს)(?=[\s,!.?…—-]|$)/;
+/** პირველი სიტყვის ნაწილაკი „-ც“ („გრიშასთანაც ჩავედი“ — „ისიც“) — წინა ტაქტის გაგრძელება. */
+const ALSO_ENCLITIC = /^[ა-ჰ]{3,}(ც|აც)(?=[\s,!.?…—-]|$)/;
+/** უკან მიმთითებელი ნაცვალსახელი („ეს ამბავი“, „მაგაზე“, „ამას“) — იგივე საგანი სხვა სიტყვით (სპეცის „shared subject“). */
+const ANAPHORA = /(^|[^ა-ჰ])(ეს ამბავი|ეს საქმე|ეს ყველაფერი|ამ ამბავს|ამ საქმეს|ამას|ამაზე|ამით|ამისთვის|მაგას|მაგაზე|მაგით|მაგისთვის|იმას|იმაზე)([^ა-ჰ]|$)/;
+const STOP = new Set(['ბატონო', 'ქალბატონო', 'პატივცემულო', 'ჩემო', 'კარგო', 'ახლა', 'მაინც', 'კიდევ', 'ძალიან', 'არის', 'იყო', 'ვარ', 'ხართ', 'ამას', 'იმას', 'ესეც', 'რომელიც']);
+
+/** სიტყვის ძირი შესადარებლად: სიტყვები ≥ 4 ასო, პირველი 4 ასო (ბრუნვის დაბოლოება არ ერევა: ბანკშია / ბანკიდან → „ბანკ“). */
+function stems(text, skip = []) {
+  const out = new Set();
+  for (const w of String(text || '').match(/[ა-ჰ]{4,}/g) || []) {
+    if (STOP.has(w) || skip.some((s) => w.startsWith(s))) continue;
+    out.add(w.slice(0, 4));
+  }
+  return out;
+}
+
+/**
+ * პასუხი → ორი ტაქტი: beat1/beat2 — პირველი ორი სასაუბრო წინადადება (რემარკის გარეშე), stageBefore — რემარკა მეორე ტაქტამდე.
+ * bridge: 'word' (ხიდის სიტყვით იწყება) | 'shared' (საერთო ძირი პირველ ტაქტთან ან კითხვასთან) | 'stage' | null.
+ */
+export function beatLink(reply, question = '', skip = []) {
+  const marked = String(reply || '').replace(/\*[^*]*\*?/g, '\n§STAGE§\n').replace(/^\s*\([^)]*\)/gm, '\n§STAGE§\n');
+  const parts = marked.split(/(?<=[.!?])\s+|\n+/).map((s) => s.trim()).filter(Boolean);
+  const isSentence = (s) => s !== '§STAGE§' && (s.match(/[ა-ჰA-Za-zА-яЁё]/g) || []).length >= 3;
+  const i1 = parts.findIndex(isSentence);
+  const i2 = i1 < 0 ? -1 : parts.findIndex((s, i) => i > i1 && isSentence(s));
+  const beat1 = i1 >= 0 ? parts[i1] : '';
+  const beat2 = i2 >= 0 ? parts[i2] : '';
+  const stageBefore = i2 >= 0 && parts.slice(0, i2).includes('§STAGE§');
+  let bridge = null;
+  if (beat2) {
+    const before = new Set([...stems(beat1, skip), ...stems(question, skip)]);
+    const start = beat2.replace(/^[„“"«(—–-]+\s*/, '');
+    if (BRIDGE_START.test(start) || ALSO_ENCLITIC.test(start)) bridge = 'word';
+    else if ([...stems(beat2, skip)].some((s) => before.has(s))) bridge = 'shared';
+    else if (ANAPHORA.test(beat2)) bridge = 'anaphora';
+    else if (stageBefore) bridge = 'stage';
+  }
+  return { beat1, beat2, stageBefore, bridge };
+}
+
+const YOU_FORMAL = /(^|[^ა-ჰ])(თქვენ|თქვენი|თქვენს|თქვენთვის|ბრძანდებით|გნებავთ|მობრძანდით|დაბრძანდით|გეკადრებათ|იცით|გაქვთ|ხართ|გინდათ|მოიტანეთ|დატოვეთ|დაელოდეთ|შემოიარეთ|მიმართეთ)([^ა-ჰ]|$)/;
+const YOU_FAMILIAR = /(^|[^ა-ჰ])(შენ|შენი|შენს|შენთვის|ხარ|გაქვს|იცი|გინდა|მოიტანე|დატოვე|დაელოდე|შემოიარე|მიმართე|მოდი)([^ა-ჰ]|$)/;
+
+/** მომხმარებლისადმი მიმართვის ფორმა ერთ პასუხში: 'თქვენ' | 'შენ' | 'mixed' | null. „ხომ იცი“ (ნაწილაკი) არ ითვლება. */
+export function addressForm(reply) {
+  const speech = String(reply || '').replace(/\*[^*]*\*?/g, ' ').replace(/ხომ იცი/g, ' ');
+  const f = YOU_FORMAL.test(speech);
+  const s = YOU_FAMILIAR.test(speech);
+  return f && s ? 'mixed' : f ? 'თქვენ' : s ? 'შენ' : null;
+}
+
+/** address_forms ორივე რეგისტრს ურევს? (ბატონო/ქალბატონო/პატივცემულო + შენ/ბიჭო/კაცო) — მაშინ ფორმა პასუხებს შორის შეიძლება იცვლებოდეს. */
+export function mixesAddress(c) {
+  const a = Object.entries(c?.address_forms || {}).filter(([k]) => /calls_others|to_/.test(k)).map(([, v]) => v).join(' ');
+  return /ბატონო|ქალბატონო|პატივცემულო/.test(a) && /(^|[^ა-ჰ])(შენ|ბიჭო|კაცო|გოგო|ბოშო|ძმაო)([^ა-ჰ]|$)/.test(a);
 }
 
 /**

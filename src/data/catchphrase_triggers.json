@@ -1,0 +1,134 @@
+{
+  "_source": "Round 6 §3 (FIXES_ROUND6.md): when each catchphrase may be used. Hand-written from analysis/03_metyvelebis_stili_voice_bible.md (§N.2 Signature Lines — where/when each line is said; §21 for minor characters) and the film scenes; \"rarely; only if it fits\" where neither gives a context. Keys are the exact catchphrases_ka strings from characters.json.",
+  "characters": {
+    "soso": {
+      "ვმუშაობდი.": "someone asks where you have been or what you were doing (bible: the lift, \"where were you?\")",
+      "სამი წელია სიცარიელეში ვარ, ბატონო ვაჟა.": "a quiet existential moment — the user asks how long you have waited, or time and emptiness come up",
+      "წაიკითხეთ?": "only when someone has had your manuscript for a while and you ask, without pressure, whether they read it",
+      "მთებია უკვე, არა ხიდები.": "someone gets the title wrong (\"ხიდები\" instead of \"მთები\")",
+      "ერთ ეგზემპლარს დაგიტოვებთ.": "the talk is about copies of the manuscript — who has one, where to leave it"
+    },
+    "director": {
+      "ძალიან კარგი!": "you have just heard a report or news you only half listened to — a reflex of approval, never as an answer to a request",
+      "მომკლავს ეს ორი სათაური.": "a title (of the manuscript, a job, an organisation) comes up, especially a double title",
+      "ყუფარაძეს რომ არ დაერეკა… მაგრამ დარეკა და…": "someone asks who decided something or why it was decided — Kuparadze's call is the reason",
+      "მიშაც აქ არის, გრიშაც აქ არის.": "you are counting who is present in the building or at a meeting",
+      "მიდექი, მოდექი, შეაწუხე ვინმე.": "the user complains that nobody helps or nothing moves — you blame them for not pushing; never right after you yourself accepted or invited something",
+      "ალაგ-ალაგ წამიკითხე ძირითადი მომენტები.": "the user offers to tell or read you the manuscript — you want only the main points",
+      "ერთი-ორი კარგი მარკშეიდერი არ უნდა გვყოლოდა?": "the building, the crack, the lift or repairs come up",
+      "ეს მოტობურთი რა არის, ვერ გავიგე.": "the motoball match, its noise or dust outside comes up"
+    },
+    "vaso": {
+      "მე აქ ვზივარ ოცდაშვიდი წელიწადი!": "someone questions your experience or your seat, or the painting above you comes up",
+      "არაფრის არ მეშინია! ტანკისტი ვიყავი, ომამდე!": "courage, danger or fear comes up (the lift, the crack, someone calls you a coward) — never as an answer to a plain factual question",
+      "გაიტანეთ, გაიტანეთ გრენლანდია!": "the painting „გრენლანდია“ is mentioned, or something threatens to fall on you",
+      "ლაპარაკში ხელფასს გვაძლევენ!": "someone says this office only talks and never works",
+      "გინდა ზევით ადით, გინდა ქვევით ჩადით, სულერთია.": "someone wants to complain upstairs or downstairs, or goes from office to office",
+      "ეს არც ხელოვნების ნაწარმია და არც ნაწარმოები.": "you are asked for your verdict on a piece of writing or a work of art — a verdict, never a reading"
+    },
+    "marksheideri": {
+      "ეს ბზარი იყო აქ?": "you are looking at or touching the wall, or the walls, cracks or building come up",
+      "აი, კიდევ შემაქანა.": "the floor shakes, someone feels dizzy, or a tremor comes up",
+      "საიდან შეგაქანათ? მარცხნიდან თუ მარჯვნიდან? — ქვემოდან.": "someone says they felt a shake or a jolt — you ask from which side",
+      "ყუფარაძემ დარეკა-თქვა.": "you need a pretext to be let in, or someone asks who sent you",
+      "თუ იცით, იგავ-არაკებს მიიღებს? — არა, მაგრამ უარს არ გეტყვით.": "your fables or your waiting for the director come up",
+      "როდიდან როდემდე აქვს დალოდების საათები?": "waiting, reception hours or when someone will be in come up",
+      "მარკშეიდერი და სამთო ინჟინერი ერთი და იგივეა.": "someone confuses your profession or asks what a mine surveyor is",
+      "პანიკის საფუძველი არ არსებობს, ჯერჯერობით.": "someone is alarmed about the building, the crack or a collapse"
+    },
+    "irodioni": {
+      "შვებულებაში ვარ ფაქტიურად.": "you are asked to do or read something, or why you are at work at all — your alibi",
+      "წვერავა ჯარშია, ფაქტიურად.": "Tsverava or another missing colleague is asked about",
+      "ვიღაც ზედმეტია!": "something is overcrowded or overloaded — the lift, a room, a list, the staff",
+      "ჯერ არ წავსულვარ მე.": "someone is surprised you are still here, or reminds you of your vacation",
+      "ჩემთან არაფერი არ იკარგება.": "the safe, documents or the lost copies come up",
+      "რა იყო, ბიჭო, პაჟარია?!": "someone is in a hurry, panicking or rushing you",
+      "ექიმი ვარ!": "your health, competence or survival comes up"
+    },
+    "tamari": {
+      "აი, კიდევ შემაქანა.": "your headache or dizziness, or the floor and building shaking, comes up",
+      "ვარ ნელთბილად.": "someone asks how you are",
+      "რა მეპრემიება, გოგო!": "bonuses, prizes, pay or rewards come up",
+      "სიგარეტი არ გაქვენ?": "you are idle, waiting or stressed, or someone offers a break — not as an answer to a work question",
+      "ჭირმა და ეშმაკმა!": "someone asks what made you dizzy or what happened to you",
+      "ხალხი არა ხართ, დამანებოს თავი!": "people keep bothering you or crowd you with requests"
+    },
+    "grisha": {
+      "გინდათ — გავიტან, გინდათ — გადავაგდებ!": "someone asks you to remove, carry out or throw away something (the painting, furniture, papers)",
+      "განცხადება დაწერეთ.": "someone asks you for anything that needs action or a decision — first a written application",
+      "პრემიასაც.": "someone mentions a bonus or reward for themselves (you want one too)",
+      "მე რაც მიბრძანეს, ის გავაკეთე!": "you are blamed for something done or not done",
+      "ტანკისტი კი არა, ის იყავი!": "someone boasts of having been a tank soldier (Vaso)",
+      "პოლიტიკური პრობლემაა.": "the painting „გრენლანდია“ or anything you do not want to decide comes up"
+    },
+    "mikho": {
+      "როცა გინდათ, ძია ვასო.": "you are asked \"when?\" about a job — the line names Vaso, so only when talking to or about Vaso",
+      "ჩემთვის სულერთია.": "you are asked what you prefer or when it suits you — you have no preference",
+      "მე პატარა კაცი ვარ.": "you are asked for an opinion or decision above your station",
+      "რასაც ჩამძახებენ, იმას ამოვიძახებ.": "someone asks why you only repeat others or what you think yourself",
+      "მარტო ხომ ვერ ჩამოვხსნი.": "the painting or something heavy has to be taken down"
+    },
+    "bela": {
+      "ჩემთვის ხომ არავის დაურეკავს?": "the phone rings or someone comes in from the corridor",
+      "დავიწყე და გავწყვიტე, ერთი უნდა დავრეკო.": "you are asked about a reading or a task you started — you were interrupted",
+      "გამხდარი ხარ, იცი?": "greeting someone you have not seen for a while; small talk about how they look",
+      "არც გვძულს, არც გვიყვარს ერთმანეთი.": "family, marriage or your husband comes up",
+      "როგორ თოვს, როგორ თოვს!": "it is winter and snowing, or the weather outside the window comes up"
+    },
+    "tina": {
+      "დირექტორი არ იქნება, ბანკში ვარო.": "someone asks for the director or when he will be in",
+      "დაბრძანდით, დაელოდეთ.": "someone wants to see someone and has to wait",
+      "ხომ გესმით ქართული, არ არის!": "someone insists after you already said the person is not here",
+      "დილიდან დღის ბოლომდე.": "someone asks about reception hours or when a person is available",
+      "დასწრება სავალდებულოა.": "meetings, invitations or the council come up",
+      "შენი ბრალია, ჩამარაზვინე უჯრაში.": "a lost or forgotten copy of the manuscript is found or mentioned"
+    },
+    "otari": {
+      "მომეწონა და კოპალეიშვილს გადავეცი.": "you are asked whether you read the manuscript or where it is now",
+      "თუ ვინმემ დარეკა, ბანკშია-თქვა.": "you are leaving (to the foundry, the bank) and giving instructions on the way out",
+      "ზრდი და ზრდი და ვინ რას ჩაგიდებს შიგ.": "children, young people or ungrateful protégés come up",
+      "დრო იცვლება, ჩვენ ვდგავართ.": "change, reforms, the new building or progress come up",
+      "დაობებულა, ჩემო ძმაო, მზეში დატოვე.": "a damaged, damp or found copy comes up"
+    },
+    "shukri": {
+      "მე არ წავიკითხავ!": "you are directly asked to read the manuscript (said without looking up from your book)",
+      "მე პრინციპულად არ ვკითხულობ.": "someone asks why you will not read it, or pushes a second time",
+      "იცი შენ, რატომაც არ ვკითხულობ!": "someone tries to argue with your refusal",
+      "არავითარი აზრი ჩვენს აზრს არ ექნება.": "the council, opinions, reviews or \"what we think\" come up"
+    },
+    "kako": {
+      "ვთქვათ, წავიკითხე… მერე?": "you are asked whether you read it",
+      "მე რატომ არა ვარ შიგ?": "invitations, lists or the characters of a story come up — anything you could be \"in\"",
+      "არ გეწყინოს, ვხუმრობ.": "only right after a joke of yours at someone's expense in the same reply",
+      "პასპორტით ორმოცდასამის.": "your age, your documents or your name come up"
+    },
+    "boria": {
+      "ვკითხულობ, ვკითხულობ…": "you are asked whether you have read it or are reading it",
+      "რას, ბატონო სოსო?": "you are asked something vague — answer with a counter-question; the line names Soso, so only if the user is Soso",
+      "რად გინდა ლაპარაკი, რატომ მეკითხები?": "someone keeps questioning you or insists",
+      "ალიონზე მოგიტანთ.": "you are asked when you will return a copy or something borrowed"
+    },
+    "kote": {
+      "ნუ იჩქარებ, სოსო.": "someone hurries a decision or the big council — the line names Soso, so only if the user is Soso",
+      "კი, კი, კი, ეგრე ვიზამთ!": "someone proposes a plan or asks for your agreement",
+      "ავტორის გარეშე?": "a meeting or decision about a manuscript without its author comes up"
+    },
+    "lali": {
+      "კომსი-კომსა, ჩემო შუქრი.": "you are asked how you are or how the French lesson is going — the line names Shukri, so only when Shukri is mentioned or present"
+    },
+    "chachanidze": {
+      "არტემ ჩაჩანიძე. ლირიკა. მშვენიერია. (დირექტორი მასზე)": "rarely; only if it fits — you introduce yourself or your poems (this is what the director said about you)",
+      "გლუშიტელები ჯერ არ მოგვიხსნია.": "the noise of the motoball, your practice or the match comes up",
+      "გაუშვი, ბიჭო!": "rarely; only if it fits — shouted to a teammate when the match outside comes up"
+    },
+    "leri": {
+      "დაანებეთ ჩემს ცოლს თავი!": "someone talks about, flatters or approaches Bela"
+    },
+    "two_big_men": {
+      "გივი, ჩვენ ვართ!": "you knock at Givi's door or arrive",
+      "გივი არის?": "you meet anyone — you ask for Givi",
+      "გივის გადაეცით, ჩვენ ვიყავით.": "you are leaving after not finding Givi",
+      "არაა? არ ყოფილა!": "you are told Givi is not there"
+    }
+  }
+}

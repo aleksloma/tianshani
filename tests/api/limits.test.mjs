@@ -7,8 +7,13 @@ const MSG = 'ბიუჯეტში გარღვევა გვაქვ�
 const nextMonth = () => { const d = new Date(); return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 1)).toISOString(); };
 
 test('ტოკენების ლიმიტი (Round 2 §2): ამოწურვის შემდეგ 429 {error:"client_limit", message, resets_at}, ბალანსი 0', async () => {
-  // mock ~3000 შემავალ ტოკენს ხარჯავს თითო მოთხოვნაზე → 2 მოთხოვნა ამოწურავს 5000-ს
-  const S = await startTestServer({ limits: { per_client_input_tokens: 5000, per_client_output_tokens: 1_000_000 } });
+  // ლიმიტი = ერთი mock მოთხოვნის ფასი × 1.5 → პირველი გადის, მეორე ამოწურავს. ფასი იზომება (პრომპტის ზომაზეა დამოკიდებული —
+  // Round 6-ში წესები და ფრაზების „როდის“ დაემატა, ფიქსირებული 5000 აღარ ეტევა ერთ მოთხოვნაში).
+  const P = await startTestServer();
+  const probe = await chat(P.base, { characterId: 'tina', messages: userMsg('გამარჯობა'), gameState: GS }, { jar: cookieJar() });
+  await P.close();
+  const LIMIT = Math.ceil(probe.done.usage.input * 1.5);
+  const S = await startTestServer({ limits: { per_client_input_tokens: LIMIT, per_client_output_tokens: 1_000_000 } });
   try {
     const jar = cookieJar();
     const r1 = await chat(S.base, { characterId: 'tina', messages: userMsg('გამარჯობა'), gameState: GS }, { jar });
@@ -26,7 +31,7 @@ test('ტოკენების ლიმიტი (Round 2 §2): ამოწ
     // done event-შიც: exhausted + resets_at + ლიმიტები (მრიცხველისთვის)
     assert.equal(r2.done.exhausted, true);
     assert.equal(r2.done.resets_at, nextMonth());
-    assert.equal(r2.done.limits.input, 5000);
+    assert.equal(r2.done.limits.input, LIMIT);
     const st = await (await fetch(`${S.base}/api/state`, { headers: { cookie: jar.header() } })).json();
     assert.equal(st.exhausted, true);
     assert.equal(st.resets_at, nextMonth());

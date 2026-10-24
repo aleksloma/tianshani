@@ -141,6 +141,57 @@ test('რეალური API (Round 4 §9): თინა ×3, ოთარი
   assert.deepEqual(failures, []);
 });
 
+// ---------- Round 6 §3: მეორე ტაქტი პირველიდან გამომდინარეობს — 8 ვიწრო კითხვა სამ პერსონაჟთან ----------
+
+test('რეალური API (Round 6 §3): დირექტორი ×3, ვასო ×3, მარკშეიდერი ×2 — მეორე ტაქტს „ხიდი“ აქვს; ფრაზა ≤ 3 / 8; მიმართვის ფორმა ჩატში არ ტრიალებს', { skip: !KEY && 'Gemini-ს გასაღები არ არის' }, async () => {
+  const { byId } = await import('../../src/characters.js');
+  const { beatLink, addressForm, mixesAddress, phraseCore } = await import('../../src/pacing.js');
+  const CONVOS = [
+    ['director', ['ჩემს ხელნაწერს სად დავდო?', 'როდის შემოგიაროთ?', 'ბზარი კიდევ გაიზარდა?']],
+    ['vaso', ['ბატონო ვასო, ეს სურათი ვინ ჩამოკიდა?', 'ლიფტი დღეს მუშაობს?', 'სადილზე ბუფეტში ჩადიხართ?']],
+    ['marksheideri', ['დირექტორი როდის მიგიღებთ?', 'ეს ბზარი საშიშია?']],
+  ];
+  const USER = 'ნინო';
+  log.beat_bridge = [];
+  const failures = [];
+  let withCatchphrase = 0;
+  for (const [id, questions] of CONVOS) {
+    const c = byId[id];
+    const cores = (c.catchphrases_ka || []).map(phraseCore).filter((p) => p.length >= 6);
+    const msgs = [];
+    const jar = cookieJar();
+    const forms = [];
+    for (const [i, q] of questions.entries()) {
+      msgs.push({ role: 'user', content: q });
+      const r = await chat(S.base, { characterId: id, messages: msgs, gameState: GS, userName: USER }, { jar });
+      assert.equal(r.status, 200);
+      assert.ok(r.done, r.error || 'no done');
+      const final = r.events.find((e) => typeof e.replace === 'string')?.replace || r.reply;
+      msgs.push({ role: 'assistant', content: final });
+      const link = beatLink(final, q, [USER.slice(0, 3)]);
+      const phrases = cores.filter((p) => final.includes(p));
+      if (phrases.length) withCatchphrase += 1;
+      const form = addressForm(final);
+      forms.push(form);
+      log.beat_bridge.push({ character: id, turn: i + 1, user: q, reply: final, beat1: link.beat1, beat2: link.beat2, bridge: link.bridge, catchphrases: phrases, address: form, usage: r.done.usage, cached_tokens: r.done.cached_tokens });
+      if (!link.beat2) failures.push(`${id} #${i + 1}: მეორე ტაქტი არ არის — ${final}`);
+      else if (!link.bridge) failures.push(`${id} #${i + 1}: მეორე ტაქტს ხიდი არ აქვს — „${link.beat1}“ / „${link.beat2}“`);
+    }
+    const mixes = mixesAddress(c);
+    const pure = forms.filter((f) => f === 'თქვენ' || f === 'შენ');
+    if (mixes) {
+      // address_forms ურევს — პასუხებს შორის შეიძლება, ოღონდ ერთ პასუხში თანმიმდევრულად (სპეცი §3)
+      forms.forEach((f, i) => { if (f === 'mixed') failures.push(`${id} #${i + 1}: ერთ პასუხში თქვენ+შენ`); });
+    } else if (new Set(pure).size > 1 || forms.includes('mixed')) {
+      failures.push(`${id}: მიმართვის ფორმა ჩატში შეიცვალა — ${forms.join(' → ')}`);
+    }
+    log.beat_bridge.push({ character: id, address_forms_mix: mixes, address_sequence: forms });
+  }
+  log.beat_bridge_catchphrase_replies = withCatchphrase;
+  if (withCatchphrase > 3) failures.push(`ცნობილი ფრაზა ${withCatchphrase} / 8 პასუხში (≤ 3)`);
+  assert.deepEqual(failures, []);
+});
+
 // ---------- Round 4 §4: უცხოენოვანი პასუხი — ფრაზები ქართული დამწერლობით ----------
 
 test('რეალური API (Round 4 §4): თამარი — რუსული და ინგლისური კითხვა → პასუხი იმ ენაზე, ქართული დამწერლობის სიტყვით, ტრანსლიტერაციის გარეშე', { skip: !KEY && 'Gemini-ს გასაღები არ არის' }, async () => {
@@ -256,8 +307,10 @@ test('რეალური API (Round 2 §8): ბელა — „როგო�
   assert.ok(!EXCUSE.test(weather.r.reply), `ამინდზე საბაბი: ${weather.r.reply}`);
   // „გადამისამართება“ ტექსტში = სხვასთან გაგზავნა (ქმრის ხსენება თავისთავად გადამისამართება არ არის — ის მხოლოდ ლოგშია)
   const SEND_AWAY = /(თან|სთან)\s+(მიდი|მიბრძანდი|შეიხედე|შეიარე|შეუხვიე|დატოვე|გადადი|მიიტანე|წაიღე|ჰკითხე)|მიმართე|(ასთან|სთან|თან)[^.!?\n]{0,25}(მიდი|გადადი|შეიარე)/;
-  assert.ok(!SEND_AWAY.test(weather.r.reply), `ამინდზე გადამისამართება: ${weather.r.reply}`);
+  // Round 6: მხოლოდ მომხმარებლისადმი ნათქვამი (რემარკის გარეთ) — „*(ფანჯარასთან მიდის)*“ პერსონაჟის მოძრაობაა, არა გადამისამართება
+  const toUser = (reply) => reply.replace(/\*[^*]*\*?/g, ' ');
+  assert.ok(!SEND_AWAY.test(toUser(weather.r.reply)), `ამინდზე გადამისამართება: ${weather.r.reply}`);
   // გადამისამართება (თუ არის) — არა უადრეს მე-3 პასუხისა; ღილაკი — მხოლოდ ≥3 ხელნაწერის შეტყობინებაზე (მე-5)
-  for (const t of turns.slice(0, 2)) assert.ok(!SEND_AWAY.test(t.r.reply), `#${t.n}: ადრეული გადამისამართება — ${t.r.reply}`);
+  for (const t of turns.slice(0, 2)) assert.ok(!SEND_AWAY.test(toUser(t.r.reply)), `#${t.n}: ადრეული გადამისამართება — ${t.r.reply}`);
   for (const t of turns.slice(0, 4)) assert.equal(t.r.done.suggested_redirect, null, `#${t.n}`);
 });

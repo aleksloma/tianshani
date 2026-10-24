@@ -68,16 +68,20 @@ test('§9 touch_pool: გამოუყენებელი ფრაზებ
   const tina = characters.find((c) => c.id === 'tina');
   const used = tina.catchphrases_ka[0];
   const excuse = tina.excuse_repertoire_ka[0];
+  // Round 6 §3: ფრაზა ორი პასუხის წინ — ამ პასუხში ისევ დასაშვებია (catchphraseAllowed), ოღონდ გამოყენებული აღარ
   const history = [
     { role: 'user', content: 'დირექტორი სადაა?' }, { role: 'assistant', content: `${used}\n${excuse}` },
-    { role: 'user', content: 'ხვალ?' },
+    { role: 'user', content: 'ხვალ?' }, { role: 'assistant', content: 'ხვალ სხდომაა.' },
+    { role: 'user', content: 'ზეგ?' }, { role: 'assistant', content: 'ზეგ შვებულებაშია.' },
+    { role: 'user', content: 'კარგი.' },
   ];
   const p = pacingState(history, tina);
   assert.deepEqual(p.usedCatchphrases, [used]);
   assert.deepEqual(p.usedExcuses, [excuse]);
   const pool = touchPool(tina, p);
-  assert.ok(!pool.includes(`„${phraseCore(used)}“`), 'გამოყენებული ფრაზა აღარ არის');
-  assert.ok(pool.includes(`„${phraseCore(tina.catchphrases_ka[1])}“`));
+  // Round 6 §3: ფრაზა „როდის“-ით — „„ფრაზა“ — use only when: …“
+  assert.ok(!pool.some((x) => x.startsWith(`„${phraseCore(used)}“`)), 'გამოყენებული ფრაზა აღარ არის');
+  assert.ok(pool.some((x) => x.startsWith(`„${phraseCore(tina.catchphrases_ka[1])}“ — use only when: `)));
   assert.ok(pool.some((x) => x.startsWith('what you are busy with:') && x.includes('ტელეფონი')));
   assert.equal(pool.filter((x) => WORLD_TOUCHES_KA.includes(x)).length, 3);
   assert.ok(touchPoolLine(tina, p).startsWith('TOUCH POOL for beat 2'));

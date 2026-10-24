@@ -10,6 +10,18 @@ const VOICE_EXTRAS = (() => {
     return JSON.parse(fs.readFileSync(path.join(ROOT, 'src', 'data', 'voice_extras.json'), 'utf8')).characters || {};
   } catch { return {}; }
 })();
+// Round 6 §3: როდის შეიძლება ცნობილი ფრაზის თქმა (ხმის ბიბლიიდან) — { id: { "<ფრაზა>": "<trigger_en>" } }
+const CATCHPHRASE_TRIGGERS = (() => {
+  try {
+    return JSON.parse(fs.readFileSync(path.join(ROOT, 'src', 'data', 'catchphrase_triggers.json'), 'utf8')).characters || {};
+  } catch { return {}; }
+})();
+export const DEFAULT_TRIGGER = 'rarely; only if it fits';
+
+/** ფრაზის „როდის“ — ფაილიდან; თუ არ არის, „იშვიათად, მხოლოდ თუ ჯდება“. */
+export function triggerFor(c, phrase) {
+  return c?.catchphrase_triggers?.[phrase] || CATCHPHRASE_TRIGGERS[c?.id]?.[phrase] || DEFAULT_TRIGGER;
+}
 
 export const world = DATA.world;
 export const meta = DATA.meta;
@@ -80,6 +92,7 @@ function build() {
     content_score: contentScore(c),
     reachable: c.appears === 'on_screen',
     voice_extras: VOICE_EXTRAS[c.id] || null,
+    catchphrase_triggers: CATCHPHRASE_TRIGGERS[c.id] || {},
     image: fs.existsSync(path.join(ROOT, 'public', 'assets', 'characters', `${c.id}.jpg`))
       ? `assets/characters/${c.id}.jpg` : null,
   }));
