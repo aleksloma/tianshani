@@ -2,10 +2,18 @@
 // ლიმიტები ნამდვილი სერვერის გზით მოწმდება: ტესტი e2e ბაზაში წერს გამოყენებას/ხარჯს, სერვერი თავად აბრუნებს 429-ს და /api/state-ს.
 import { test, expect, request as pwRequest } from '@playwright/test';
 import { openWall, openFrame, send, sendNoWait, sseDone, pctShown, e2eStore, monthKey, adminApi, SHOTS } from './helpers.js';
-import { resetDateDative, GLOBAL_SENTENCE, formatPercentKa } from '../../public/js/format.js';
+import { resetDateDative, GLOBAL_SENTENCE, CLIENT_SENTENCE, formatPercentKa } from '../../public/js/format.js';
 
 const nextMonthISO = () => { const d = new Date(); return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 1)).toISOString(); };
-const CLIENT_BODY = () => `თვის ბოლომდე დავიცადოთ. ლიმიტი განახლდება ${resetDateDative(nextMonthISO())}.`;
+// Round 4 §3: „კითხვების“ ენით; კუდი ორივე ფანჯარაში ერთნაირია
+const TAIL = () => `თვის ბოლომდე დავიცადოთ. განახლდება ${resetDateDative(nextMonthISO())}.`;
+const CLIENT_BODY = () => `${CLIENT_SENTENCE} ${TAIL()}`;
+const noTokenWord = async (page) => {
+  for (const sel of ['#topbar', '#tokens-tip', '#limit-modal']) {
+    expect(await page.locator(sel).evaluate((el) => el.textContent + (el.getAttribute('aria-label') || '')), sel).not.toMatch(/ტოკენ/);
+  }
+  expect(await page.locator('#stat-tokens').getAttribute('aria-label')).not.toMatch(/ტოკენ/);
+};
 const THIN = ' ';
 const clientIdOf = (page) => page.evaluate(async () => (await (await fetch('/api/state', { credentials: 'same-origin' })).json()).client_id);
 
@@ -40,11 +48,41 @@ test('Round 3 §3 ინდიკატორი: რგოლი + „0,0 %“;
   const tip = page.locator('#tokens-tip');
   await expect(tip).toHaveCSS('opacity', '1');
   const p = await pctShown(page);
-  await expect(tip).toHaveText(`გახარჯულია შემომავალი ტოკენების ${formatPercentKa(p)} · განახლდება ${resetDateDative(nextMonthISO())}`);
+  // Round 4 §3: ადამიანის ენით — „კითხვების ლიმიტის X % გახარჯულია · დარჩა დაახლოებით N კითხვა · განახლდება …“
+  const left = Number(await counter.getAttribute('data-left'));
+  await expect(tip).toHaveText(`კითხვების ლიმიტის ${formatPercentKa(p)} გახარჯულია · დარჩა დაახლოებით ${left} კითხვა · განახლდება ${resetDateDative(nextMonthISO())}`);
+  await expect(tip).toContainText('კითხვ');
+  await expect(tip).toContainText('დარჩა');
+  expect(left % 10).toBe(0); // ≥ 10 → ათეულებად
+  await noTokenWord(page);
   // ერთი ხაზი (padding-ის გარეშე)
   expect(await tip.evaluate((el) => { const s = getComputedStyle(el); return Math.round((el.clientHeight - parseFloat(s.paddingTop) - parseFloat(s.paddingBottom)) / parseFloat(s.lineHeight)); })).toBe(1);
   await page.waitForTimeout(250);
   await page.screenshot({ path: `${SHOTS}/R3-03-ring-desktop.png`, clip: { x: 640, y: 0, width: 726, height: 150 } });
+  await page.screenshot({ path: `${SHOTS}/R4-03-tooltip-questions.png`, clip: { x: 480, y: 0, width: 886, height: 130 } });
+});
+
+test('Round 4 §3 დარჩენილი კითხვები მცირდება პასუხის შემდეგ (< 10 — ზუსტი რიცხვი)', async ({ page }) => {
+  const store = e2eStore();
+  await openWall(page);
+  const cid = await clientIdOf(page);
+  const lim = (await (await page.request.get('/api/state')).json()).limits;
+  try {
+    store.addUsage(cid, monthKey(), lim.input - 50_000, 0); // დარჩა 50 000 → 50000 / 6000 ≈ 8 კითხვა
+    await page.reload();
+    await page.waitForFunction(() => window.tianshani?.ready === true);
+    const counter = page.locator('#stat-tokens');
+    const before = Number(await counter.getAttribute('data-left'));
+    expect(before).toBe(8);
+    await expect(page.locator('#tokens-tip')).toContainText('დარჩა 8 კითხვა');
+    await openFrame(page, 'tina');
+    await send(page, 'დირექტორი აქ არის?');
+    await expect.poll(async () => Number(await counter.getAttribute('data-left'))).toBeLessThan(before);
+    await expect(page.locator('#tokens-tip')).toContainText(/დარჩა \d კითხვა/);
+    await noTokenWord(page);
+  } finally {
+    store.resetUsage(cid, monthKey());
+  }
 });
 
 test('Round 3 §3 ფერი: ნეიტრალური < 70% ≤ ქარვისფერი ≤ 90% < წითელი', async ({ page }) => {
@@ -105,6 +143,7 @@ test('§2 ბრაუზერის ლიმიტი: ნამდვილ�
     await expect(page.locator('#limit-body')).toHaveText(CLIENT_BODY());
     await expect(modal.locator('.limit-stamp')).toHaveText('შეჩერებულია');
     expect(await modal.textContent()).not.toMatch(/[{}]|client_limit|resets_at/); // ნედლი JSON არასდროს
+    await noTokenWord(page); // Round 4 §3
     await expect(modal).toHaveAttribute('data-kind', 'client_limit');
     // ყველაფრის თავზე
     const z = await page.evaluate(() => ({ m: Number(getComputedStyle(document.getElementById('limit-modal')).zIndex), c: Number(getComputedStyle(document.getElementById('chat')).zIndex) }));
@@ -189,7 +228,8 @@ test('§3 გლობალური ბიუჯეტი: ორ სხვა
       await expect(p.locator('#limit-modal')).toHaveAttribute('data-kind', 'global_budget');
       await expect(p.locator('#limit-title')).toHaveText('ბიუჯეტში გარღვევა გვაქვს');
       // იგივე ტექსტი, რაც ბრაუზერის ლიმიტზე + ერთი დამატებითი წინადადება
-      await expect(p.locator('#limit-body')).toHaveText(`${GLOBAL_SENTENCE} ${CLIENT_BODY()}`);
+      await expect(p.locator('#limit-body')).toHaveText(`${GLOBAL_SENTENCE} ${TAIL()}`);
+      await noTokenWord(p);
       await expect(p.locator('#chat-input')).toBeDisabled();
       ids.push(await clientIdOf(p));
     }

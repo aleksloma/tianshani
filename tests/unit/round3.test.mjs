@@ -186,8 +186,9 @@ test('§3 პროცენტი: ერთი ათწილადი, ქ�
   assert.equal(usedPercent(600000, 500000), 100, 'ძველი მთვლელი ახალ ლიმიტზე მეტია → 100%');
   assert.equal(usedPercent(10, 0), 0);
   assert.deepEqual([0, 69.9, 70, 90, 90.1, 100].map(percentLevel), ['ok', 'ok', 'warn', 'warn', 'hot', 'hot']);
-  assert.equal(tokensTipLine(0.3, 'monthly', '2026-11-01T00:00:00.000Z'), `გახარჯულია შემომავალი ტოკენების 0,3${NB}% · განახლდება 1 ნოემბერს`);
-  assert.equal(tokensTipLine(5, 'lifetime', null), `გახარჯულია შემომავალი ტოკენების 5,0${NB}% · ერთჯერადი ლიმიტი`);
+  // Round 4 §3: ტოკენების ნაცვლად — „კითხვების ლიმიტი“
+  assert.equal(tokensTipLine(0.3, 'monthly', '2026-11-01T00:00:00.000Z'), `კითხვების ლიმიტის 0,3${NB}% გახარჯულია · განახლდება 1 ნოემბერს`);
+  assert.equal(tokensTipLine(5, 'lifetime', null), `კითხვების ლიმიტის 5,0${NB}% გახარჯულია · ერთჯერადი ლიმიტი`);
 });
 
 const PAINTING = { id: 'painting', rank: -1, size: { w: 450, mw: 250, aspect: 539 / 760 }, rot: [2.5, 4] };

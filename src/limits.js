@@ -30,6 +30,8 @@ export function balance(store, cfg, clientId, now = new Date()) {
     resets_at: resetsAt(cfg.limits.period, now),
     limits: { input: li, output: lo },
     used: { input: u.input_tokens, output: u.output_tokens, requests: u.requests },
+    // Round 4 §3: საშუალო შემავალი ერთ კითხვაზე („დარჩა დაახლოებით N კითხვა“); < 3 მოთხოვნაზე — null (კლიენტი 6000-ს იღებს)
+    avg_input_per_request: u.requests >= 3 ? Math.round(u.input_tokens / u.requests) : null,
     remaining: { input: Math.max(0, li - u.input_tokens), output: Math.max(0, lo - u.output_tokens) },
     exhausted: u.input_tokens >= li || u.output_tokens >= lo,
   };

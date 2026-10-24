@@ -21,17 +21,46 @@ export function resetDateDative(iso) {
 export const LIMIT_TITLE = 'ბიუჯეტში გარღვევა გვაქვს';
 export const GLOBAL_SENTENCE = 'გამომცემლობის თვიური ბიუჯეტი ამოიწურა.';
 
+export const CLIENT_SENTENCE = 'კითხვების თვიური ლიმიტი ამოიწურა.';
+
 /**
- * ფანჯრის ტექსტი. ბრაუზერის ლიმიტი და გლობალური ბიუჯეტი იდენტურია, გლობალურს ერთი დამატებითი წინადადება აქვს.
+ * ფანჯრის ტექსტი (სათაური — „ბიუჯეტში გარღვევა გვაქვს“). Round 4 §3: „კითხვების“ ენით, ტოკენების გარეშე.
+ * ბრაუზერის ლიმიტი: „კითხვების თვიური ლიმიტი ამოიწურა. თვის ბოლომდე დავიცადოთ. განახლდება 1 ნოემბერს.“
+ * გლობალური ბიუჯეტი: იგივე კუდი, პირველი წინადადების ნაცვლად — „გამომცემლობის თვიური ბიუჯეტი ამოიწურა.“
  * kind: 'client_limit' | 'global_budget'; resetsAt: ISO ან null (lifetime).
  */
 export function limitBody(kind, resetsAt) {
   const when = resetDateDative(resetsAt);
-  const base = when ? `თვის ბოლომდე დავიცადოთ. ლიმიტი განახლდება ${when}.` : 'ლიმიტი ამოწურულია.';
-  return kind === 'global_budget' ? `${GLOBAL_SENTENCE} ${base}` : base;
+  if (!when) return kind === 'global_budget' ? GLOBAL_SENTENCE : 'კითხვების ლიმიტი ამოიწურა.';
+  const tail = `თვის ბოლომდე დავიცადოთ. განახლდება ${when}.`;
+  return `${kind === 'global_budget' ? GLOBAL_SENTENCE : CLIENT_SENTENCE} ${tail}`;
 }
 
-// ---------- Round 3 §3: ტოკენები პროცენტად ----------
+// ---------- Round 4 §3: დარჩენილი კითხვები ----------
+
+/** საშუალო შემავალი ერთ კითხვაზე, სანამ ბრაუზერს 3 მოთხოვნა არ ექნება (სისტემური პრომპტი + few-shot + ისტორია). */
+export const AVG_INPUT_FALLBACK = 6000;
+
+/**
+ * რამდენი კითხვა დარჩა: დარჩენილი შემავალი / საშუალო ერთ კითხვაზე.
+ * ≥ 10 → ათეულებად დამრგვალებული („დაახლოებით 80“); < 10 → ზუსტად; ლიმიტი სრულად ამოწურულია → 0.
+ */
+export function questionsLeft(remainingInput, avgPerRequest) {
+  const rem = Math.max(0, Number(remainingInput) || 0);
+  if (rem <= 0) return { n: 0, approx: false };
+  const avg = Number(avgPerRequest) > 0 ? Number(avgPerRequest) : AVG_INPUT_FALLBACK;
+  const q = rem / avg;
+  if (q >= 10) return { n: Math.round(q / 10) * 10, approx: true };
+  return { n: Math.max(1, Math.floor(q)), approx: false };
+}
+
+/** „დარჩა დაახლოებით 80 კითხვა“ / „დარჩა 7 კითხვა“ / „კითხვები აღარ დარჩა“. */
+export function questionsLeftText(left) {
+  if (!left || left.n <= 0) return 'კითხვები აღარ დარჩა';
+  return left.approx ? `დარჩა დაახლოებით ${left.n} კითხვა` : `დარჩა ${left.n} კითხვა`;
+}
+
+// ---------- Round 3 §3: ლიმიტი პროცენტად ----------
 
 /** დახარჯულის წილი პროცენტებში (0…100). */
 export function usedPercent(used, limit) {
@@ -53,12 +82,19 @@ export function percentLevel(p) {
   return 'ok';
 }
 
-/** tooltip — ერთი ხაზი: „გახარჯულია შემომავალი ტოკენების 0,3 % · განახლდება 1 ნოემბერს“. */
-export function tokensTipLine(p, period, resetsAt) {
-  const head = `გახარჯულია შემომავალი ტოკენების ${formatPercentKa(p)}`;
-  if (period === 'lifetime') return `${head} · ერთჯერადი ლიმიტი`;
-  const when = resetDateDative(resetsAt);
-  return when ? `${head} · განახლდება ${when}` : head;
+/**
+ * tooltip — ერთი ხაზი (Round 4 §3, ადამიანის ენით):
+ * „კითხვების ლიმიტის 3,9 % გახარჯულია · დარჩა დაახლოებით 80 კითხვა · განახლდება 1 ნოემბერს“.
+ */
+export function tokensTipLine(p, period, resetsAt, left = null) {
+  const parts = [`კითხვების ლიმიტის ${formatPercentKa(p)} გახარჯულია`];
+  if (left) parts.push(questionsLeftText(left));
+  if (period === 'lifetime') parts.push('ერთჯერადი ლიმიტი');
+  else {
+    const when = resetDateDative(resetsAt);
+    if (when) parts.push(`განახლდება ${when}`);
+  }
+  return parts.join(' · ');
 }
 
 /** tooltip-ის პერიოდის ხაზი. */

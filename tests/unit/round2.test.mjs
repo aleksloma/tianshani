@@ -116,9 +116,10 @@ test('ფანჯრის ტექსტი: სათაური, გან
   assert.equal(resetDateDative('garbage'), null);
   const client = limitBody('client_limit', '2026-11-01T00:00:00.000Z');
   const global = limitBody('global_budget', '2026-11-01T00:00:00.000Z');
-  assert.equal(client, 'თვის ბოლომდე დავიცადოთ. ლიმიტი განახლდება 1 ნოემბერს.');
-  assert.equal(global, `${GLOBAL_SENTENCE} ${client}`);
-  assert.equal(limitBody('client_limit', null), 'ლიმიტი ამოწურულია.');
+  // Round 4 §3: იგივე კუდი, სხვადასხვა პირველი წინადადება; „ტოკენ“ არსად
+  assert.equal(client, 'კითხვების თვიური ლიმიტი ამოიწურა. თვის ბოლომდე დავიცადოთ. განახლდება 1 ნოემბერს.');
+  assert.equal(global, `${GLOBAL_SENTENCE} თვის ბოლომდე დავიცადოთ. განახლდება 1 ნოემბერს.`);
+  assert.equal(limitBody('client_limit', null), 'კითხვების ლიმიტი ამოიწურა.');
   for (const t of [client, global]) assert.ok(!/[{}"]|error|client_limit|global_budget/.test(t), 'JSON/კოდი არასდროს ჩანს');
   assert.equal(periodLine('monthly', '2026-11-01T00:00:00.000Z'), 'ლიმიტი განახლდება 1 ნოემბერს');
   assert.equal(periodLine('lifetime', null), 'ერთჯერადი ლიმიტი');

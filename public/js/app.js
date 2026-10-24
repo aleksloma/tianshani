@@ -9,7 +9,7 @@ import {
 import { withDefaults, dateFor, formatDateKa, SEASON_KA, derive, dayFromSeason } from './calendar.js';
 import { createCopyNote } from './copyNote.js';
 import { treeMarkup, updateTree } from './tree.js';
-import { usedPercent, formatPercentKa, percentLevel, tokensTipLine } from './format.js';
+import { usedPercent, formatPercentKa, percentLevel, tokensTipLine, questionsLeft } from './format.js';
 import { createLimitModal } from './limitModal.js';
 import { createWallBackground } from './background.js';
 
@@ -63,9 +63,10 @@ async function main() {
     $('season-tip-cycle').textContent = `შენობა №${game.cycle}`;
   }
 
-  // --- ტოკენები (Round 3 §3): რგოლი + „0,3 %“ — დახარჯული შემავალი ტოკენების წილი ამ პერიოდში.
-  //     /api/state ჩატვირთვისას, done ყოველი პასუხის შემდეგ (Round 2 §1) ---
-  let tokenInfo = { limits: state?.limits, period: state?.period, resets_at: state?.resets_at };
+  // --- ლიმიტი (Round 3 §3): რგოლი + „0,3 %“ — დახარჯული შემავალი ტოკენების წილი ამ პერიოდში.
+  //     Round 4 §3: tooltip ადამიანის ენით — „კითხვების ლიმიტის … · დარჩა დაახლოებით N კითხვა“
+  //     (N = დარჩენილი / ამ ბრაუზერის საშუალო ერთ კითხვაზე). /api/state ჩატვირთვისას, done ყოველი პასუხის შემდეგ ---
+  let tokenInfo = { limits: state?.limits, period: state?.period, resets_at: state?.resets_at, avg_input_per_request: state?.avg_input_per_request ?? null };
   const RING = 2 * Math.PI * 11;
   function renderTokens(info) {
     if (!info?.remaining) return;
@@ -77,7 +78,9 @@ async function main() {
     $('tokens-pct').dataset.value = String(pct);
     $('tokens-ring').setAttribute('stroke-dasharray', `${((RING * pct) / 100).toFixed(2)} ${RING.toFixed(2)}`);
     $('stat-tokens').dataset.level = percentLevel(pct);
-    $('tokens-tip').textContent = tokensTipLine(pct, tokenInfo.period, tokenInfo.resets_at);
+    const left = questionsLeft(remaining.input, tokenInfo.avg_input_per_request);
+    $('stat-tokens').dataset.left = String(left.n);
+    $('tokens-tip').textContent = tokensTipLine(pct, tokenInfo.period, tokenInfo.resets_at, left);
     $('stat-tokens').setAttribute('aria-label', $('tokens-tip').textContent);
   }
 

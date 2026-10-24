@@ -259,6 +259,8 @@ export function createApp(cfg) {
       limits: after.limits,
       period: after.period,
       resets_at: after.resets_at,
+      avg_input_per_request: after.avg_input_per_request, // Round 4 §3
+      requests: after.used.requests,
       exhausted: after.exhausted,
       // „→ მივიდე …“ მხოლოდ ხელნაწერზე მე-3 შეტყობინებიდან და მხოლოდ თუ პასუხში მართლა ასახელებს (FIXES_ROUND2 §8)
       suggested_redirect: detectRedirect({ speaker, reply, currentId: target.id, manuscriptCount: pacing.manuscriptCount }),

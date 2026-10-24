@@ -504,7 +504,7 @@ export function createChat({ byId, api, getConfig, getGameState, onExchange, onO
     if (m.redirect) { const b = redirectButton(m.redirect); if (b) row.append(b); }
     if (live()) { setSpeaker(id, done.spoken_by); scrollDown(); }
     // მთვლელი, თარიღი და (საჭიროებისას) ინტერტიტრი — ერთად, პასუხის დასრულებისთანავე (Round 2 §1, §5)
-    if (done.remaining) onTokens({ remaining: done.remaining, limits: done.limits, period: done.period, resets_at: done.resets_at });
+    if (done.remaining) onTokens({ remaining: done.remaining, limits: done.limits, period: done.period, resets_at: done.resets_at, avg_input_per_request: done.avg_input_per_request });
     busy.delete(id);
     updateBusy();
     if (live()) current.exchanges += 1; // დახურვისას დრო მიდის მხოლოდ თუ ამ საუბარში გაცვლა შედგა (Round 3 §2)
