@@ -99,8 +99,27 @@ export function scriptLines(text) {
  * აწყობს mock პასუხის ტექსტს. Round 2 §8: ხაზები \n-ით (როგორც რეალურ მოდელს ვთხოვთ), ერთი იდეა + მაქს. ერთი გარემოს შტრიხი,
  * გადამისამართება მხოლოდ ხელნაწერზე მე-3 შეტყობინებიდან (manuscriptCount ≥ 3).
  */
-export function composeMockReply({ speaker, invisible, userText, historyLen, gameState, manuscriptCount = 0, userName = '' }) {
+/**
+ * Round 6 §4 (ტესტებისთვის): თუ მომხმარებელი სათაურს კითხულობს („რა ერქვა…?“) და ადრე, ამ ჩატის ისტორიაში, ბრჭყალებში
+ * სათაური დაწერა — mock მას იმეორებს. ასე ინტეგრაციის ტესტი ამტკიცებს, რომ ისტორია სერვერამდე მართლა მიდის.
+ */
+export function recallTitle(userText, history = []) {
+  if (!/(სათაურ|ერქვა|ჰქვია)[^?]*\?|\?.*(სათაურ|ერქვა|ჰქვია)/.test(String(userText || ''))) return null;
+  for (const m of history) {
+    if (m?.role !== 'user') continue;
+    const t = String(m.content || '').match(/„([^“„]{2,60})“/);
+    if (t) return t[1].trim();
+  }
+  return null;
+}
+
+export function composeMockReply({ speaker, invisible, userText, historyLen, gameState, manuscriptCount = 0, userName = '', history = [] }) {
   const parts = composeParts({ speaker, invisible, userText, historyLen, gameState, manuscriptCount });
+  const title = recallTitle(userText, history);
+  if (title) {
+    const i = parts.findIndex((p) => p && !/^[*(]/.test(p));
+    parts.splice(i >= 0 ? i : parts.length, 0, `„${title}“ — ასე ერქვა, ხომ?`);
+  }
   // Round 3 §1: სახელით მიმართვა (e2e ამოწმებს, რომ სახელი პასუხამდე აღწევს) — პირველ სასაუბრო ხაზს ემატება
   if (userName) {
     const i = parts.findIndex((p) => p && !/^[*(]/.test(p)); // რემარკა არა
@@ -175,7 +194,9 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 export async function* mockStream({ systemInstruction, contents, speaker, invisible, userText, gameState, signal, historyLen: convLen, manuscriptCount = 0, userName = '' }) {
   // საუბრის სიგრძე few-shot-ის გარეშე (წინა შეტყობინებების რაოდენობა); ძველი გამოძახებისთვის — contents.length
   const historyLen = Number.isInteger(convLen) ? convLen : contents.length;
-  const text = composeMockReply({ speaker, invisible, userText, historyLen, gameState, manuscriptCount, userName });
+  // საუბარი few-shot-ის გარეშე: ბოლო historyLen + 1 (მიმდინარე) ელემენტი — წინა შეტყობინებები, ისევე როგორც მოდელი იღებს
+  const history = contents.slice(Math.max(0, contents.length - historyLen - 1), -1);
+  const text = composeMockReply({ speaker, invisible, userText, historyLen, gameState, manuscriptCount, userName, history });
   const delay = Number(process.env.MOCK_DELAY_MS ?? 25);
   // სიტყვა + მისი მომდევნო სივრცე ერთ delta-დ
   const words = text.match(/\S+\s*/g) || [text];

@@ -192,6 +192,25 @@ test('რეალური API (Round 6 §3): დირექტორი ×3, 
   assert.deepEqual(failures, []);
 });
 
+// ---------- Round 6 §4: კონტექსტი — სათაური #1-იდან #3-ზე ----------
+
+test('რეალური API (Round 6 §4): ვასო — #1 სათაური „ქვიშის საათი“, #2 სხვა თემა, #3 „რა ერქვა?“ → პასუხში სათაურია', { skip: !KEY && 'Gemini-ს გასაღები არ არის' }, async () => {
+  const Q = ['ბატონო ვასო, ჩემს მოთხრობას „ქვიშის საათი“ ჰქვია, გადახედავთ?', 'ეს სურათი ხომ არ ჩამოვარდება?', 'გახსოვთ, რა ერქვა ჩემს მოთხრობას?'];
+  const msgs = [];
+  const jar = cookieJar();
+  log.title_recall = [];
+  for (const q of Q) {
+    msgs.push({ role: 'user', content: q });
+    const r = await chat(S.base, { characterId: 'vaso', messages: msgs, gameState: GS, userName: 'ნინო' }, { jar });
+    assert.equal(r.status, 200);
+    assert.ok(r.done, r.error || 'no done');
+    const final = r.events.find((e) => typeof e.replace === 'string')?.replace || r.reply;
+    msgs.push({ role: 'assistant', content: final });
+    log.title_recall.push({ user: q, reply: final, usage: r.done.usage });
+  }
+  assert.match(log.title_recall[2].reply, /ქვიშის\s+საათ/, `სათაური არ ახსოვს: ${log.title_recall[2].reply}`);
+});
+
 // ---------- Round 4 §4: უცხოენოვანი პასუხი — ფრაზები ქართული დამწერლობით ----------
 
 test('რეალური API (Round 4 §4): თამარი — რუსული და ინგლისური კითხვა → პასუხი იმ ენაზე, ქართული დამწერლობის სიტყვით, ტრანსლიტერაციის გარეშე', { skip: !KEY && 'Gemini-ს გასაღები არ არის' }, async () => {

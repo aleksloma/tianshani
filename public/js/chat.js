@@ -5,6 +5,7 @@ import { renderSegments } from './stage.js';
 import { sizeClass } from './layout.js';
 import { fitText } from './wall.js';
 import { parseSseChunk, tokensFromDone } from './sse.js';
+import { historyForServer } from './history.js';
 
 const TYPING = ['…ფიქრობს', '…ტელეფონზეა', '…საუზმობს', '…რეზოლუციას წერს', '…ბზარს უყურებს', '…ყურმილს იღებს'];
 const TYPING_ABSENT = ['…კარს აკაკუნებენ', '…ვიღაც მოდის დერეფანში', '…ხაზი დაკავებულია', '…დაელოდეთ'];
@@ -409,8 +410,8 @@ export function createChat({ byId, api, getConfig, getGameState, onExchange, onO
     const gs = getGameState();
     const payload = {
       characterId: id,
-      // Round 5 §1: ძველი სკრიპტული ხაზი (`scripted: true`) სერვერს არასდროს ეგზავნება — მიგრაციის შემდეგაც, ყოველი შემთხვევისთვის
-      messages: msgs.filter((m) => !m.scripted).slice(-cfg.chat.history_window).map(({ role, content }) => ({ role, content })),
+      // ბოლო chat.history_window შეტყობინება; `scripted: true` (Round 5 §1) — არასდროს (Round 6 §4: public/js/history.js)
+      messages: historyForServer(msgs, cfg.chat.history_window),
       gameState: {
         day: gs.day, season: gs.season, crackStage: gs.crackStage, lostCopies: gs.lostCopies, cycle: gs.cycle,
         paintingFallen: Boolean(gs.paintingFallen),

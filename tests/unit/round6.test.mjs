@@ -5,6 +5,8 @@ import fs from 'node:fs';
 import { characters, byId, publicList, ROLE_DISPLAY_KA, triggerFor, DEFAULT_TRIGGER } from '../../src/characters.js';
 import { buildPrompt, GENERAL_RULES_EN, SHAPE_EXAMPLES, SHAPE_EXAMPLES_EN } from '../../src/prompt.js';
 import { touchPool, touchPoolLine, pacingState, beatLink, addressForm, mixesAddress, phraseCore, catchphraseAllowed, catchphraseGateLine } from '../../src/pacing.js';
+import { historyForServer } from '../../public/js/history.js';
+import { recallTitle, composeMockReply } from '../../src/mock.js';
 
 const CFG = { game: {} };
 const GS = { day: 0, season: 'autumn', crackStage: 0, lostCopies: 0, cycle: 1 };
@@ -155,4 +157,42 @@ test('§3 beatLink / addressForm / mixesAddress — ევრისტიკა'
   assert.equal(addressForm('*(ყურმილს იღებს) შენ არა.*\nდღეს ბანკშია.'), null); // რემარკაში — მესამე პირს
   assert.equal(mixesAddress(byId.marksheideri), false); // „თქვენ, ქალბატონო, ბატონო“
   assert.equal(mixesAddress(byId.vaso), true); // „… შენ (ახალგაზრდებს)“
+});
+
+// ---------- §4 ----------
+
+test('§4 historyForServer: ზუსტად ბოლო N (კონფიგიდან), ძველიდან ახლისკენ, როლები მონაცვლეობს, მხოლოდ {role, content}, scripted — არა', () => {
+  const ex = JSON.parse(fs.readFileSync(new URL('../../settings.example.json', import.meta.url), 'utf8'));
+  const N = ex.chat.history_window;
+  assert.equal(N, 20);
+  const msgs = [];
+  for (let i = 0; i < 25; i++) msgs.push({ role: i % 2 ? 'assistant' : 'user', content: `m${i}`, ts: i, spoken_by: 'tina', redirect: null });
+  const out = historyForServer(msgs, N);
+  assert.equal(out.length, N);
+  assert.deepEqual(out.map((m) => m.content), msgs.slice(-N).map((m) => m.content), 'ბოლო N, ძველიდან ახლისკენ');
+  for (let i = 1; i < out.length; i++) assert.notEqual(out[i].role, out[i - 1].role, `როლები მონაცვლეობს (${i})`);
+  for (const m of out) assert.deepEqual(Object.keys(m).sort(), ['content', 'role']);
+  // scripted ჯერ იფილტრება, მერე იჭრება — N ნამდვილი შეტყობინება რჩება
+  const withOld = [{ role: 'assistant', content: 'სკრიპტული', scripted: true }, ...msgs.slice(0, 3), { role: 'assistant', content: 'კიდევ', scripted: true }];
+  assert.deepEqual(historyForServer(withOld, N).map((m) => m.content), ['m0', 'm1', 'm2']);
+  assert.deepEqual(historyForServer(msgs, 3).map((m) => m.content), ['m22', 'm23', 'm24']);
+  // ნაგავი / უცნობი როლი არ გადის
+  assert.deepEqual(historyForServer([null, { role: 'system', content: 'x' }, { role: 'user', content: 5 }, { role: 'user', content: 'ok' }], N), [{ role: 'user', content: 'ok' }]);
+  assert.deepEqual(historyForServer(undefined, N), []);
+});
+
+test('§4 mock-ის „მეხსიერება“: სათაურს #1-იდან იმეორებს #3-ზე, მხოლოდ ისტორიიდან', () => {
+  const history = [
+    { role: 'user', content: 'ჩემს მოთხრობას „ქვიშის საათი“ ჰქვია, წაიკითხავთ?' },
+    { role: 'assistant', content: 'კი, კი.' },
+    { role: 'user', content: 'ამინდი როგორია?' },
+    { role: 'assistant', content: 'წვიმს.' },
+  ];
+  assert.equal(recallTitle('რა ერქვა ჩემს მოთხრობას?', history), 'ქვიშის საათი');
+  assert.equal(recallTitle('რა ერქვა ჩემს მოთხრობას?', []), null);
+  assert.equal(recallTitle('ამინდი როგორია?', history), null);
+  const reply = composeMockReply({ speaker: byId.vaso, invisible: null, userText: 'გახსოვთ, რა სათაური ჰქონდა?', historyLen: 4, gameState: GS, history });
+  assert.ok(reply.includes('„ქვიშის საათი“'), reply);
+  assert.ok(!composeMockReply({ speaker: byId.vaso, invisible: null, userText: 'გახსოვთ, რა სათაური ჰქონდა?', historyLen: 0, gameState: GS, history: [] }).includes('ქვიშის საათი'));
+  void phraseCore;
 });
