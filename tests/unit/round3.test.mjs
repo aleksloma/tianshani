@@ -5,6 +5,57 @@ import fs from 'node:fs';
 import { computeLayout, findOverlaps, rectsOverlap, sizeClass, NARROW_PROFILES, MIN_ROT, MAX_ROT } from '../../public/js/layout.js';
 import { usedPercent, formatPercentKa, percentLevel, tokensTipLine } from '../../public/js/format.js';
 
+// ---------- §1 ----------
+import { buildPrompt, userBlock, cleanUserName, isSoso, GENERAL_RULES_EN, STAGE_EXAMPLES_EN } from '../../src/prompt.js';
+import { byId } from '../../src/characters.js';
+import { composeMockReply } from '../../src/mock.js';
+
+const CFG = { game: { seasons: ['autumn', 'winter', 'spring', 'summer'], crack_stages: 5, copies: 3 } };
+const GS0 = { season: 'autumn', crackStage: 0, lostCopies: 0, cycle: 1 };
+
+test('§1 პრომპტი: სახელი და წესი სიტყვასიტყვით; სოსოდ აღარ ითვლება', () => {
+  const s = buildPrompt({ speaker: byId.director, gameState: GS0, cfg: CFG, userName: 'ნინო' }).systemInstruction;
+  assert.ok(s.includes('# THE USER'));
+  assert.ok(s.includes('The user\'s name is „ნინო“. Address them by this name (with ბატონო/ქალბატონო where the character\'s address_forms says so). Do not call them Soso unless their name is Soso. If no name is given, address them as „ავტორო“ / „ჩემო კარგო“ / „ახალგაზრდავ“ according to the character, and never invent a name.'));
+  assert.ok(s.includes('the user\'s novella'));
+  assert.ok(s.includes('სოსოც დადიოდა ასე სამი წელი'));
+  assert.ok(!s.includes('The user IS Soso'));
+  // მსოფლიოს ინსტრუქცია: მოთამაშე — ახალი ავტორი საკუთარი ხელნაწერით
+  assert.ok(GENERAL_RULES_EN[0].includes('new author bringing their own manuscript'));
+  assert.ok(!GENERAL_RULES_EN[0].includes('Soso or themselves'));
+  // მაგალითებში მომხმარებელს „სოსოს“ აღარ ეძახიან
+  assert.ok(!STAGE_EXAMPLES_EN.join('\n').includes('ჩემო სოსო'));
+  assert.ok(!GENERAL_RULES_EN.join('\n').includes('ხო, სოსო'));
+});
+
+test('§1 სოსო: ძველი ქცევა („ცისფერი მთები ანუ ტიან-შანი“); სახელის გარეშე — „ავტორო“, სახელს არ იგონებს', () => {
+  const soso = userBlock('სოსო');
+  assert.ok(soso.includes('The user IS Soso'));
+  assert.ok(soso.includes('„ცისფერი მთები ანუ ტიან-შანი“'));
+  assert.ok(isSoso('Soso') && isSoso(' სოსო ') && !isSoso('სოსო ბატონო') && !isSoso('ნინო'));
+  const none = userBlock('');
+  for (const w of ['„ავტორო“', '„ჩემო კარგო“', '„ახალგაზრდავ“', 'never invent a name', 'Do not call them Soso']) assert.ok(none.includes(w), w);
+  assert.ok(!none.includes('The user\'s name is'));
+  assert.ok(buildPrompt({ speaker: byId.tina, gameState: GS0, cfg: CFG }).systemInstruction.includes('has not told you their name'));
+});
+
+test('§1 სახელის გასუფთავება: მართვის სიმბოლოები, ბრჭყალები, < >, 40 სიმბოლო', () => {
+  assert.equal(cleanUserName('  ნინო\n\t '), 'ნინო');
+  assert.equal(cleanUserName('<b>„ნინო“</b>'), 'bნინო/b');
+  assert.equal(cleanUserName('ა'.repeat(60)).length, 40);
+  assert.equal(cleanUserName(null), '');
+  assert.equal(cleanUserName(42), '42');
+});
+
+test('§1 mock სახელით მიმართავს (რემარკის შემდეგ, პირველ სასაუბრო ხაზზე)', () => {
+  const r = composeMockReply({ speaker: byId.tina, invisible: null, userText: 'გამარჯობა', historyLen: 0, gameState: GS0, userName: 'ნინო' });
+  assert.ok(r.startsWith('*('));
+  assert.match(r.split('\n')[1], /^ნინო, /);
+  const p = composeMockReply({ speaker: byId.soso, invisible: byId.givi, userText: 'გივი აქ არის?', historyLen: 0, gameState: GS0, userName: 'ნინო' });
+  assert.ok(p.includes('ნინო, გივი ოთახში არ არის'));
+  assert.ok(!composeMockReply({ speaker: byId.tina, invisible: null, userText: 'გამარჯობა', historyLen: 0, gameState: GS0 }).includes('ნინო'));
+});
+
 // ---------- §3 ----------
 
 test('§3 პროცენტი: ერთი ათწილადი, ქართული მძიმე, 0–100-ში', () => {

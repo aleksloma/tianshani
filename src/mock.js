@@ -93,7 +93,17 @@ export function scriptLines(text) {
  * აწყობს mock პასუხის ტექსტს. Round 2 §8: ხაზები \n-ით (როგორც რეალურ მოდელს ვთხოვთ), ერთი იდეა + მაქს. ერთი გარემოს შტრიხი,
  * გადამისამართება მხოლოდ ხელნაწერზე მე-3 შეტყობინებიდან (manuscriptCount ≥ 3).
  */
-export function composeMockReply({ speaker, invisible, userText, historyLen, gameState, manuscriptCount = 0 }) {
+export function composeMockReply({ speaker, invisible, userText, historyLen, gameState, manuscriptCount = 0, userName = '' }) {
+  const parts = composeParts({ speaker, invisible, userText, historyLen, gameState, manuscriptCount });
+  // Round 3 §1: სახელით მიმართვა (e2e ამოწმებს, რომ სახელი პასუხამდე აღწევს) — პირველ სასაუბრო ხაზს ემატება
+  if (userName) {
+    const i = parts.findIndex((p) => p && !/^[*(]/.test(p)); // რემარკა არა
+    if (i >= 0) parts[i] = `${userName}, ${parts[i]}`;
+  }
+  return parts.filter(Boolean).join('\n');
+}
+
+function composeParts({ speaker, invisible, userText, historyLen, gameState, manuscriptCount }) {
   const h = hash(`${speaker.id}|${userText}|${historyLen}`);
   const lang = guessLang(userText);
   const catchphrase = pick(speaker.catchphrases_ka || [], h >>> 3);
@@ -106,20 +116,20 @@ export function composeMockReply({ speaker, invisible, userText, historyLen, gam
     const absence = (ABSENCE_FACTS_KA[invisible.id] || `${invisible.short_name_ka} არ არის.`).split(';')[0].trim();
     if (lang !== 'ka' && lang !== 'unknown') {
       parts.push((FOREIGN_ABSENT[lang] || FOREIGN_ABSENT.other)(enShort(invisible)));
-      return parts.join('\n');
+      return parts;
     }
     parts.push(`${absence}.`.replace(/\.\.$/, '.'), `${invisible.short_name_ka} ისევ არ ჩანს — დაელოდეთ, ან სხვას ჰკითხეთ.`);
     if ((h & 1) === 0) parts.push(pick(SEASON_LINES[gameState.season] || [], h >>> 5));
     const doors = (speaker.redirects_to || []).filter((id) => byId[id] && byId[id].reachable && id !== invisible.id);
     parts.push(doors.length ? `${dative(byId[pick(doors, h >>> 9)].short_name_ka)} მიმართეთ.` : 'ხელნაწერი თინასთან დატოვეთ.');
-    return parts.filter(Boolean).join('\n');
+    return parts;
   }
   parts.push(stageFor(speaker));
 
   if (lang !== 'ka' && lang !== 'unknown') {
     parts.push((FOREIGN[lang] || FOREIGN.other)(enShort(speaker)));
     if (catchphrase) parts.push(catchphrase);
-    return parts.join('\n');
+    return parts;
   }
 
   const dialogues = speaker.sample_dialogues || [];
@@ -148,7 +158,7 @@ export function composeMockReply({ speaker, invisible, userText, historyLen, gam
     const r = byId[pick(redirects, h >>> 9)];
     parts.push(`${dative(r.short_name_ka)} მიმართეთ.`);
   }
-  return parts.filter(Boolean).join('\n');
+  return parts;
 }
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -156,10 +166,10 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 /**
  * იგივე ინტერფეისი, რაც gemini.streamChat: async generator → { delta } ... ბოლოს { usage }.
  */
-export async function* mockStream({ systemInstruction, contents, speaker, invisible, userText, gameState, signal, historyLen: convLen, manuscriptCount = 0 }) {
+export async function* mockStream({ systemInstruction, contents, speaker, invisible, userText, gameState, signal, historyLen: convLen, manuscriptCount = 0, userName = '' }) {
   // საუბრის სიგრძე few-shot-ის გარეშე (წინა შეტყობინებების რაოდენობა); ძველი გამოძახებისთვის — contents.length
   const historyLen = Number.isInteger(convLen) ? convLen : contents.length;
-  const text = composeMockReply({ speaker, invisible, userText, historyLen, gameState, manuscriptCount });
+  const text = composeMockReply({ speaker, invisible, userText, historyLen, gameState, manuscriptCount, userName });
   const delay = Number(process.env.MOCK_DELAY_MS ?? 25);
   // სიტყვა + მისი მომდევნო სივრცე ერთ delta-დ
   const words = text.match(/\S+\s*/g) || [text];

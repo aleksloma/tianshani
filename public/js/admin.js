@@ -75,7 +75,7 @@ async function loadClients() {
   list.replaceChildren(...data.clients.map((c) => {
     const pct = c.limit_pct;
     const b = el('button', { type: 'button', 'data-id': c.client_id, 'aria-current': String(c.client_id === selected) },
-      el('span', { class: 'cid', text: c.client_id }),
+      el('span', { class: 'cid' }, c.user_name ? el('b', { class: 'uname', text: `${c.user_name} · ` }) : null, c.client_id),
       el('span', { class: 'cmeta', text: `ბოლოს: ${when(c.last_seen)} · შეტყობინება: ${c.messages} · პერსონაჟი: ${c.characters}` }),
       el('span', { class: 'cmeta', text: `ტოკენი (${data.period_key}): ${fmt.format(c.input_tokens)} შემ. / ${fmt.format(c.output_tokens)} გამ. · ლიმიტის ${pct}%` }),
       el('span', { class: 'cmeta cost', text: `ხარჯი: ${usd(c.cost_usd)} (სულ ${usd(c.total_cost_usd)})` }),
@@ -92,8 +92,8 @@ async function openClient(id) {
   $('detail-empty').hidden = true;
   $('detail-body').hidden = false;
   $('detail-tab').textContent = `საქმე ${id.slice(0, 8)}`;
-  $('detail-title').textContent = id;
   const c = data.client || {};
+  $('detail-title').textContent = c.user_name ? `${c.user_name} — ${id}` : id;
   $('detail-meta').textContent = `პირველად: ${when(c.first_seen)} · ბოლოს: ${when(c.last_seen)} · ${c.user_agent || ''}`;
   $('export-one').href = `/api/admin/export?client=${encodeURIComponent(id)}`;
 
@@ -117,7 +117,7 @@ async function openClient(id) {
 function renderConversation(g) {
   $('conversation').replaceChildren(...g.messages.map((m) => {
     const who = m.role === 'user'
-      ? el('strong', { text: 'მომხმარებელი' })
+      ? el('strong', { text: m.user_name ? `მომხმარებელი (${m.user_name})` : 'მომხმარებელი' })
       : (g.reachable ? el('strong', { text: g.name }) : el('strong', {}, el('s', { class: 'struck', text: g.name }), ` ${m.spoken_by_name || ''}`));
     return el('div', { class: `cmsg ${m.role}` },
       el('div', { class: 'meta' }, who,

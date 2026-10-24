@@ -10,11 +10,16 @@ export const log = {
 };
 
 /** მომხმარებლის შეტყობინება + პასუხი ერთად. ჩატის ისტორია უხილავის id-ზე ინახება, spoken_by — ვინ უპასუხა. */
-export function logExchange(store, cfg, { clientId, characterId, spokenBy, userText, reply, usage, gameState }) {
+export function logExchange(store, cfg, { clientId, characterId, spokenBy, userText, reply, usage, gameState, userName = null, original = null }) {
   if (!cfg.logging.store_conversations) return;
-  const common = { client_id: clientId, character_id: characterId, season: gameState.season, cycle: gameState.cycle };
+  const common = { client_id: clientId, character_id: characterId, season: gameState.season, cycle: gameState.cycle, user_name: userName || null };
   store.logMessage({ ...common, role: 'user', content: userText, lang_guess: guessLang(userText), input_tokens: usage.input });
   if (reply) {
-    store.logMessage({ ...common, role: 'assistant', spoken_by: spokenBy, content: reply, lang_guess: guessLang(reply), output_tokens: usage.output });
+    // Round 3 §4: კორექტურით შეცვლილი პასუხი — ორივე ვერსია (ადმინში გვერდიგვერდ)
+    const changed = Boolean(original && original !== reply);
+    store.logMessage({
+      ...common, role: 'assistant', spoken_by: spokenBy, content: reply, lang_guess: guessLang(reply), output_tokens: usage.output,
+      proofread_original: changed ? original : null, proofread_changed: changed ? 1 : 0,
+    });
   }
 }

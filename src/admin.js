@@ -93,14 +93,14 @@ export function adminRouter(cfg, store) {
     const q = String(req.query.q || '').trim();
     const like = `%${q}%`;
     const rows = db.prepare(`
-      SELECT c.client_id, c.first_seen, c.last_seen, c.user_agent,
+      SELECT c.client_id, c.first_seen, c.last_seen, c.user_agent, c.user_name,
         (SELECT COUNT(*) FROM messages m WHERE m.client_id = c.client_id AND m.role = 'user') AS messages,
         (SELECT COUNT(DISTINCT character_id) FROM messages m WHERE m.client_id = c.client_id) AS characters,
         COALESCE(u.input_tokens, 0) AS input_tokens, COALESCE(u.output_tokens, 0) AS output_tokens,
         (SELECT COALESCE(SUM(input_tokens),0) FROM usage x WHERE x.client_id = c.client_id) AS total_input_tokens,
         (SELECT COALESCE(SUM(output_tokens),0) FROM usage x WHERE x.client_id = c.client_id) AS total_output_tokens
       FROM clients c LEFT JOIN usage u ON u.client_id = c.client_id AND u.period_key = @key
-      WHERE @q = '' OR c.client_id LIKE @like OR c.user_agent LIKE @like
+      WHERE @q = '' OR c.client_id LIKE @like OR c.user_agent LIKE @like OR c.user_name LIKE @like
         OR EXISTS (SELECT 1 FROM messages m WHERE m.client_id = c.client_id AND m.content LIKE @like)
       ORDER BY c.last_seen DESC LIMIT 500`).all({ key, q, like });
     const li = cfg.limits.per_client_input_tokens;

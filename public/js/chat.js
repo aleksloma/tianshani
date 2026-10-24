@@ -1,6 +1,6 @@
 // ჩატის პანელი: ჩარჩო ცენტრში და უკან (FLIP), სტრიმინგი (SSE fetch-ით), სცენური რემარკები,
 // უხილავთა წარმომადგენლები („~~გივი~~ სოსო“ + თამბნეილი + „პასუხობს: სოსო“), გადამისამართების ღილაკი.
-import { getChat, saveChat, clearChat } from './storage.js';
+import { getChat, saveChat, clearChat, getUserName } from './storage.js';
 import { renderSegments } from './stage.js';
 import { sizeClass } from './layout.js';
 import { fitText } from './wall.js';
@@ -37,6 +37,7 @@ export function createChat({ byId, api, getConfig, getGameState, onExchange, onO
   const nameEl = document.getElementById('chat-name');
   const roleEl = document.getElementById('chat-role');
   const subEl = document.getElementById('chat-sub');
+  const userEl = document.getElementById('chat-user');
   const form = document.getElementById('chat-form');
   const input = document.getElementById('chat-input');
   const sendBtn = document.getElementById('chat-send');
@@ -105,6 +106,13 @@ export function createChat({ byId, api, getConfig, getGameState, onExchange, onO
     subEl.hidden = !proxy;
     subEl.textContent = proxy ? `${c.short_name_ka} ადგილზე არ არის — ${proxy.short_name_ka} პასუხობს მის ნაცვლად` : '';
     if (current?.id === id) setBadge(current.portrait, proxy);
+  }
+
+  /** Round 3 §9: სათაურში პატარად — ვის მიმართავს პერსონაჟი. */
+  function refreshUser() {
+    const n = getUserName();
+    userEl.hidden = !n;
+    userEl.textContent = n ? `საუბრობს: ${n}` : '';
   }
 
   function setBadge(portrait, proxy) {
@@ -299,6 +307,7 @@ export function createChat({ byId, api, getConfig, getGameState, onExchange, onO
     lockScroll(rects.mobile);
     backdrop.hidden = false;
     setSpeaker(id, currentProxy(id));
+    refreshUser();
     renderLog(id);
     placePanel(rects);
     panel.classList.remove('closing');
@@ -405,6 +414,7 @@ export function createChat({ byId, api, getConfig, getGameState, onExchange, onO
         paintingFallen: Boolean(gs.paintingFallen),
       },
       lastSpokenBy: currentProxy(id),
+      userName: getUserName(), // Round 3 §1
     };
 
     let reply = '';
@@ -526,5 +536,5 @@ export function createChat({ byId, api, getConfig, getGameState, onExchange, onO
     lockScroll(r.mobile);
   });
 
-  return { open, close, switchTo, isOpen: () => Boolean(current), currentId: () => current?.id || null };
+  return { open, close, switchTo, refreshUser, isOpen: () => Boolean(current), currentId: () => current?.id || null };
 }

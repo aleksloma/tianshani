@@ -23,8 +23,19 @@ export async function adminApi(request, method, path) {
 export const SHOTS = 'test-results/screens';
 fs.mkdirSync(SHOTS, { recursive: true });
 
-/** გვერდის ჩატვირთვა და ყველა ანიმაციის დასრულება. */
-export async function openWall(page, path = '/') {
+/** e2e-ის ნაგულისხმევი ავტორი (Round 3 §1) — რომ „საშვის“ ბარათი სხვა ტესტებს არ ეფარებოდეს. */
+export const E2E_NAME = 'ნინო';
+
+/**
+ * გვერდის ჩატვირთვა და ყველა ანიმაციის დასრულება.
+ * name: null — სახელი არ ითესება (პირველი ვიზიტი, „საშვის“ ბარათი ჩანს).
+ */
+export async function openWall(page, path = '/', { name = E2E_NAME } = {}) {
+  if (name !== null) {
+    await page.addInitScript((n) => {
+      try { if (localStorage.getItem('tianshani.user_name') === null) localStorage.setItem('tianshani.user_name', JSON.stringify(n)); } catch { /* მიუწვდომელია */ }
+    }, name);
+  }
   await page.goto(path);
   await page.waitForFunction(() => window.tianshani?.ready === true);
   await settle(page);
@@ -78,8 +89,14 @@ export async function waitIntertitle(page) {
   await expect(page.locator('#intertitle')).toBeHidden({ timeout: 15_000 });
 }
 
+/** „საშვის“ ბარათი (სახელის გარეშე ჩატვირთვისას) — დავხუროთ, თუ ჩანს. */
+export async function closePassCard(page) {
+  if (await page.locator('#pass-card').isVisible()) await page.locator('#pass-close').click();
+}
+
 /** ჩატის გახსნა კედლის ჩარჩოზე დაჭერით. */
 export async function openFrame(page, id) {
+  await closePassCard(page);
   await page.locator(`#frames .frame[data-id="${id}"]`).click();
   await expect(page.locator('#chat')).toBeVisible();
   await expect(page.locator('.frame.portrait')).toHaveCount(1);
@@ -90,6 +107,7 @@ export async function openFrame(page, id) {
 /** ჩატის გახსნა „ესაუბრე სხვას“ მენიუდან (კედლის კუთხის ღილაკი, ან ჩატის ქვედა ზოლი, თუ ჩატი ღიაა). */
 export async function openFromMenu(page, id) {
   // ჩატი „ღიაა“ მხოლოდ მაშინ, როცა .shown აქვს (დახურვის ანიმაციის დროს #chat ჯერ კიდევ ჩანს, მაგრამ უკვე იხურება)
+  await closePassCard(page);
   const inChat = (await page.locator('#chat.shown').count()) > 0;
   if (!inChat) await expect(page.locator('#chat')).toBeHidden();
   await page.locator(inChat ? '#chat-others' : '#others-btn').click();

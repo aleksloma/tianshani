@@ -10,7 +10,13 @@ try {
   available = false;
 }
 
-export const KEYS = { chats: 'tianshani.chats', game: 'tianshani.game', client: 'tianshani.client_id' };
+export const KEYS = { chats: 'tianshani.chats', game: 'tianshani.game', client: 'tianshani.client_id', userName: 'tianshani.user_name' };
+
+// --- Round 3 §1: მომხმარებლის სახელი (მაქს. 40 სიმბოლო) ---
+export const USER_NAME_MAX = 40;
+export function normalizeUserName(v) { return String(v ?? '').replace(/\s+/g, ' ').trim().slice(0, USER_NAME_MAX); }
+export function getUserName() { const v = getJSON(KEYS.userName, ''); return typeof v === 'string' ? normalizeUserName(v) : ''; }
+export function setUserName(v) { setJSON(KEYS.userName, normalizeUserName(v)); }
 
 export function storageAvailable() { return available; }
 

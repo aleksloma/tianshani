@@ -8,7 +8,7 @@ import cookieParser from 'cookie-parser';
 
 import { loadConfig, ROOT } from './config.js';
 import { byId, publicList, pickProxy, famousRollCall, meta } from './characters.js';
-import { buildPrompt, sanitizeGameState, annotateForProxy, pickStageMode, SEASON_KA } from './prompt.js';
+import { buildPrompt, sanitizeGameState, annotateForProxy, pickStageMode, cleanUserName, SEASON_KA } from './prompt.js';
 import { openDb } from './db.js';
 import { balance, createRateLimiter, MSG_LIMIT, MSG_RATE, MSG_TOO_LONG } from './limits.js';
 import {
@@ -154,6 +154,8 @@ export function createApp(cfg) {
     }
 
     const gameState = sanitizeGameState(req.body.gameState, cfg);
+    const userName = cleanUserName(req.body.userName); // Round 3 §1
+    if (userName) store.setClientName(clientId, userName);
 
     // უხილავი → წარმომადგენელი. preferred = ვინც ამ ჩატში ბოლოს უპასუხა (კლიენტი აგზავნის)
     let speaker = target;
@@ -166,7 +168,7 @@ export function createApp(cfg) {
 
     const stageMode = pickStageMode({ invisible, historyLen: clean.length - 1 });
     const pacing = pacingState(clean, speaker);
-    const { systemInstruction, fewShot } = buildPrompt({ speaker, invisible, gameState, cfg, stageMode, pacing });
+    const { systemInstruction, fewShot } = buildPrompt({ speaker, invisible, gameState, cfg, stageMode, pacing, userName });
     // წარმომადგენლის ჩატში მომხმარებლის შეტყობინებებს (მხოლოდ მოდელისთვის) ემატება „ვის მიმართავს“ შენიშვნა; ლოგში — ორიგინალი
     const convo = invisible
       ? clean.map((m) => (m.role === 'user' ? { ...m, content: annotateForProxy(m.content, invisible, speaker) } : m))
@@ -198,7 +200,7 @@ export function createApp(cfg) {
     let usage = { input: 0, output: 0 };
     try {
       const gen = cfg.gemini.mock
-        ? mockStream({ systemInstruction, contents, speaker, invisible, userText: last.content, gameState, signal: ac.signal, historyLen: clean.length - 1, manuscriptCount: pacing.manuscriptCount })
+        ? mockStream({ systemInstruction, contents, speaker, invisible, userText: last.content, gameState, signal: ac.signal, historyLen: clean.length - 1, manuscriptCount: pacing.manuscriptCount, userName })
         : geminiStream({ cfg, systemInstruction, contents, signal: ac.signal });
       for await (const ev of gen) {
         if (ev.delta) { reply += ev.delta; send({ delta: ev.delta }); }
@@ -221,7 +223,7 @@ export function createApp(cfg) {
     store.addUsage(clientId, bal.period_key, usage.input, usage.output);
     // გლობალური ხარჯი — რეალური usageMetadata-დან (mock-ში ყალბი usage-დან)
     store.addGlobal(gNow.period_key, usage.input, usage.output, costUsd(usage.input, usage.output, cfg.budget));
-    logExchange(store, cfg, { clientId, characterId: target.id, spokenBy: speaker.id, userText: last.content, reply, usage, gameState });
+    logExchange(store, cfg, { clientId, characterId: target.id, spokenBy: speaker.id, userText: last.content, reply, usage, gameState, userName });
 
     const after = balance(store, cfg, clientId);
     send({

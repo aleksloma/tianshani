@@ -1,5 +1,6 @@
 // აპლიკაციის ჩატვირთვა: მონაცემები, კედელი, ჩატი, კალენდარი და ხე, ტოკენების მთვლელი, ლიმიტის ფანჯარა.
-import { clientId, storageAvailable, clearAllChats, setJSON, KEYS } from './storage.js';
+import { clientId, storageAvailable, clearAllChats, setJSON, KEYS, getUserName } from './storage.js';
+import { createNameCard } from './userName.js';
 import { createWall, createOthersMenu, renderRollCall } from './wall.js';
 import { createChat } from './chat.js';
 import {
@@ -176,12 +177,24 @@ async function main() {
 
   $('others-btn').addEventListener('click', (e) => menu.toggle(e.currentTarget, { variant: 'wall' }));
 
+  // --- ავტორის სახელი (Round 3 §1): პირველ ვიზიტზე „საშვი“; ზოლში „ავტორი: ნინო ✎“ — დაჭერით იცვლება ---
+  function renderUser() {
+    const n = getUserName();
+    $('user-name').textContent = n || '—';
+    $('user-chip').setAttribute('aria-label', n ? `ავტორი: ${n}. სახელის შეცვლა` : 'სახელის მითითება');
+    chat.refreshUser();
+  }
+  const nameCard = createNameCard({ onChange: renderUser });
+  $('user-chip').addEventListener('click', () => (nameCard.isOpen() ? nameCard.close() : nameCard.open()));
+  renderUser();
+
   // ფონტები ჩაიტვირთა → ზომები შეიძლება შეიცვალა
   wall.render();
   document.fonts?.ready.then(() => wall.render());
 
   // ლიმიტი/ბიუჯეტი — ფანჯარა მაშინვე, თუ ამოწურულია (ყველა ბრაუზერში, არა მხოლოდ წარუმატებელი გაგზავნის შემდეგ)
   applyLimitState(state);
+  if (!getUserName() && !modal.isBlocked()) nameCard.open(); // სახელი ჯერ არ ვიცით
 
   // ტესტებისა და დებაგისთვის (მხოლოდ წასაკითხად)
   window.tianshani = {
@@ -191,6 +204,7 @@ async function main() {
     chat,
     modal,
     background,
+    nameCard,
     ready: true,
   };
   document.body.classList.add('ready');

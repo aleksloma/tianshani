@@ -41,6 +41,10 @@
           <b id="tokens-pct">…</b>
           <span class="tooltip tokens-tip" id="tokens-tip" role="tooltip"></span>
         </span>
+        <!-- Round 3 §1: ვინ არის ავტორი — დაჭერით სახელი იცვლება -->
+        <button type="button" class="stat user-chip" id="user-chip" aria-haspopup="dialog" title="სახელის შეცვლა">
+          <span class="uc-label">ავტორი:</span> <b id="user-name">—</b> <span class="uc-pen" aria-hidden="true">✎</span>
+        </button>
       </div>
       <div id="mock-banner" class="banner" hidden></div>
       <div id="storage-banner" class="banner" hidden>ბრაუზერის მეხსიერება მიუწვდომელია — საუბრები გვერდის გადატვირთვამდე შეინახება.</div>
@@ -71,6 +75,22 @@
     </main>
   </div>
 
+  <!-- „გამომცემლობის საშვი“ (Round 3 §1): კედელზე მიმაგრებული ბარათი, არა მოდალი — კედელი არ იბლოკება -->
+  <section id="pass-card" class="pass-card" role="dialog" aria-labelledby="pass-title" hidden>
+    <div class="pin" aria-hidden="true"></div>
+    <p class="pass-kicker">გამომცემლობის საშვი</p>
+    <form id="pass-form" autocomplete="off">
+      <label id="pass-title" for="pass-input">როგორ გქვიათ?</label>
+      <input id="pass-input" type="text" maxlength="40" placeholder="სახელი" spellcheck="false">
+      <div class="pass-actions">
+        <button type="submit" id="pass-enter">შესვლა</button>
+        <button type="button" id="pass-soso" class="pass-link">სოსო ვარ</button>
+      </div>
+    </form>
+    <div class="pass-stamp" aria-hidden="true">№ 1983</div>
+    <button type="button" id="pass-close" class="pass-close" aria-label="დახურვა">✕</button>
+  </section>
+
   <!-- „ესაუბრე სხვას“ სია -->
   <div id="others-menu" class="menu" role="listbox" hidden></div>
 
@@ -83,6 +103,7 @@
         <h2 id="chat-name"></h2>
         <p id="chat-role"></p>
         <p id="chat-sub" class="chat-sub" hidden></p>
+        <p id="chat-user" class="chat-user" hidden></p>
       </div>
       <button type="button" class="close" id="chat-close" aria-label="დახურვა">✕</button>
     </header>

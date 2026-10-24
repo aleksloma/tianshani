@@ -57,6 +57,14 @@ export function openDb(dbPath) {
   const db = new Database(dbPath);
   db.pragma('journal_mode = WAL');
   db.exec(SCHEMA);
+  // Round 3: ახალი სვეტები არსებულ ბაზაზეც (ALTER TABLE მხოლოდ თუ ჯერ არ არის)
+  const addColumn = (table, col, type) => {
+    if (!db.prepare(`PRAGMA table_info(${table})`).all().some((c) => c.name === col)) db.exec(`ALTER TABLE ${table} ADD COLUMN ${col} ${type}`);
+  };
+  addColumn('clients', 'user_name', 'TEXT');               // §1 — ბოლოს მითითებული სახელი
+  addColumn('messages', 'user_name', 'TEXT');              // §1
+  addColumn('messages', 'proofread_original', 'TEXT');     // §4 — პასუხი კორექტურამდე (თუ შეიცვალა)
+  addColumn('messages', 'proofread_changed', 'INTEGER NOT NULL DEFAULT 0');
 
   // ინსტალაციის საიდუმლო: ადმინის cookie-ს ხელმოწერა და IP-ს ჰეში. რეპოში არასდროს ხვდება.
   let row = db.prepare('SELECT value FROM meta WHERE key = ?').get('secret');
@@ -73,8 +81,9 @@ export function openDb(dbPath) {
       INSERT INTO clients (client_id, first_seen, last_seen, user_agent, ip_hash) VALUES (@client_id, @now, @now, @ua, @ip)
       ON CONFLICT(client_id) DO UPDATE SET last_seen = @now, user_agent = COALESCE(@ua, user_agent), ip_hash = COALESCE(@ip, ip_hash)`),
     insertMessage: db.prepare(`
-      INSERT INTO messages (client_id, character_id, spoken_by, role, content, lang_guess, input_tokens, output_tokens, season, cycle, created_at)
-      VALUES (@client_id, @character_id, @spoken_by, @role, @content, @lang_guess, @input_tokens, @output_tokens, @season, @cycle, @created_at)`),
+      INSERT INTO messages (client_id, character_id, spoken_by, role, content, lang_guess, input_tokens, output_tokens, season, cycle, created_at, user_name, proofread_original, proofread_changed)
+      VALUES (@client_id, @character_id, @spoken_by, @role, @content, @lang_guess, @input_tokens, @output_tokens, @season, @cycle, @created_at, @user_name, @proofread_original, @proofread_changed)`),
+    setClientName: db.prepare('UPDATE clients SET user_name = ? WHERE client_id = ?'),
     getUsage: db.prepare('SELECT * FROM usage WHERE client_id = ? AND period_key = ?'),
     addUsage: db.prepare(`
       INSERT INTO usage (client_id, period_key, input_tokens, output_tokens, requests, first_seen, last_seen)
@@ -99,7 +108,13 @@ export function openDb(dbPath) {
     touchClient(clientId, ua, ip) {
       stmts.upsertClient.run({ client_id: clientId, now: now(), ua: ua ? String(ua).slice(0, 300) : null, ip: this.hashIp(ip) });
     },
-    logMessage(m) { stmts.insertMessage.run({ spoken_by: null, lang_guess: null, input_tokens: 0, output_tokens: 0, season: null, cycle: null, created_at: now(), ...m }); },
+    logMessage(m) {
+      stmts.insertMessage.run({
+        spoken_by: null, lang_guess: null, input_tokens: 0, output_tokens: 0, season: null, cycle: null, created_at: now(),
+        user_name: null, proofread_original: null, proofread_changed: 0, ...m,
+      });
+    },
+    setClientName(clientId, name) { if (name) stmts.setClientName.run(name, clientId); },
     getUsage(clientId, periodKey) {
       return stmts.getUsage.get(clientId, periodKey) || { input_tokens: 0, output_tokens: 0, requests: 0 };
     },
