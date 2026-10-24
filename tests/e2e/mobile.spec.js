@@ -183,6 +183,25 @@ test('§5 ჩატი ჩანს: ჩარჩო → sheet (opacity 1, ე�
   expect(await page.evaluate(() => getComputedStyle(document.documentElement).overflow)).not.toBe('hidden');
 });
 
+test('Round 6 §2: გრიშას თანამდებობა „ესაუბრე სხვას“ ფურცელში — „სამეურნეო ნაწილის გამგე“ (ან კედელზეა — სათაური ჩატში)', async ({ page }) => {
+  await openWall(page);
+  const onWall = (await visibleFrameIds(page)).includes('grisha');
+  if (onWall) {
+    // ვიწრო ეკრანზე ფირფიტაზე მხოლოდ სახელია (Round 3 §6) — თანამდებობა ჩატის სათაურშია
+    await page.locator('#frames .frame[data-id="grisha"]').tap();
+  } else {
+    await page.locator('#others-btn').scrollIntoViewIfNeeded();
+    await page.locator('#others-btn').tap();
+    const row = page.locator('#others-menu .menu-item[data-id="grisha"]');
+    await row.scrollIntoViewIfNeeded();
+    await expect(row.locator('.mi-role')).toHaveText('სამეურნეო ნაწილის გამგე');
+    await row.screenshot({ path: `${SHOTS}/R6-03-grisha-dropdown-row-${tag()}.png` });
+    await row.click();
+  }
+  await expect.poll(() => chatStyle(page)).toEqual({ opacity: '1', pe: 'auto', display: 'flex' });
+  await expect(page.locator('#chat-role')).toHaveText('სამეურნეო ნაწილის გამგე');
+});
+
 test('Round 5 §2: „ყველაფრის განულება“ ტელეფონზე/პლანშეტზე — ბმული ბარათზე, ფურცელი ეკრანში ეტევა, შეხებით მუშაობს', async ({ page }) => {
   await openWall(page);
   const id = (await visibleFrameIds(page))[0];

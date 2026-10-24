@@ -176,6 +176,13 @@ export function pickProxy(invisibleId, preferred = null, rnd = Math.random) {
   return list[Math.floor(rnd() * list.length)];
 }
 
+/**
+ * Round 6 §2: ეკრანზე ნაჩვენები თანამდებობა, სადაც მონაცემების სიტყვა ჩვეულებრივი მკითხველისთვის გაუგებარია.
+ * მხოლოდ UI-სთვის (ფირფიტა, „ესაუბრე სხვას“ რიგი, ჩატის სათაური) — characters.json და LLM-ის პრომპტი უცვლელია.
+ * „მნე“ (არქაული) → უკვე მონაცემებშია: name_ka „გრიშა — მნე (სამეურნეო ნაწილის გამგე)“.
+ */
+export const ROLE_DISPLAY_KA = { grisha: 'სამეურნეო ნაწილის გამგე' };
+
 /** სია UI-სთვის — სრულ პრომპტებს კლიენტს არ ვუგზავნით. */
 export function publicList(wallCount = 12) {
   const wallIds = new Set(wallCharacters(wallCount).map((c) => c.id));
@@ -183,8 +190,8 @@ export function publicList(wallCount = 12) {
     id: c.id,
     name_ka: c.name_ka,
     short_name_ka: c.short_name_ka,
-    role_ka: c.role_ka,
-    role_short_ka: c.role_short_ka,
+    role_ka: ROLE_DISPLAY_KA[c.id] || c.role_ka,
+    role_short_ka: ROLE_DISPLAY_KA[c.id] || c.role_short_ka,
     actor: c.actor,
     image: c.image,
     on_wall: wallIds.has(c.id),
