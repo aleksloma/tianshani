@@ -97,6 +97,27 @@ test('რეალური API: ვაჟა ზაზაევიჩი — �
   log.director_unmarked_phone = log.cases.filter((c) => c.case === 'director' && c.checks.unmarked_phone_talk).length;
 });
 
+// ---------- Round 4 §4: უცხოენოვანი პასუხი — ფრაზები ქართული დამწერლობით ----------
+
+test('რეალური API (Round 4 §4): თამარი — რუსული და ინგლისური კითხვა → პასუხი იმ ენაზე, ქართული დამწერლობის სიტყვით, ტრანსლიტერაციის გარეშე', { skip: !KEY && 'Gemini-ს გასაღები არ არის' }, async () => {
+  const TRANSLIT = /тбилад|бошо|tbilad|bosho/i;
+  log.foreign = [];
+  for (const [lang, q, script] of [
+    ['ru', 'Здравствуйте, Тамара! Как вы себя чувствуете сегодня?', /[А-Яа-яЁё]{3,}/],
+    ['en', 'Hello Tamari, how are you feeling today?', /[A-Za-z]{3,}/],
+  ]) {
+    const r = await chat(S.base, { characterId: 'tamari', messages: userMsg(q), gameState: GS, userName: 'Nino' });
+    assert.equal(r.status, 200);
+    assert.ok(r.done, r.error || 'no done');
+    const final = r.events.find((e) => typeof e.replace === 'string')?.replace || r.reply;
+    const georgianWords = final.match(/[ა-ჰ]{2,}/g) || [];
+    log.foreign.push({ lang, user: q, reply: final, georgian_words: georgianWords, transliteration: TRANSLIT.test(final) });
+    assert.match(final, script, `პასუხი ${lang}-ზე არ არის: ${final}`);
+    assert.ok(georgianWords.length >= 1, `ქართული დამწერლობის სიტყვა არ არის: ${final}`);
+    assert.doesNotMatch(final, TRANSLIT, `ტრანსლიტერაცია: ${final}`);
+  }
+});
+
 // ---------- Round 3 §4 + §1: კორექტურა (ვასო ×3, თამარი ×2), სახელით მიმართვა ----------
 
 test('რეალური API (Round 3 §4): ვასო ×3, თამარი ×2 — ორიგინალი/შესწორებული წყვილები; საბოლოო პასუხში არარსებული სიტყვა არ არის; „ნინო“ — არა „სოსო“', { skip: !KEY && 'Gemini-ს გასაღები არ არის' }, async () => {

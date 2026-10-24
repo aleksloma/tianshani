@@ -5,6 +5,28 @@ import { derive, withDefaults, advanceDays } from '../../public/js/calendar.js';
 import { LOST_COPY_NOTES } from '../../public/js/game.js';
 import { questionsLeft, questionsLeftText, tokensTipLine, limitBody, AVG_INPUT_FALLBACK, CLIENT_SENTENCE } from '../../public/js/format.js';
 
+// ---------- §4 ----------
+import { GENERAL_RULES_EN, buildPrompt, georgianScriptPhrases } from '../../src/prompt.js';
+import { byId } from '../../src/characters.js';
+
+test('§4 ენის წესი: უცხოენოვან პასუხში ფრაზები ქართული დამწერლობით, ტრანსლიტერაციის გარეშე; რემარკა — პასუხის ენაზე', () => {
+  const lang = GENERAL_RULES_EN.find((r) => r.startsWith('LANGUAGE:'));
+  assert.ok(lang.includes('When you answer in a language other than Georgian, your catchphrases, signature words and dialect forms stay in **Georgian script**, untranslated and untransliterated, embedded in the foreign-language sentence'));
+  assert.ok(lang.includes('Everything else is in the user\'s language. Stage directions follow the language of the reply.'));
+  // მაგალითი ნეიტრალურია — თამარის საფირმო ფრაზა/დიალექტი საერთო წესში არ ხვდება (Round 2/3)
+  assert.ok(!/ნელთბილად|ბოშო/.test(lang));
+  // საკუთარი სია: თამარს — ნელთბილად/ბოშო/რავა; ვასოს — არა (მისი — „ოცდაშვიდი წელიწადი“)
+  const tam = georgianScriptPhrases(byId.tamari);
+  for (const w of ['ვარ ნელთბილად', 'ბოშო', 'რავა']) assert.ok(tam.includes(w), w);
+  const vaso = georgianScriptPhrases(byId.vaso);
+  assert.ok(vaso.includes('ოცდაშვიდი წელიწადი') && !vaso.some((x) => /ბოშო|რავა|ნელთბილად/.test(x)));
+  const CFG = { game: {} };
+  assert.ok(buildPrompt({ speaker: byId.tamari, gameState: { day: 0 }, cfg: CFG }).systemInstruction.includes('Phrases that stay in Georgian script in any language'));
+  const stage = GENERAL_RULES_EN.find((r) => r.startsWith('STAGE DIRECTIONS:'));
+  assert.ok(stage.includes('in the language of the reply (Georgian by default)'));
+  assert.ok(!stage.includes('Stage directions are in Georgian,'), 'წინააღმდეგობა აღარ არის');
+});
+
 // ---------- §3 ----------
 
 test('§3 დარჩენილი კითხვები: საშუალოთი (≥ 3 მოთხოვნა) ან 6000-ით; ≥ 10 → ათეულებად; < 10 → ზუსტად; 0 → ამოწურულია', () => {
