@@ -31,6 +31,36 @@ export function limitBody(kind, resetsAt) {
   return kind === 'global_budget' ? `${GLOBAL_SENTENCE} ${base}` : base;
 }
 
+// ---------- Round 3 §3: ტოკენები პროცენტად ----------
+
+/** დახარჯულის წილი პროცენტებში (0…100). */
+export function usedPercent(used, limit) {
+  const l = Number(limit);
+  if (!(l > 0)) return 0;
+  return Math.min(100, Math.max(0, (Number(used) / l) * 100));
+}
+
+/** 0.27 → „0,3 %“ (ერთი ათწილადი, ქართული მძიმე, უწყვეტი სივრცე % -მდე). */
+export function formatPercentKa(p) {
+  const v = Math.round(Math.min(100, Math.max(0, Number(p) || 0)) * 10) / 10;
+  return `${v.toFixed(1).replace('.', ',')} %`;
+}
+
+/** ფერის დონე: ნეიტრალური < 70% ≤ ქარვისფერი ≤ 90% < წითელი. */
+export function percentLevel(p) {
+  if (p > 90) return 'hot';
+  if (p >= 70) return 'warn';
+  return 'ok';
+}
+
+/** tooltip — ერთი ხაზი: „გახარჯულია შემომავალი ტოკენების 0,3 % · განახლდება 1 ნოემბერს“. */
+export function tokensTipLine(p, period, resetsAt) {
+  const head = `გახარჯულია შემომავალი ტოკენების ${formatPercentKa(p)}`;
+  if (period === 'lifetime') return `${head} · ერთჯერადი ლიმიტი`;
+  const when = resetDateDative(resetsAt);
+  return when ? `${head} · განახლდება ${when}` : head;
+}
+
 /** tooltip-ის პერიოდის ხაზი. */
 export function periodLine(period, resetsAt) {
   if (period === 'lifetime') return 'ერთჯერადი ლიმიტი';

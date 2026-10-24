@@ -158,7 +158,7 @@ export async function sseDone(response) {
   return events.find((e) => e.done) || null;
 }
 
-/** ტოკენების მთვლელის რიცხვი (თხელი სივრცეები მოშორებული). */
-export const tokensShown = (page) => page.locator('#tokens-in').evaluate((el) => Number(el.textContent.replace(/[\s ]/g, '')));
+/** ტოკენების ინდიკატორი (Round 3 §3): დახარჯული შემავალის % (დაუმრგვალებელი — data-value). */
+export const pctShown = (page) => page.locator('#tokens-pct').evaluate((el) => Number(el.dataset.value));
 
 export const storage = (page, key) => page.evaluate((k) => JSON.parse(localStorage.getItem(k) || 'null'), key);

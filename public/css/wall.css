@@ -140,23 +140,19 @@ button { font: inherit; color: inherit; }
 .stat { position: relative; white-space: nowrap; display: inline-flex; align-items: center; gap: 4px; }
 .stat .ico { font-size: 15px; line-height: 1; }
 .crack-ico { width: 15px; height: 15px; color: #4a3f35; }
-/* ---------- ტოკენების მთვლელი (Round 2 §1) ---------- */
-.stat.tokens {
-  display: inline-grid;
-  grid-template-columns: auto;
-  gap: 1px;
-  font-size: 12px;
-  color: var(--ink);
-  cursor: help;
-  white-space: nowrap;
-}
-.stat.tokens .tok-main b { font-weight: 700; font-variant-numeric: tabular-nums; }
-.stat.tokens .tok-of { color: var(--ink-soft); font-size: 11px; }
-.stat.tokens .tok-bar { display: block; height: 3px; background: rgba(42, 38, 34, 0.15); border-radius: 2px; overflow: hidden; }
-.stat.tokens .tok-bar i { display: block; height: 100%; width: 100%; background: #3d6b4f; transition: width 0.6s ease; }
-.stat.tokens .tok-bar i.low { background: var(--red); }
-.stat.tokens .tok-out { font-size: 10px; color: var(--ink-soft); font-variant-numeric: tabular-nums; }
-.tokens-tip { right: 0; left: auto; width: 250px; white-space: pre-line; line-height: 1.45; }
+/* ---------- ტოკენები (Round 3 §3): რგოლი + პროცენტი; ფერი — ნეიტრალური / ქარვისფერი ≥70% / წითელი >90% ---------- */
+.stat.tokens { gap: 5px; font-size: 13px; color: var(--ink); cursor: help; }
+.tok-ring { width: 28px; height: 28px; transform: rotate(-90deg); flex: none; }
+.tok-ring circle { fill: none; stroke-width: 4; }
+.tok-ring .track { stroke: rgba(42, 38, 34, 0.15); }
+.tok-ring .fill { stroke: #3d6b4f; transition: stroke-dasharray 0.6s ease, stroke 0.3s ease; }
+#stat-tokens[data-level='warn'] .tok-ring .fill { stroke: #c28a12; }
+#stat-tokens[data-level='hot'] .tok-ring .fill { stroke: var(--red); }
+#tokens-pct { font-weight: 700; font-variant-numeric: tabular-nums; }
+#stat-tokens[data-level='warn'] #tokens-pct { color: #8a5f00; }
+#stat-tokens[data-level='hot'] #tokens-pct { color: var(--red); }
+#stat-tokens .tokens-tip { right: 0; left: auto; width: max-content; max-width: calc(100vw - 24px); white-space: nowrap; line-height: 1.45; }
+@media (max-width: 899px) { #stat-tokens .tokens-tip { white-space: normal; width: min(260px, calc(100vw - 24px)); } }
 #stat-tokens:hover .tooltip, #stat-tokens:focus .tooltip { opacity: 1; }
 
 /* ---------- სეზონის ხე ---------- */

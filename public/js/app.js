@@ -7,7 +7,7 @@ import {
 } from './game.js';
 import { withDefaults, dateFor, formatDateKa, SEASON_KA } from './calendar.js';
 import { treeMarkup, updateTree } from './tree.js';
-import { formatTokens, periodLine } from './format.js';
+import { usedPercent, formatPercentKa, percentLevel, tokensTipLine } from './format.js';
 import { createLimitModal } from './limitModal.js';
 import { createWallBackground } from './background.js';
 
@@ -60,27 +60,22 @@ async function main() {
     $('season-tip-cycle').textContent = `შენობა №${game.cycle}`;
   }
 
-  // --- ტოკენების მთვლელი (Round 2 §1): /api/state ჩატვირთვისას, done ყოველი პასუხის შემდეგ ---
+  // --- ტოკენები (Round 3 §3): რგოლი + „0,3 %“ — დახარჯული შემავალი ტოკენების წილი ამ პერიოდში.
+  //     /api/state ჩატვირთვისას, done ყოველი პასუხის შემდეგ (Round 2 §1) ---
   let tokenInfo = { limits: state?.limits, period: state?.period, resets_at: state?.resets_at };
+  const RING = 2 * Math.PI * 11;
   function renderTokens(info) {
     if (!info?.remaining) return;
     tokenInfo = { ...tokenInfo, ...Object.fromEntries(Object.entries(info).filter(([, v]) => v !== undefined)) };
     const { remaining, limits } = tokenInfo;
-    $('tokens-in').textContent = formatTokens(remaining.input);
-    $('tokens-in').dataset.value = String(remaining.input);
-    $('tokens-in-limit').textContent = limits ? formatTokens(limits.input) : '…';
-    $('tokens-out').textContent = formatTokens(remaining.output);
-    $('tokens-out').dataset.value = String(remaining.output);
-    const pct = limits?.input ? Math.max(0, Math.min(100, (remaining.input / limits.input) * 100)) : 100;
-    const bar = $('tokens-bar');
-    bar.style.width = `${pct}%`;
-    bar.classList.toggle('low', pct < 15);
-    $('tokens-tip').textContent = [
-      `შემავალი: ${formatTokens(remaining.input)}${limits ? ` / ${formatTokens(limits.input)}` : ''}`,
-      `გამომავალი: ${formatTokens(remaining.output)}${limits ? ` / ${formatTokens(limits.output)}` : ''}`,
-      periodLine(tokenInfo.period, tokenInfo.resets_at),
-    ].join('\n'); // სამი ხაზი (white-space: pre-line)
-    $('stat-tokens').setAttribute('aria-label', `ტოკენები: ${$('tokens-tip').textContent}`);
+    const limit = Number(limits?.input) || 0;
+    const pct = usedPercent(limit - remaining.input, limit);
+    $('tokens-pct').textContent = formatPercentKa(pct);
+    $('tokens-pct').dataset.value = String(pct);
+    $('tokens-ring').setAttribute('stroke-dasharray', `${((RING * pct) / 100).toFixed(2)} ${RING.toFixed(2)}`);
+    $('stat-tokens').dataset.level = percentLevel(pct);
+    $('tokens-tip').textContent = tokensTipLine(pct, tokenInfo.period, tokenInfo.resets_at);
+    $('stat-tokens').setAttribute('aria-label', $('tokens-tip').textContent);
   }
 
   /** ლიმიტის/ბიუჯეტის მდგომარეობა სერვერიდან — გადატვირთვა ფანჯარას ვერ გვერდს აუვლის. */

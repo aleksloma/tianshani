@@ -3,6 +3,26 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { computeLayout, findOverlaps, rectsOverlap, sizeClass, NARROW_PROFILES, MIN_ROT, MAX_ROT } from '../../public/js/layout.js';
+import { usedPercent, formatPercentKa, percentLevel, tokensTipLine } from '../../public/js/format.js';
+
+// ---------- §3 ----------
+
+test('§3 პროცენტი: ერთი ათწილადი, ქართული მძიმე, 0–100-ში', () => {
+  const NB = ' ';
+  assert.equal(formatPercentKa(0), `0,0${NB}%`);
+  assert.equal(formatPercentKa(0.27), `0,3${NB}%`);
+  assert.equal(formatPercentKa(12.345), `12,3${NB}%`);
+  assert.equal(formatPercentKa(99.96), `100,0${NB}%`);
+  assert.equal(formatPercentKa(140), `100,0${NB}%`);
+  assert.equal(formatPercentKa(-3), `0,0${NB}%`);
+  assert.equal(formatPercentKa('x'), `0,0${NB}%`);
+  assert.equal(usedPercent(1500, 500000), 0.3);
+  assert.equal(usedPercent(600000, 500000), 100, 'ძველი მთვლელი ახალ ლიმიტზე მეტია → 100%');
+  assert.equal(usedPercent(10, 0), 0);
+  assert.deepEqual([0, 69.9, 70, 90, 90.1, 100].map(percentLevel), ['ok', 'ok', 'warn', 'warn', 'hot', 'hot']);
+  assert.equal(tokensTipLine(0.3, 'monthly', '2026-11-01T00:00:00.000Z'), `გახარჯულია შემომავალი ტოკენების 0,3${NB}% · განახლდება 1 ნოემბერს`);
+  assert.equal(tokensTipLine(5, 'lifetime', null), `გახარჯულია შემომავალი ტოკენების 5,0${NB}% · ერთჯერადი ლიმიტი`);
+});
 
 const PAINTING = { id: 'painting', rank: -1, size: { w: 450, mw: 250, aspect: 539 / 760 }, rot: [2.5, 4] };
 const itemsN = (n) => [PAINTING, ...Array.from({ length: n }, (_, i) => ({ id: `c${i}`, rank: i }))];

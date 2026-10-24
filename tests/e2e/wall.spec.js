@@ -147,7 +147,7 @@ test('ზედა ზოლი: სეზონის ხე (ტექსტ�
   await expect(page.locator('#crack-val')).toHaveText('1/5');
   await expect(page.locator('#copies-val')).toHaveText('3/3');
   await expect(page.locator('#cycle-val')).toHaveText('1');
-  await expect(page.locator('#stat-tokens')).toContainText('ტოკენები:');
+  await expect(page.locator('#tokens-pct')).toHaveText(/^\d{1,3},\d %$/); // Round 3 §3
   await expect(page.locator('#mock-banner')).toContainText('settings.json → gemini.api_key');
   await expect(page.locator('#rollcall li')).toHaveCount(6);
   await expect(page.locator('#rollcall li').first()).toHaveText('შოთა მივლინებაშია');
@@ -156,10 +156,10 @@ test('ზედა ზოლი: სეზონის ხე (ტექსტ�
 test.describe('მობილური', () => {
   test.use({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
 
-  test('მობილური: 12 ჩარჩო, 12px დაშორება, ვერტიკალური სქროლი, ჩატი ეკრანში ეტევა', async ({ page }) => {
+  test('მობილური: 6 ჩარჩო (Round 3 §6), დაშორებით, ჩატი ეკრანში ეტევა', async ({ page }) => {
     await openWall(page);
     const R = await frameRects(page);
-    expect(R.frames).toHaveLength(12);
+    expect(R.frames).toHaveLength(6);
     expectNoOverlaps(R, 10);
     for (const f of R.frames) expect(f.x >= 0 && f.x + f.w <= 390).toBe(true);
     await page.screenshot({ path: `${SHOTS}/08-wall-mobile.png`, fullPage: true });

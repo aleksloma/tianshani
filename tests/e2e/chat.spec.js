@@ -1,6 +1,6 @@
 // ჩატი: ცენტრში მოსვლა, სტრიმინგი, ისტორია (გადატვირთვა, ცალკე პერსონაჟები), უხილავები, ენა, გადამისამართება, შეცდომები.
 import { test, expect } from '@playwright/test';
-import { openWall, openFrame, openFromMenu, send, storage, tokensShown, SHOTS } from './helpers.js';
+import { openWall, openFrame, openFromMenu, send, storage, pctShown, SHOTS } from './helpers.js';
 
 test('ჩარჩო → ცენტრში → ჩატი; პასუხი სტრიმით; ისტორია გადატვირთვას უძლებს; Esc აბრუნებს', async ({ page }) => {
   await openWall(page);
@@ -55,12 +55,12 @@ test('ჩარჩო → ცენტრში → ჩატი; პასუ�
   expect(all.director).toHaveLength(2);
 });
 
-test('ბალანსი მცირდება პასუხის შემდეგ', async ({ page }) => {
+test('დახარჯული % იზრდება პასუხის შემდეგ', async ({ page }) => {
   await openWall(page);
-  const before = await tokensShown(page);
+  const before = await pctShown(page);
   await openFrame(page, 'tina');
   await send(page, 'დირექტორი აქ არის?');
-  await expect.poll(() => tokensShown(page)).toBeLessThan(before);
+  await expect.poll(() => pctShown(page)).toBeGreaterThan(before);
 });
 
 test('Round 2 §8: პასუხი ხაზებად (≥2 ხაზი ბუშტში); რემარკა ცალკე ხაზზე', async ({ page }) => {

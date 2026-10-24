@@ -1,60 +1,83 @@
 // FIXES_ROUND2 §1–§3, §9: ტოკენების მთვლელი, ბრაუზერის ლიმიტის ფანჯარა, გლობალური თვიური ბიუჯეტი (ორ ბრაუზერში), ადმინის ბარათი.
 // ლიმიტები ნამდვილი სერვერის გზით მოწმდება: ტესტი e2e ბაზაში წერს გამოყენებას/ხარჯს, სერვერი თავად აბრუნებს 429-ს და /api/state-ს.
 import { test, expect, request as pwRequest } from '@playwright/test';
-import { openWall, openFrame, send, sendNoWait, sseDone, tokensShown, e2eStore, monthKey, adminApi, SHOTS } from './helpers.js';
-import { resetDateDative, GLOBAL_SENTENCE } from '../../public/js/format.js';
+import { openWall, openFrame, send, sendNoWait, sseDone, pctShown, e2eStore, monthKey, adminApi, SHOTS } from './helpers.js';
+import { resetDateDative, GLOBAL_SENTENCE, formatPercentKa } from '../../public/js/format.js';
 
 const nextMonthISO = () => { const d = new Date(); return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 1)).toISOString(); };
 const CLIENT_BODY = () => `თვის ბოლომდე დავიცადოთ. ლიმიტი განახლდება ${resetDateDative(nextMonthISO())}.`;
 const THIN = ' ';
 const clientIdOf = (page) => page.evaluate(async () => (await (await fetch('/api/state', { credentials: 'same-origin' })).json()).client_id);
 
-// ---------- §1 მთვლელი ----------
+// ---------- §1 (Round 3 §3: ერთი რიცხვი, ერთი ვიზუალი) ----------
 
-test('§1 მთვლელი: ჩატვირთვისას ჩანს; პასუხის შემდეგ მცირდება ზუსტად usage.input-ით; tooltip — შემავალი/გამომავალი/პერიოდი', async ({ page }) => {
+test('Round 3 §3 ინდიკატორი: რგოლი + „0,0 %“; პასუხის შემდეგ იზრდება ზუსტად usage.input / ლიმიტი-ით; აბსოლუტური რიცხვები აღარ ჩანს; tooltip — ერთი ხაზი', async ({ page }) => {
   await openWall(page);
   const counter = page.locator('#stat-tokens');
   await expect(counter).toBeVisible();
-  await expect(counter).toContainText(`ტოკენები: 2${THIN}000${THIN}000 / 2${THIN}000${THIN}000`);
-  await expect(page.locator('#tokens-bar')).toHaveAttribute('style', /width: 100%/);
-  const before = await tokensShown(page);
-  const beforeOut = Number(await page.locator('#tokens-out').getAttribute('data-value'));
+  const st = await (await page.request.get('/api/state')).json();
+  const limit = st.limits.input;
+  await expect(page.locator('#tokens-pct')).toHaveText(formatPercentKa(((limit - st.remaining.input) / limit) * 100));
+  await expect(page.locator('#tokens-pct')).toHaveText(/^\d{1,3},\d %$/);
+  await expect(counter.locator('svg.tok-ring circle.fill')).toHaveCount(1);
+  const before = await pctShown(page);
 
   await openFrame(page, 'tina');
   const resP = page.waitForResponse((r) => r.url().endsWith('/api/chat'));
   await send(page, 'დირექტორი აქ არის?');
   const done = await sseDone(await resP);
   expect(done.usage.input).toBeGreaterThan(0);
-  await expect.poll(() => tokensShown(page)).toBe(before - done.usage.input);
-  expect(Number(await page.locator('#tokens-out').getAttribute('data-value'))).toBe(beforeOut - done.usage.output);
-  // რიცხვები თხელი სივრცით
-  expect(await page.locator('#tokens-in').textContent()).toMatch(new RegExp(`^\\d{1,3}(${THIN}\\d{3})+$`));
+  await expect.poll(() => pctShown(page)).toBeCloseTo(before + (done.usage.input / limit) * 100, 9);
   await page.keyboard.press('Escape');
+  // ზედა ზოლში არც „/ 2 000 000“, არც „ტოკენები:“, არც გამომავალი
+  const header = await page.locator('#topbar').textContent();
+  expect(header).not.toMatch(/\/\s*\d{1,3}(?:[   ]\d{3})+/); // „/ 2 000 000“-ის მსგავსი არაფერი
+  expect(header).not.toContain('ტოკენები:');
+  expect(header).not.toContain('გამ.:');
+  await expect(counter).toHaveAttribute('data-level', 'ok');
 
   await counter.hover();
   const tip = page.locator('#tokens-tip');
   await expect(tip).toHaveCSS('opacity', '1');
-  await expect(tip).toContainText('შემავალი:');
-  await expect(tip).toContainText('გამომავალი:');
-  await expect(tip).toContainText(`ლიმიტი განახლდება ${resetDateDative(nextMonthISO())}`);
+  const p = await pctShown(page);
+  await expect(tip).toHaveText(`გახარჯულია შემომავალი ტოკენების ${formatPercentKa(p)} · განახლდება ${resetDateDative(nextMonthISO())}`);
+  // ერთი ხაზი (padding-ის გარეშე)
+  expect(await tip.evaluate((el) => { const s = getComputedStyle(el); return Math.round((el.clientHeight - parseFloat(s.paddingTop) - parseFloat(s.paddingBottom)) / parseFloat(s.lineHeight)); })).toBe(1);
   await page.waitForTimeout(250);
-  // tooltip ზოლის ქვემოთ ჩამოდის — კადრი ზოლზე ოდნავ მაღალია
-  await page.screenshot({ path: `${SHOTS}/R2-01-counter-desktop.png`, clip: { x: 0, y: 0, width: 1366, height: 210 } });
+  await page.screenshot({ path: `${SHOTS}/R3-03-ring-desktop.png`, clip: { x: 640, y: 0, width: 726, height: 150 } });
+});
+
+test('Round 3 §3 ფერი: ნეიტრალური < 70% ≤ ქარვისფერი ≤ 90% < წითელი', async ({ page }) => {
+  const store = e2eStore();
+  await openWall(page);
+  const cid = await clientIdOf(page);
+  const limit = (await (await page.request.get('/api/state')).json()).limits.input;
+  try {
+    for (const [pct, level] of [[75, 'warn'], [95, 'hot']]) {
+      store.resetUsage(cid, monthKey());
+      store.addUsage(cid, monthKey(), Math.round((limit * pct) / 100), 0);
+      await page.reload();
+      await page.waitForFunction(() => window.tianshani?.ready === true);
+      await expect(page.locator('#tokens-pct')).toHaveText(`${pct},0 %`);
+      await expect(page.locator('#stat-tokens')).toHaveAttribute('data-level', level);
+    }
+  } finally {
+    store.resetUsage(cid, monthKey());
+  }
 });
 
 test.describe('მობილური', () => {
-  test.use({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
-  test('§1 მთვლელი 390px-ზე ჩანს და ეკრანში ეტევა', async ({ page }) => {
+  test.use({ viewport: { width: 375, height: 812 }, isMobile: true, hasTouch: true });
+  test('Round 3 §3 ინდიკატორი 375px-ზე ჩანს და ეკრანში ეტევა', async ({ page }) => {
     await openWall(page);
     const counter = page.locator('#stat-tokens');
     await expect(counter).toBeVisible();
-    await expect(page.locator('#tokens-in')).toBeVisible();
+    await expect(page.locator('#tokens-pct')).toBeVisible();
     const box = await counter.boundingBox();
     expect(box.x).toBeGreaterThanOrEqual(0);
-    expect(box.x + box.width).toBeLessThanOrEqual(390);
-    expect(box.height).toBeGreaterThan(10);
-    expect(await tokensShown(page)).toBeGreaterThan(0);
-    await page.locator('#topbar').screenshot({ path: `${SHOTS}/R2-01-counter-mobile.png` });
+    expect(box.x + box.width).toBeLessThanOrEqual(375);
+    await expect(page.locator('#tokens-pct')).toHaveText(/^\d{1,3},\d %$/);
+    await page.locator('#topbar').screenshot({ path: `${SHOTS}/R3-03-ring-mobile.png` });
   });
 });
 
@@ -117,7 +140,8 @@ test('§2 ბრაუზერის ლიმიტი: ნამდვილ�
     await page.locator('#limit-close').click();
     await openFrame(page, 'tina');
     await expect(page.locator('#chat-input')).toBeDisabled();
-    await expect(page.locator('#tokens-in')).toHaveText('0');
+    await expect(page.locator('#tokens-pct')).toHaveText('100,0 %');
+    await expect(page.locator('#stat-tokens')).toHaveAttribute('data-level', 'hot');
   } finally {
     store.resetUsage(cid, monthKey());
   }
