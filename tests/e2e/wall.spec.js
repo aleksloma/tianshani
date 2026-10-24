@@ -172,7 +172,10 @@ test.describe('მობილური', () => {
     expect(box.x).toBeGreaterThanOrEqual(0);
     expect(box.x + box.width).toBeLessThanOrEqual(390);
     expect(box.y + box.height).toBeLessThanOrEqual(844);
-    expect(portrait.y + portrait.height).toBeLessThanOrEqual(box.y + 2); // სურათი ზემოთ, ჩატი ქვემოთ
+    // Round 3 §5: ჩატი მთელ ეკრანზეა, პატარა პორტრეტი მის სათაურში
+    const head = await page.locator('#chat .chat-head').boundingBox();
+    expect(portrait.y + portrait.height).toBeLessThanOrEqual(head.y + head.height + 4);
+    expect(await page.locator('#chat').evaluate((el) => getComputedStyle(el).opacity)).toBe('1');
     await page.screenshot({ path: `${SHOTS}/09-chat-mobile.png` });
   });
 });

@@ -18,6 +18,15 @@ export const MIN_ROT = 5;
 export const MAX_ROT = 10;
 export const MOBILE_BREAKPOINT = 700;
 
+/** ზომის კლასი (Round 3 §5/§6) — CSS-ის media query-ებთან ერთად: phone < 700 ≤ tablet < 900 ≤ desktop. */
+export const PHONE_MAX = 699;
+export const TABLET_MAX = 899;
+export function sizeClass(width) {
+  if (width <= PHONE_MAX) return 'phone';
+  if (width <= TABLET_MAX) return 'tablet';
+  return 'desktop';
+}
+
 /** w×h მართკუთხედის bounding box deg გრადუსით მობრუნების შემდეგ. */
 export function rotatedSize(w, h, deg) {
   const r = (Math.abs(deg) * Math.PI) / 180;

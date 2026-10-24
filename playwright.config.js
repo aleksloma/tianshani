@@ -25,6 +25,12 @@ export default defineConfig({
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
   },
+  // Round 3 §5/§6: ვიწრო ეკრანები რეგულარულ მატრიცაშია — mobile.spec.js ეშვება ტელეფონზე (375×812) და პლანშეტზე (700×900)
+  projects: [
+    { name: 'desktop', testIgnore: /mobile\.spec\.js$/ },
+    { name: 'phone-375', testMatch: /mobile\.spec\.js$/, use: { viewport: { width: 375, height: 812 }, isMobile: true, hasTouch: true } },
+    { name: 'tablet-700', testMatch: /mobile\.spec\.js$/, use: { viewport: { width: 700, height: 900 }, isMobile: true, hasTouch: true } },
+  ],
   webServer: {
     command: 'node src/server.js',
     url: 'http://127.0.0.1:3999/api/health',

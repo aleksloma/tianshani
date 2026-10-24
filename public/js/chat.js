@@ -2,6 +2,8 @@
 // უხილავთა წარმომადგენლები („~~გივი~~ სოსო“ + თამბნეილი + „პასუხობს: სოსო“), გადამისამართების ღილაკი.
 import { getChat, saveChat, clearChat } from './storage.js';
 import { renderSegments } from './stage.js';
+import { sizeClass } from './layout.js';
+import { fitText } from './wall.js';
 
 const TYPING = ['…ფიქრობს', '…ტელეფონზეა', '…საუზმობს', '…რეზოლუციას წერს', '…ბზარს უყურებს', '…ყურმილს იღებს'];
 const TYPING_ABSENT = ['…კარს აკაკუნებენ', '…ვიღაც მოდის დერეფანში', '…ხაზი დაკავებულია', '…დაელოდეთ'];
@@ -182,10 +184,15 @@ export function createChat({ byId, api, getConfig, getGameState, onExchange, onO
 
   // ---------- პორტრეტი ცენტრში (FLIP) ----------
 
+  /** iOS-ის „ჭრილი“ (safe-area) ზემოთ — CSS-ის env()-დან (--sat :root-ზე). */
+  function safeTop() {
+    return parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--sat')) || 0;
+  }
+
   function targetRects() {
     const W = window.innerWidth;
     const H = window.innerHeight;
-    if (W >= 900) {
+    if (sizeClass(W) === 'desktop') {
       const pw = Math.min(300, W * 0.24);
       const ph = pw * 1.42;
       const cw = Math.min(540, W * 0.44);
@@ -198,13 +205,13 @@ export function createChat({ byId, api, getConfig, getGameState, onExchange, onO
         panel: { x: x0 + pw + 40, y: (H - ch) / 2, w: cw, h: ch },
       };
     }
-    const pw = Math.min(118, W * 0.3);
-    const ph = pw * 1.42;
-    const top = 10;
+    // Round 3 §5: ვიწრო ეკრანზე ჩატი მთელ ეკრანზეა (fixed sheet), პატარა პორტრეტი — სათაურის მარცხენა უჯრაში
+    const pw = Math.round(Math.min(120, Math.max(96, W * 0.28)));
+    const ph = Math.round(pw * 1.42);
     return {
       mobile: true,
-      portrait: { x: (W - pw) / 2, y: top, w: pw, h: ph },
-      panel: { x: 8, y: top + ph + 10, w: W - 16, h: H - (top + ph + 10) - 8 },
+      portrait: { x: 12, y: 10 + safeTop(), w: pw, h: ph },
+      panel: null,
     };
   }
 
@@ -224,15 +231,31 @@ export function createChat({ byId, api, getConfig, getGameState, onExchange, onO
   }
 
   function placePanel(rects) {
+    panel.classList.toggle('sheet', rects.mobile);
+    if (rects.mobile) {
+      // sheet-ის ზომა CSS-შია (inset: 0; 100dvh) — inline ზომები არ უნდა გადაფარავდეს
+      for (const k of ['left', 'top', 'width', 'height']) panel.style[k] = '';
+      panel.style.setProperty('--pw', `${rects.portrait.w}px`);
+      panel.style.setProperty('--ph', `${rects.portrait.h}px`);
+      return;
+    }
     const p = rects.panel;
     Object.assign(panel.style, { left: `${p.x}px`, top: `${p.y}px`, width: `${p.w}px`, height: `${p.h}px` });
-    panel.classList.toggle('mobile', rects.mobile);
   }
 
   function placePortrait(portrait, rects) {
     const t = rects.portrait;
     Object.assign(portrait.style, { left: `${t.x}px`, top: `${t.y}px`, width: `${t.w}px`, height: `${t.h}px` });
+    portrait.classList.toggle('in-sheet', rects.mobile);
+    if (rects.mobile) {
+      // კედლის ჩარჩოს ასლს ფირფიტის inline შრიფტი მოჰყვება — პატარა პორტრეტზე თავიდან ვარგებთ
+      const name = portrait.querySelector('.plate-name');
+      if (name) { name.style.fontSize = ''; fitText(name, 8); }
+    }
   }
+
+  /** ვიწრო ეკრანზე გვერდი არ სქროლავს, სანამ sheet ღიაა (სქროლის პოზიცია რჩება). */
+  function lockScroll(on) { document.documentElement.classList.toggle('sheet-lock', on); }
 
   /** სად „მიფრინდეს“ პორტრეტი: კედლის ჩარჩოსთან (თუ არის), თორემ ქვემოთ, პატარავდება. */
   function awayTransform(source, portraitRect) {
@@ -262,8 +285,8 @@ export function createChat({ byId, api, getConfig, getGameState, onExchange, onO
       stamp.textContent = 'ადგილზე არ არის';
       portrait.append(stamp);
     }
-    placePortrait(portrait, rects);
     document.body.append(portrait);
+    placePortrait(portrait, rects);
 
     const startTransform = awayTransform(fromWall, rects.portrait);
     portrait.style.transition = 'none';
@@ -273,20 +296,21 @@ export function createChat({ byId, api, getConfig, getGameState, onExchange, onO
     current = { id, portrait, source: fromWall };
 
     document.body.classList.add('chat-open');
+    lockScroll(rects.mobile);
     backdrop.hidden = false;
     setSpeaker(id, currentProxy(id));
     renderLog(id);
     placePanel(rects);
+    panel.classList.remove('closing');
     panel.hidden = false;
 
-    // FLIP: შემდეგ კადრში საბოლოო მდგომარეობა
+    // FLIP: საწყისი მდგომარეობა სტილში „ჩაიწერა“ (reflow) → საბოლოო მაშინვე, requestAnimationFrame-ის გარეშე.
+    // Round 3 §5: ადრე `shown` მხოლოდ rAF-ში ემატებოდა — ფონურ/დამალულ ფანჯარაში rAF არ ეშვება და პანელი opacity 0-ზე რჩებოდა.
     void portrait.getBoundingClientRect();
-    requestAnimationFrame(() => {
-      portrait.style.transition = `transform ${ANIM_MS}ms ${EASE_IN}, opacity ${ANIM_MS}ms`;
-      portrait.style.transform = 'rotate(-1.5deg)';
-      portrait.style.opacity = '1';
-      panel.classList.add('shown');
-    });
+    portrait.style.transition = `transform ${ANIM_MS}ms ${EASE_IN}, opacity ${ANIM_MS}ms`;
+    portrait.style.transform = 'rotate(-1.5deg)';
+    portrait.style.opacity = '1';
+    panel.classList.add('shown');
     input.value = '';
     updateBusy();
     setTimeout(() => { if (current?.id === id) input.focus({ preventScroll: true }); }, ANIM_MS);
@@ -303,7 +327,9 @@ export function createChat({ byId, api, getConfig, getGameState, onExchange, onO
     session += 1;
     menu.close();
     panel.classList.remove('shown');
+    if (panel.classList.contains('sheet')) panel.classList.add('closing'); // sheet ქრება, კედელი ჩანს, პორტრეტი სახლში ბრუნდება
     document.body.classList.remove('chat-open');
+    lockScroll(false);
     if (!instant) {
       const rect = portrait.getBoundingClientRect();
       // სახლი დახურვისას თავიდან ითვლება — თუ ფანჯარა შეიცვალა, პორტრეტი ახალ ადგილას ბრუნდება
@@ -316,6 +342,7 @@ export function createChat({ byId, api, getConfig, getGameState, onExchange, onO
     portrait.remove();
     source?.classList.remove('lifted');
     panel.hidden = true;
+    panel.classList.remove('closing');
     backdrop.hidden = true;
     subEl.hidden = true;
   }
@@ -496,6 +523,7 @@ export function createChat({ byId, api, getConfig, getGameState, onExchange, onO
     const r = targetRects();
     placePanel(r);
     placePortrait(current.portrait, r);
+    lockScroll(r.mobile);
   });
 
   return { open, close, switchTo, isOpen: () => Boolean(current), currentId: () => current?.id || null };

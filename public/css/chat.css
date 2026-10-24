@@ -131,8 +131,51 @@
 }
 .chat[hidden] { display: none; }
 .chat.shown { opacity: 1; transform: none; }
-.chat.mobile { transform: translateY(24px); }
-.chat.mobile.shown { transform: none; }
+.chat:not(.shown) { pointer-events: none; } /* დამალვის ანიმაციისას უხილავი პანელი შეხებას აღარ „ყლაპავს“ */
+.portrait-slot { display: none; }
+
+/* ---------- Round 3 §5: ვიწრო ეკრანი (< 900px) — ჩატი მთელ ეკრანზე (fixed sheet) ----------
+   opacity/transform სტატიკურია (transition-ის გარეშე): პანელი ჩანს იმ წამსვე, როცა hidden იხსნება —
+   requestAnimationFrame-ზე და ანიმაციის დროზე დამოკიდებული აღარ არის. მოძრაობას პორტრეტის FLIP იძლევა. */
+.chat.sheet {
+  inset: 0;
+  width: auto;
+  height: 100vh;
+  height: 100dvh;
+  border-radius: 0;
+  box-shadow: none;
+  opacity: 1;
+  transform: none;
+  transition: none;
+}
+.chat.sheet.closing { opacity: 0; transition: opacity 0.2s ease; }
+.chat.sheet .chat-head {
+  display: grid;
+  grid-template-columns: calc(var(--pw, 105px) + 14px) minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 0 8px;
+  min-height: calc(var(--ph, 150px) + 18px);
+  padding: calc(10px + var(--sat, 0px)) 12px 8px 12px;
+}
+.chat.sheet .portrait-slot { display: block; height: var(--ph, 150px); }
+.chat.sheet .chat-title { padding-top: 4px; min-width: 0; }
+.chat.sheet .chat-log { overscroll-behavior: contain; }
+.chat.sheet .chat-form { padding-bottom: calc(8px + env(safe-area-inset-bottom)); }
+.chat.sheet .chat-form textarea { font-size: 16px; } /* iOS 16px-ზე ნაკლებზე zoom-ს აკეთებს */
+.chat.sheet .chat-foot { padding-bottom: calc(8px + env(safe-area-inset-bottom)); }
+.frame.portrait.in-sheet { /* sheet-ის (55) ზემოთ, მენიუს (70) და ფანჯრების ქვემოთ */
+  z-index: 56;
+  padding: 6px 6px 0;
+  box-shadow: inset 0 0 0 2px var(--wood-dark), inset 0 0 10px rgba(0, 0, 0, 0.4), 3px 6px 12px rgba(0, 0, 0, 0.35);
+}
+.frame.portrait.in-sheet .photo { padding: 4px; }
+.frame.portrait.in-sheet .plate { margin: 4px 2px 6px; padding: 2px 3px 3px; }
+.frame.portrait.in-sheet .plate-role { display: none; }
+.frame.portrait.in-sheet .absent-stamp { font-size: 11px; border-width: 2px; padding: 2px 3px; }
+.frame.portrait.in-sheet .proxy-badge { right: -6px; bottom: 8%; padding: 2px 3px; }
+.frame.portrait.in-sheet .proxy-badge .thumb { width: 30px; height: 30px; }
+.frame.portrait.in-sheet .proxy-badge .cap { font-size: 9px; }
+html.sheet-lock, html.sheet-lock body { overflow: hidden; }
 
 .chat-head {
   display: flex;

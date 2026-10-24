@@ -10,7 +10,7 @@ export const PAINTING = { id: 'painting', src: 'assets/painting.webp', size: { w
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 /** ფირფიტაზე გრძელი სიტყვა (მაგ. „მარკშეიდერი“) — შრიფტი მცირდება, სანამ არ ჩაეტევა. */
-function fitText(el, min = 8.5) {
+export function fitText(el, min = 8.5) {
   if (!el) return;
   el.style.fontSize = '';
   let size = parseFloat(getComputedStyle(el).fontSize);

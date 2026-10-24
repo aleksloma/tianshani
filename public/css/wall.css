@@ -16,6 +16,7 @@
   --season-tint: rgba(196, 140, 60, 0.10);
   --font: 'Noto Sans Georgian', 'Sylfaen', 'DejaVu Sans', sans-serif;
   --font-title: 'Noto Serif Georgian', 'Sylfaen', serif;
+  --sat: env(safe-area-inset-top, 0px); /* iOS „ჭრილი“ — chat.js კითხულობს პორტრეტის ადგილისთვის */
 }
 body[data-season='autumn'] { --season-tint: rgba(196, 140, 60, 0.12); }
 body[data-season='winter'] { --season-tint: rgba(70, 120, 200, 0.20); }
