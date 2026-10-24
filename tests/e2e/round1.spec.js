@@ -33,7 +33,7 @@ test('§2 ვაჟას პასუხი: ტელეფონის რე
   await page.reload();
   await page.waitForFunction(() => window.tianshani?.ready === true);
   await openFrame(page, 'director');
-  await expect(page.locator('#chat-log .msg.char .bubble .stage').first()).toContainText('ყურმილს იღებს');
+  await expect(page.locator('#chat-log .msg.char:not(.scripted) .bubble .stage').first()).toContainText('ყურმილს იღებს');
 });
 
 test('§2 სტრიმინგი: გაუხსნელი * ბოლოში → რემარკა ბოლომდე; შუალედურ ნაწილებშიც * არ ჩანს', async ({ page }) => {
@@ -54,11 +54,11 @@ test('§2 სტრიმინგი: გაუხსნელი * ბოლ�
   }));
   await page.locator('#chat-input').fill('გამარჯობა');
   await page.locator('#chat-input').press('Enter');
-  await expect(page.locator('#chat-log .msg.char:not(.streaming)')).toHaveCount(1);
+  await expect(page.locator('#chat-log .msg.char:not(.streaming):not(.scripted)')).toHaveCount(1);
   expect(await seenStar).toBe(false);
-  const stages = await page.locator('#chat-log .msg.char .stage').allTextContents();
+  const stages = await page.locator('#chat-log .msg.char:not(.scripted) .stage').allTextContents();
   expect(stages).toEqual(['ყურმილს იღებს: დიახ, დიახ…', 'ტელეფონი ისევ რეკავს']);
-  await expect(page.locator('#chat-log .msg.char .speech').first()).toHaveText('ძალიან კარგი!');
+  await expect(page.locator('#chat-log .msg.char:not(.scripted) .speech').first()).toHaveText('ძალიან კარგი!');
 });
 
 // ---------- §3 წარმომადგენელი ----------

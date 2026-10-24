@@ -43,12 +43,12 @@ test('§4 { replace }: ბუშტი სრულად იკითხებ�
   const watch = page.evaluate(() => new Promise((resolve) => {
     const log = document.getElementById('chat-log');
     const seen = new Set();
-    const obs = new MutationObserver(() => { for (const b of log.querySelectorAll('.msg.char .bubble')) seen.add(b); });
+    const obs = new MutationObserver(() => { for (const b of log.querySelectorAll('.msg.char:not(.scripted) .bubble')) seen.add(b); });
     obs.observe(log, { subtree: true, childList: true, characterData: true });
     setTimeout(() => { obs.disconnect(); resolve(seen.size); }, 1500);
   }));
   await send(page, 'როგორ ხართ?');
-  const bubble = page.locator('#chat-log .msg.char .bubble');
+  const bubble = page.locator('#chat-log .msg.char:not(.scripted) .bubble');
   await expect(bubble).toHaveCount(1);
   await expect(bubble).toContainText('ვზივარ');
   await expect(bubble).not.toContainText('ვჭედავარ');

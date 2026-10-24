@@ -154,7 +154,7 @@ test('(c) გახსნა → გადატვირთვა: ყველ
   expect(after).toEqual(before);
   // localStorage-ში ჩარჩოს/პორტრეტის კვალი არ არის
   const keys = await page.evaluate(() => Object.keys(localStorage));
-  expect(keys.sort()).toEqual(['tianshani.client_id', 'tianshani.game', 'tianshani.user_name']); // Round 3 §1: სახელი
+  expect(keys.sort()).toEqual(['tianshani.chats', 'tianshani.client_id', 'tianshani.game', 'tianshani.user_name']); // chats — Round 4 §8 პირველი ხაზი // Round 3 §1: სახელი
   const g = await page.evaluate(() => JSON.parse(localStorage.getItem('tianshani.game')));
   expect(Object.keys(g).sort()).toEqual(['cycle', 'day', 'exchanges', 'lastCharacterId', 'visited']);
 });

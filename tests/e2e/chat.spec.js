@@ -19,15 +19,17 @@ test('ჩარჩო → ცენტრში → ჩატი; პასუ�
   await page.locator('#chat-input').fill('გამარჯობათ, ერთი მოთხრობა მაქვს, წაიკითხავთ?');
   await page.locator('#chat-input').press('Enter');
   await expect(page.locator('#chat-log .msg.char.streaming')).toHaveCount(1);
-  await expect(page.locator('#chat-log .msg.char:not(.streaming) .bubble')).toHaveCount(1, { timeout: 15_000 });
-  const reply = await page.locator('#chat-log .msg.char .bubble').textContent();
+  await expect(page.locator('#chat-log .msg.char:not(.streaming):not(.scripted) .bubble')).toHaveCount(1, { timeout: 15_000 });
+  const reply = await page.locator('#chat-log .msg.char:not(.scripted) .bubble').textContent();
   expect(reply.trim().length).toBeGreaterThan(5);
   await expect(page.locator('#chat-log .msg.user .bubble')).toHaveText('გამარჯობათ, ერთი მოთხრობა მაქვს, წაიკითხავთ?');
   await page.screenshot({ path: `${SHOTS}/03-chat-director.png` });
 
   const chats = await storage(page, 'tianshani.chats');
-  expect(chats.director).toHaveLength(2);
-  expect(chats.director[1]).toMatchObject({ role: 'assistant', spoken_by: 'director' });
+  // Round 4 §8: [0] — სკრიპტული პირველი ხაზი
+  expect(chats.director).toHaveLength(3);
+  expect(chats.director[0]).toMatchObject({ role: 'assistant', scripted: true });
+  expect(chats.director[2]).toMatchObject({ role: 'assistant', spoken_by: 'director' });
 
   // Esc → ჩარჩო თავის ადგილას
   await page.keyboard.press('Escape');
@@ -40,19 +42,20 @@ test('ჩარჩო → ცენტრში → ჩატი; პასუ�
   await page.waitForFunction(() => window.tianshani?.ready === true);
   await openFrame(page, 'director');
   await expect(page.locator('#chat-log .msg.user')).toHaveCount(1);
-  await expect(page.locator('#chat-log .msg.char')).toHaveCount(1);
+  await expect(page.locator('#chat-log .msg.char:not(.scripted)')).toHaveCount(1);
+  await expect(page.locator('#chat-log .msg.char.scripted')).toHaveCount(1);
   await page.locator('#chat-close').click();
   await expect(page.locator('#chat')).toBeHidden();
 
   // მეორე პერსონაჟი — ცალკე, ცარიელი ისტორია
   await openFrame(page, 'vaso');
   await expect(page.locator('#chat-log .msg.user')).toHaveCount(0);
-  await expect(page.locator('#chat-log .msg.hint')).toBeVisible();
+  await expect(page.locator('#chat-log .msg.char.scripted')).toHaveCount(1); // Round 4 §8: „დაიწყეთ საუბარი…“-ს ნაცვლად
   await send(page, 'როგორ ხართ, ბატონო ვასო?');
   const all = await storage(page, 'tianshani.chats');
   expect(Object.keys(all).sort()).toEqual(['director', 'vaso']);
-  expect(all.vaso).toHaveLength(2);
-  expect(all.director).toHaveLength(2);
+  expect(all.vaso).toHaveLength(3);
+  expect(all.director).toHaveLength(3);
 });
 
 test('დახარჯული % იზრდება პასუხის შემდეგ', async ({ page }) => {
@@ -87,7 +90,9 @@ test('ისტორიის გასუფთავება ამ პე�
   await expect(page.locator('#chat-log .msg.user')).toHaveCount(1);
   await page.locator('#chat-clear').click();
   await expect(page.locator('#chat-log .msg.user')).toHaveCount(0);
-  expect((await storage(page, 'tianshani.chats')).bela).toBeUndefined();
+  // Round 4 §8: გასუფთავების შემდეგ ისევ მხოლოდ პირველი ხაზი
+  expect((await storage(page, 'tianshani.chats')).bela).toMatchObject([{ role: 'assistant', scripted: true }]);
+  await expect(page.locator('#chat-log .msg.char.scripted')).toHaveCount(1);
 });
 
 test('უხილავი (გივი): სილუეტი ცენტრში, პასუხობს წარმომადგენელი — „~~გივი~~ X“ ყოველ ბუშტზე', async ({ page }) => {
@@ -105,7 +110,7 @@ test('უხილავი (გივი): სილუეტი ცენტ�
   expect(deco).toBe('rgb(192, 57, 43)');
 
   for (let i = 0; i < 3; i++) await send(page, `გივი, ჩვენ ვართ! (${i})`);
-  const whos = page.locator('#chat-log .msg.char .who');
+  const whos = page.locator('#chat-log .msg.char:not(.scripted) .who');
   await expect(whos).toHaveCount(3);
   for (let i = 0; i < 3; i++) {
     await expect(whos.nth(i).locator('s.struck')).toHaveText('გივი');
@@ -116,7 +121,7 @@ test('უხილავი (გივი): სილუეტი ცენტ�
   const header = (await page.locator('#chat-name .real').textContent()).trim();
   expect(proxyNames).toContain(header);
   const chats = await storage(page, 'tianshani.chats');
-  expect(chats.givi).toHaveLength(6); // ერთი ისტორია გივისთან
+  expect(chats.givi).toHaveLength(7); // ერთი ისტორია გივისთან (+ სკრიპტული პირველი ხაზი)
   expect(chats.givi.filter((m) => m.role === 'assistant').every((m) => m.spoken_by && m.spoken_by !== 'givi')).toBe(true);
   await page.screenshot({ path: `${SHOTS}/04-chat-givi-proxy.png` });
 });
@@ -169,7 +174,7 @@ test('API შეცდომა სტრიმში → „ხაზი და
   await page.locator('#chat-input').fill('გამარჯობა');
   await page.locator('#chat-input').press('Enter');
   await expect(page.locator('#chat-log .msg.system')).toHaveText('ხაზი დაკავებულია. ცოტა ხანში სცადეთ.');
-  await expect(page.locator('#chat-log .msg.char')).toHaveCount(0);
+  await expect(page.locator('#chat-log .msg.char:not(.scripted)')).toHaveCount(0);
 });
 
 test('localStorage მიუწვდომელია → გაფრთხილება, მაგრამ ჩატი მუშაობს მეხსიერებაში', async ({ page }) => {
@@ -180,7 +185,7 @@ test('localStorage მიუწვდომელია → გაფრთხ�
   await expect(page.locator('#storage-banner')).toBeVisible();
   await openFrame(page, 'mikho');
   await send(page, 'მიხო, წაიკითხავ?');
-  await expect(page.locator('#chat-log .msg.char')).toHaveCount(1);
+  await expect(page.locator('#chat-log .msg.char:not(.scripted)')).toHaveCount(1);
 });
 
 test('კლავიატურა: ჩარჩოზე Enter ხსნის ჩატს', async ({ page }) => {

@@ -205,7 +205,7 @@ test('§2 done.exhausted: ბოლო პასუხმა ამოწურ�
     await sendNoWait(page, 'ბელა, როგორ ხარ?');
     await expect(page.locator('#limit-modal')).toBeVisible();
     await expect(page.locator('#limit-body')).toHaveText(CLIENT_BODY());
-    await expect(page.locator('#chat-log .msg.char')).toHaveCount(1); // პასუხი მოვიდა
+    await expect(page.locator('#chat-log .msg.char:not(.scripted)')).toHaveCount(1); // პასუხი მოვიდა (პირველი ხაზის გარდა)
   } finally {
     store.resetUsage(cid, monthKey());
   }

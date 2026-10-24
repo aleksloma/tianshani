@@ -4,6 +4,7 @@ import { getChat, saveChat, clearChat, getUserName } from './storage.js';
 import { renderSegments } from './stage.js';
 import { sizeClass } from './layout.js';
 import { fitText } from './wall.js';
+import { pickOpener } from './format.js';
 
 const TYPING = ['…ფიქრობს', '…ტელეფონზეა', '…საუზმობს', '…რეზოლუციას წერს', '…ბზარს უყურებს', '…ყურმილს იღებს'];
 const TYPING_ABSENT = ['…კარს აკაკუნებენ', '…ვიღაც მოდის დერეფანში', '…ხაზი დაკავებულია', '…დაელოდეთ'];
@@ -151,7 +152,7 @@ export function createChat({ byId, api, getConfig, getGameState, onExchange, onO
 
   function messageNode(id, m) {
     const row = document.createElement('div');
-    row.className = `msg ${m.role === 'user' ? 'user' : 'char'}`;
+    row.className = `msg ${m.role === 'user' ? 'user' : 'char'}${m.scripted ? ' scripted' : ''}`;
     if (m.role !== 'user') row.append(whoNode(id, m.spoken_by));
     if (m.role === 'user') {
       const bubble = document.createElement('div');
@@ -176,8 +177,22 @@ export function createChat({ byId, api, getConfig, getGameState, onExchange, onO
 
   function scrollDown() { log.scrollTop = log.scrollHeight; }
 
+  /**
+   * Round 4 §8: ცარიელ ჩატში პერსონაჟი თვითონ იწყებს — სკრიპტული ხაზი (LLM-ის გარეშე, ციკლი + id-ით არჩეული).
+   * ისტორიაში ინახება `scripted: true`-ით; სერვერს არასდროს ეგზავნება და ლიმიტში არ ითვლება.
+   */
+  function seedOpener(id) {
+    const o = pickOpener(byId[id]?.openers, getGameState().cycle, id);
+    if (!o) return [];
+    const m = { role: 'assistant', content: o.text, ts: Date.now(), scripted: true };
+    if (o.spoken_by) m.spoken_by = o.spoken_by;
+    saveChat(id, [m]);
+    return [m];
+  }
+
   function renderLog(id) {
-    const msgs = getChat(id);
+    let msgs = getChat(id);
+    if (!msgs.length) msgs = seedOpener(id);
     log.replaceChildren(...msgs.map((m) => messageNode(id, m)));
     if (!msgs.length) {
       const hint = document.createElement('div');
@@ -414,7 +429,8 @@ export function createChat({ byId, api, getConfig, getGameState, onExchange, onO
     const gs = getGameState();
     const payload = {
       characterId: id,
-      messages: msgs.slice(-cfg.chat.history_window).map(({ role, content }) => ({ role, content })),
+      // სკრიპტული პირველი ხაზი (Round 4 §8) სერვერს არ ეგზავნება
+      messages: msgs.filter((m) => !m.scripted).slice(-cfg.chat.history_window).map(({ role, content }) => ({ role, content })),
       gameState: {
         day: gs.day, season: gs.season, crackStage: gs.crackStage, lostCopies: gs.lostCopies, cycle: gs.cycle,
         paintingFallen: Boolean(gs.paintingFallen),

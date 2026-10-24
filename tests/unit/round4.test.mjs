@@ -27,6 +27,44 @@ test('§4 ენის წესი: უცხოენოვან პასუ
   assert.ok(!stage.includes('Stage directions are in Georgian,'), 'წინააღმდეგობა აღარ არის');
 });
 
+// ---------- §8 ჩატის პირველი ხაზი ----------
+import { characters, openersFor } from '../../src/characters.js';
+import { pickOpener } from '../../public/js/format.js';
+import { parseStage } from '../../public/js/stage.js';
+import { findNonWords } from '../../src/georgian.js';
+import { forbiddenDialectFor } from '../../src/proofread.js';
+
+test('§8 პირველი ხაზები: ყველას 3+, თითო ≤ 3 ხაზი, ქართულად, „ტოკენ“/ლათინური/არარსებული სიტყვა არ არის; სხვისი კილო არა', () => {
+  for (const c of characters) {
+    const list = openersFor(c);
+    assert.ok(list.length >= 3, `${c.id}: ${list.length}`);
+    for (const o of list) {
+      const lines = o.text.split('\n').filter((l) => l.trim());
+      assert.ok(lines.length >= 1 && lines.length <= 3, `${c.id}: ${o.text}`);
+      assert.ok(/[ა-ჰ]/.test(o.text) && !/[A-Za-z]/.test(o.text), `${c.id}: ${o.text}`);
+      assert.ok(!/ტოკენ|სოსო,|ჩემო სოსო/.test(o.text), `${c.id}: ${o.text}`);
+      assert.deepEqual(findNonWords(o.text), []);
+      // * დაბალანსებულია, რემარკა სწორად იპარსება
+      assert.equal((o.text.match(/\*/g) || []).length % 2, 0, `${c.id}: ${o.text}`);
+      assert.ok(parseStage(o.text).some((s) => s.type === 'speech'), `${c.id}: საუბარი არ არის`);
+      for (const w of forbiddenDialectFor(c)) assert.ok(!new RegExp(`(^|[^ა-ჰ])${w}([^ა-ჰ]|$)`).test(o.text), `${c.id}: ${w}`);
+    }
+    if (!c.reachable) {
+      assert.ok(list.every((o) => o.spoken_by && o.spoken_by !== c.id), `${c.id}: წარმომადგენელი`);
+      assert.ok(list.every((o) => /არ არის|დაკავებულია|დაკეტილია|არ დადის|ჯარშია|მივლინებაშია|კომისარიატშია/.test(o.text)), c.id);
+    }
+  }
+});
+
+test('§8 არჩევანი დეტერმინისტულია: იგივე ციკლი + id → იგივე; ციკლები შორის იცვლება', () => {
+  const list = [{ text: 'a' }, { text: 'b' }, { text: 'c' }];
+  assert.equal(pickOpener(list, 1, 'vaso'), pickOpener(list, 1, 'vaso'));
+  const seen = new Set([1, 2, 3, 4, 5, 6].map((cy) => pickOpener(list, cy, 'vaso').text));
+  assert.ok(seen.size >= 2, [...seen].join());
+  assert.equal(pickOpener([], 1, 'x'), null);
+  assert.equal(pickOpener(undefined, 1, 'x'), null);
+});
+
 // ---------- §3 ----------
 
 test('§3 დარჩენილი კითხვები: საშუალოთი (≥ 3 მოთხოვნა) ან 6000-ით; ≥ 10 → ათეულებად; < 10 → ზუსტად; 0 → ამოწურულია', () => {
