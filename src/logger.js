@@ -10,7 +10,7 @@ export const log = {
 };
 
 /** მომხმარებლის შეტყობინება + პასუხი ერთად. ჩატის ისტორია უხილავის id-ზე ინახება, spoken_by — ვინ უპასუხა. */
-export function logExchange(store, cfg, { clientId, characterId, spokenBy, userText, reply, usage, gameState, userName = null, original = null }) {
+export function logExchange(store, cfg, { clientId, characterId, spokenBy, userText, reply, usage, gameState, userName = null, original = null, longReply = false }) {
   if (!cfg.logging.store_conversations) return;
   const common = { client_id: clientId, character_id: characterId, season: gameState.season, cycle: gameState.cycle, user_name: userName || null };
   store.logMessage({ ...common, role: 'user', content: userText, lang_guess: guessLang(userText), input_tokens: usage.input });
@@ -20,6 +20,7 @@ export function logExchange(store, cfg, { clientId, characterId, spokenBy, userT
     store.logMessage({
       ...common, role: 'assistant', spoken_by: spokenBy, content: reply, lang_guess: guessLang(reply), output_tokens: usage.output,
       proofread_original: changed ? original : null, proofread_changed: changed ? 1 : 0,
+      long_reply: longReply ? 1 : 0, // Round 4 §9
     });
   }
 }

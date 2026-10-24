@@ -69,6 +69,12 @@ async function loadStats() {
     card('შემავალი ტოკენი სულ', t.input_tokens),
     card('გამომავალი ტოკენი სულ', t.output_tokens),
     top,
+    // Round 4 §9: > 3 წინადადებიანი პასუხები პერსონაჟების მიხედვით
+    el('div', { class: 'stat-card top long-replies', id: 'long-replies' },
+      el('div', { class: 'k', text: 'ზედმეტად გრძელი პასუხები (> 3 წინადადება)' }),
+      (s.long_replies || []).length
+        ? el('ol', {}, ...s.long_replies.map((c) => el('li', { 'data-id': c.character_id, text: `${c.name} — ${c.n}` })))
+        : el('p', { class: 'muted', text: 'ჯერ არცერთი.' })),
   );
   renderBudget(s.budget);
 }

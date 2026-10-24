@@ -21,7 +21,8 @@ test('/admin: არასწორი პაროლი → შეცდომ
   await page.locator('#pw').fill('e2e-admin-pass');
   await page.locator('#login-form button').click();
   await expect(page.locator('#app')).toBeVisible();
-  await expect(page.locator('#stats .stat-card')).toHaveCount(5);
+  await expect(page.locator('#stats .stat-card')).toHaveCount(6); // + Round 4 §9 „ზედმეტად გრძელი პასუხები“
+  await expect(page.locator('#long-replies')).toContainText('ზედმეტად გრძელი პასუხები');
   await expect(page.locator('#mode-line')).toContainText('MOCK');
 
   const item = page.locator(`#client-list button[data-id="${cid}"]`);

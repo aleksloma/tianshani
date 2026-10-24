@@ -35,22 +35,65 @@ export function phraseCore(phrase) {
 export function pacingState(history, speaker) {
   const users = history.filter((m) => m.role === 'user');
   const replies = history.filter((m) => m.role === 'assistant').map((m) => m.content).join('\n');
-  const used = (speaker?.catchphrases_ka || []).filter((c) => {
+  const usedOf = (list) => (list || []).filter((c) => {
     const core = phraseCore(c);
     return core.length >= 3 && replies.includes(core);
   });
   return {
     messageCount: users.length,
     manuscriptCount: users.filter((m) => isManuscriptMessage(m.content)).length,
-    usedCatchphrases: used,
+    usedCatchphrases: usedOf(speaker?.catchphrases_ka),
+    usedExcuses: usedOf(speaker?.excuse_repertoire_ka), // Round 4 §9: საბაბიც არ მეორდება
   };
 }
 
 /**
- * სიგრძის მკაცრი ზღვარი ამ პასუხისთვის (რეალურმა smoke-მა აჩვენა, რომ ზოგადი წესის მიუხედავად მოდელი 4 წინადადებას წერს).
+ * სიგრძის ზღვარი ამ პასუხისთვის (Round 4 §9: ორი „ტაქტი“ — პასუხი + ერთი დამახასიათებელი შტრიხი).
  * რემარკა (*…*) არ ითვლება.
  */
-export const LENGTH_CAP_LINE = 'LENGTH FOR THIS REPLY: at most 3 short sentences in total (1–2 for small talk) — count them before answering. Each line is exactly ONE sentence: never put two sentences (e.g. a question and an exclamation) on one line. The stage direction does not count. Pick ONE thing to say and keep the rest for later turns.';
+export const LENGTH_CAP_LINE = 'LENGTH FOR THIS REPLY: two beats — 2 sentences by default (one per beat), 3 at most, never just 1. Each line is exactly ONE sentence. The stage direction does not count. Answer only what was asked; do not answer questions that were not asked.';
+
+/** Round 4 §9: შენობის „მარადიული“ ფონური თემები (world.setting_ka-ს მოტივები) — მეორე ტაქტისთვის. */
+export const WORLD_TOUCHES_KA = [
+  'ფანჯრის მიღმა მოტობურთის მატჩი და მტვერი',
+  'ბზარი კედელში — თითქოს გაიზარდა',
+  'ლიფტი, რომელიც ისევ გაიჭედა',
+  'ამინდი და სეზონი',
+  'სადილი / ბუფეტი',
+  'ტელეფონი, რომელიც არ ჩერდება',
+  'ვინ არის შვებულებაში ან მივლინებაში',
+];
+
+/**
+ * Round 4 §9: მეორე ტაქტის მასალა კანონიდან — ჯერ გამოუყენებელი ცნობილი ფრაზები (≤ 4), რეალური საქმიანობა
+ * და 3 ფონური თემა (შეტყობინებების რაოდენობით ბრუნავს, რომ ტაქტები იცვლებოდეს).
+ */
+export function touchPool(speaker, pacing) {
+  const used = new Set((pacing?.usedCatchphrases || []).map(phraseCore));
+  const phrases = (speaker?.catchphrases_ka || []).map(phraseCore).filter((c) => c.length >= 3 && !used.has(c)).slice(0, 4);
+  const activity = String(speaker?.persona_ka?.real_activity || '').trim();
+  const n = WORLD_TOUCHES_KA.length;
+  const start = (pacing?.messageCount || 0) % n;
+  const world = [0, 1, 2].map((i) => WORLD_TOUCHES_KA[(start + i) % n]);
+  return [
+    ...phrases.map((p) => `„${p}“`),
+    ...(activity ? [`what you are busy with: ${activity}`] : []),
+    ...world,
+  ];
+}
+
+export function touchPoolLine(speaker, pacing) {
+  return `TOUCH POOL for beat 2 (pick ONE, or ask a counter-question; it is never more information about the request): [${touchPool(speaker, pacing).join('; ')}]`;
+}
+
+/**
+ * წინადადებების რაოდენობა (რემარკების *…* გარეშე): ახალი ხაზი ან . ! ? ყოფს; „…“ არ ყოფს; მოკლე ნამსხვრევები არ ითვლება.
+ * Round 4 §9 — „ზედმეტად გრძელი პასუხები“ (> 3) და რეალური smoke.
+ */
+export function countSentences(text) {
+  const speech = String(text || '').replace(/\*[^*]*\*?/g, '\n').replace(/^\s*\([^)]*\)/gm, '\n');
+  return speech.split(/(?<=[.!?])\s+|\n+/).map((s) => s.trim()).filter((s) => (s.match(/[ა-ჰA-Za-zА-яЁё]/g) || []).length >= 3).length;
+}
 
 /**
  * გადამისამართების „ჩამკეტი“ ამ პასუხისთვის: ზოგადი წესი საკმარისი არ აღმოჩნდა (რეალური smoke: ბელამ ხელნაწერის
@@ -65,6 +108,6 @@ export function redirectGateLine(p) {
 
 /** პრომპტის ხაზი (სპეცის ფორმატით). */
 export function pacingLine(p) {
-  const used = p.usedCatchphrases.length ? p.usedCatchphrases.map((c) => `„${phraseCore(c)}“`).join(', ') : 'none';
-  return `Messages in this chat so far: ${p.messageCount}. Messages about the manuscript so far: ${p.manuscriptCount}. Catchphrases already used in this chat: [${used}]`;
+  const list = (arr) => (arr?.length ? arr.map((c) => `„${phraseCore(c)}“`).join(', ') : 'none');
+  return `Messages in this chat so far: ${p.messageCount}. Messages about the manuscript so far: ${p.manuscriptCount}. Catchphrases already used in this chat: [${list(p.usedCatchphrases)}]. Excuses already used in this chat: [${list(p.usedExcuses)}]`;
 }

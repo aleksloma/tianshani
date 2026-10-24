@@ -65,6 +65,74 @@ test('§8 არჩევანი დეტერმინისტულია
   assert.equal(pickOpener(undefined, 1, 'x'), null);
 });
 
+// ---------- §9 დიალოგის ფორმა ----------
+import { SHAPE_EXAMPLES, SHAPE_EXAMPLES_EN } from '../../src/prompt.js';
+import { pacingState, pacingLine, touchPool, touchPoolLine, countSentences, LENGTH_CAP_LINE, phraseCore, WORLD_TOUCHES_KA } from '../../src/pacing.js';
+
+test('§9 ზოგადი მაგალითები: ყოველ პასუხში ზუსტად 2 სასაუბრო ხაზი (რემარკის გარდა); ერთი ორ-სვლიანი მაგალითი; ნეიტრალური', () => {
+  assert.ok(SHAPE_EXAMPLES.length >= 4);
+  for (const ex of SHAPE_EXAMPLES) {
+    for (const t of ex.turns) {
+      const speech = t.reply.split('\n').filter((l) => l.trim() && !/^\s*\*[^*]*\*\s*$/.test(l));
+      assert.equal(speech.length, 2, t.reply);
+      assert.equal(countSentences(t.reply), 2, t.reply);
+    }
+  }
+  assert.ok(SHAPE_EXAMPLES.some((ex) => ex.turns.length === 2), 'ორი ზედიზედ კითხვის მაგალითი');
+  // ნეიტრალური: არცერთი პერსონაჟის სახელი/ცნობილი ფრაზა
+  const all = SHAPE_EXAMPLES_EN.join('\n');
+  for (const c of characters) for (const p of c.catchphrases_ka || []) assert.ok(!all.includes(phraseCore(p)) || phraseCore(p).length < 6, `${c.id}: ${p}`);
+  for (const n of ['ვაჟა', 'ბელა', 'თინა', 'ვასო', 'სოსო']) assert.ok(!all.includes(n), n);
+});
+
+test('§9 წესები სპეცის ტექსტით; სიგრძე 2–3, არასდროს 1; max_output_tokens 180', async () => {
+  const shape = GENERAL_RULES_EN.find((r) => r.startsWith('REPLY SHAPE'));
+  for (const needle of [
+    'Reply in two beats: (1) one sentence answering only what was asked',
+    'Never pre-empt the user\'s next questions.',
+    'One excuse or one piece of information per reply. The repertoire is revealed slowly over a long conversation, never listed.',
+    'Stay consistent within a reply: do not refuse and then agree, or promise and then withdraw, in the same breath.',
+    'Length: 2 sentences by default (one per beat), 3 at most. Never a dry one-word refusal, never a monologue.',
+    'Model every reply on the dialogues of the film and the book you were given',
+  ]) assert.ok(shape.includes(needle), needle);
+  assert.ok(GENERAL_RULES_EN.length <= 25);
+  assert.ok(LENGTH_CAP_LINE.includes('never just 1'));
+  const ex = JSON.parse((await import('node:fs')).readFileSync(new URL('../../settings.example.json', import.meta.url), 'utf8'));
+  assert.equal(ex.gemini.max_output_tokens, 180);
+  assert.equal(ex.chat.trim_long_replies, true);
+});
+
+test('§9 touch_pool: გამოუყენებელი ფრაზები, რეალური საქმიანობა, 3 ფონური თემა; მდგომარეობის ხაზში — გამოყენებული საბაბებიც', () => {
+  const tina = characters.find((c) => c.id === 'tina');
+  const used = tina.catchphrases_ka[0];
+  const excuse = tina.excuse_repertoire_ka[0];
+  const history = [
+    { role: 'user', content: 'დირექტორი სადაა?' }, { role: 'assistant', content: `${used}\n${excuse}` },
+    { role: 'user', content: 'ხვალ?' },
+  ];
+  const p = pacingState(history, tina);
+  assert.deepEqual(p.usedCatchphrases, [used]);
+  assert.deepEqual(p.usedExcuses, [excuse]);
+  const pool = touchPool(tina, p);
+  assert.ok(!pool.includes(`„${phraseCore(used)}“`), 'გამოყენებული ფრაზა აღარ არის');
+  assert.ok(pool.includes(`„${phraseCore(tina.catchphrases_ka[1])}“`));
+  assert.ok(pool.some((x) => x.startsWith('what you are busy with:') && x.includes('ტელეფონი')));
+  assert.equal(pool.filter((x) => WORLD_TOUCHES_KA.includes(x)).length, 3);
+  assert.ok(touchPoolLine(tina, p).startsWith('TOUCH POOL for beat 2'));
+  assert.ok(pacingLine(p).includes(`Excuses already used in this chat: [„${phraseCore(excuse)}“]`));
+  // თემები ბრუნავს
+  assert.notDeepEqual(touchPool(tina, { ...p, messageCount: 1 }).slice(-3), touchPool(tina, { ...p, messageCount: 2 }).slice(-3));
+  const s = buildPrompt({ speaker: tina, gameState: { day: 0 }, cfg: { game: {} }, pacing: p }).systemInstruction;
+  assert.ok(s.includes('TOUCH POOL for beat 2') && s.includes('Excuses already used in this chat'));
+});
+
+test('§9 countSentences: რემარკა არ ითვლება; ხაზები და . ! ? ყოფს; „…“ — არა', () => {
+  assert.equal(countSentences('*(ყურმილს იღებს) დიახ, დიახ.*\nდღეს ბანკშია.\nხვალ ნახეთ?'), 2);
+  assert.equal(countSentences('ერთი. ორი! სამი? ოთხი.'), 4);
+  assert.equal(countSentences('ვკითხულობ, ვკითხულობ… ჯერ არა.'), 1);
+  assert.equal(countSentences(''), 0);
+});
+
 // ---------- §3 ----------
 
 test('§3 დარჩენილი კითხვები: საშუალოთი (≥ 3 მოთხოვნა) ან 6000-ით; ≥ 10 → ათეულებად; < 10 → ზუსტად; 0 → ამოწურულია', () => {

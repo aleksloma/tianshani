@@ -97,6 +97,50 @@ test('რეალური API: ვაჟა ზაზაევიჩი — �
   log.director_unmarked_phone = log.cases.filter((c) => c.case === 'director' && c.checks.unmarked_phone_talk).length;
 });
 
+// ---------- Round 4 §9: ორი ტაქტი — 6 ვიწრო კითხვა ორ პერსონაჟთან ----------
+
+test('რეალური API (Round 4 §9): თინა ×3, ოთარი ×3 — 2–3 წინადადება, ≤ 1 საბაბის წინადადება, საბაბი არ მეორდება, უარი+თანხმობა ერთად არა', { skip: !KEY && 'Gemini-ს გასაღები არ არის' }, async () => {
+  const { byId } = await import('../../src/characters.js');
+  const { countSentences, phraseCore } = await import('../../src/pacing.js');
+  const EXCUSE = /(^|[^ა-ჰ])(ვერ|არ მცალია|უნდა|მერე|ხვალ|შემდეგ)([^ა-ჰ]|$)/;
+  const REFUSE = /(^|[^ა-ჰ])(ვერ|არა|არ)([^ა-ჰ]|$)/;
+  const AGREE = /კი ბატონო|როგორც გინდათ|სულერთია/;
+  const CONVOS = [
+    ['tina', ['დირექტორი დღეს მოვა?', 'ხვალ?', 'მისი ტელეფონის ნომერი რა არის?']],
+    ['otari', ['ჩემი ხელნაწერი წაიკითხეთ?', 'ვის გადაეცით?', 'როდის დამიბრუნებთ?']],
+  ];
+  log.reply_shape = [];
+  const failures = [];
+  for (const [id, questions] of CONVOS) {
+    const c = byId[id];
+    const msgs = [];
+    const jar = cookieJar();
+    const usedExcuses = new Map();
+    for (const [i, q] of questions.entries()) {
+      msgs.push({ role: 'user', content: q });
+      const r = await chat(S.base, { characterId: id, messages: msgs, gameState: GS, userName: 'ნინო' }, { jar });
+      assert.equal(r.status, 200);
+      assert.ok(r.done, r.error || 'no done');
+      const final = r.events.find((e) => typeof e.replace === 'string')?.replace || r.reply;
+      msgs.push({ role: 'assistant', content: final });
+      const speech = final.replace(/\*[^*]*\*/g, '\n');
+      const sentences = speech.split(/(?<=[.!?])\s+|\n+/).map((s) => s.trim()).filter((s) => (s.match(/[ა-ჰ]/g) || []).length >= 3);
+      const n = countSentences(final);
+      const excuseSentences = sentences.filter((s) => EXCUSE.test(s)).length;
+      const excuses = (c.excuse_repertoire_ka || []).map(phraseCore).filter((e) => e.length >= 6 && final.includes(e));
+      const repeated = excuses.filter((e) => usedExcuses.has(e));
+      for (const e of excuses) if (!usedExcuses.has(e)) usedExcuses.set(e, i + 1);
+      const refuseAgree = sentences.some((s) => REFUSE.test(s) && AGREE.test(s)) || (REFUSE.test(speech) && AGREE.test(speech));
+      log.reply_shape.push({ character: id, turn: i + 1, user: q, reply: final, checks: { sentences: n, excuse_sentences: excuseSentences, repeated_excuses: repeated, refuse_and_agree: refuseAgree }, usage: r.done.usage });
+      if (n < 2 || n > 3) failures.push(`${id} #${i + 1}: ${n} წინადადება — ${final}`);
+      if (excuseSentences > 1) failures.push(`${id} #${i + 1}: ${excuseSentences} საბაბის წინადადება — ${final}`);
+      if (repeated.length) failures.push(`${id} #${i + 1}: საბაბი განმეორდა ${repeated.join(', ')} — ${final}`);
+      if (refuseAgree) failures.push(`${id} #${i + 1}: უარი და თანხმობა ერთად — ${final}`);
+    }
+  }
+  assert.deepEqual(failures, []);
+});
+
 // ---------- Round 4 §4: უცხოენოვანი პასუხი — ფრაზები ქართული დამწერლობით ----------
 
 test('რეალური API (Round 4 §4): თამარი — რუსული და ინგლისური კითხვა → პასუხი იმ ენაზე, ქართული დამწერლობის სიტყვით, ტრანსლიტერაციის გარეშე', { skip: !KEY && 'Gemini-ს გასაღები არ არის' }, async () => {

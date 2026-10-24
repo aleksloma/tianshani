@@ -13,7 +13,7 @@ test('ზოგადი ინსტრუქცია: 15–25 წესი, �
   assert.ok(GENERAL_RULES_EN.length >= 15 && GENERAL_RULES_EN.length <= 25, String(GENERAL_RULES_EN.length));
   const all = GENERAL_RULES_EN.join('\n');
   // Round 2 §8: ხარისხი, PACING, REDIRECTS LATER, OFF-TOPIC, FORMAT (\n)
-  for (const needle of ['LANGUAGE', 'Write standard literary Georgian', 'Never invent or distort words', 'PACING', 'ONE idea per reply', 'REDIRECTS AND "NO TIME" COME LATER',
+  for (const needle of ['LANGUAGE', 'Write standard literary Georgian', 'Never invent or distort words', 'REPLY SHAPE', 'two beats', 'Never pre-empt', 'REDIRECTS AND "NO TIME" COME LATER',
     'OFF-TOPIC', 'FORMAT', 'NEW LINE (\\n)', 'NEVER read the manuscript', 'Shukri', 'Mikho', 'Soso', 'AI', 'calm', 'ONE famous catchphrase', 'Time loops', 'season']) {
     assert.ok(all.includes(needle), needle);
   }

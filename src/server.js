@@ -15,7 +15,7 @@ import {
   MSG_BUDGET, costUsd, globalStatus, wouldOvershoot, reserveUsd, estimateTokens, createWarnLogger,
 } from './budget.js';
 import { detectRedirect } from './redirect.js';
-import { pacingState } from './pacing.js';
+import { pacingState, countSentences } from './pacing.js';
 import { mockStream } from './mock.js';
 import { shouldProofread, proofread, proofreadMaxTokens } from './proofread.js';
 import { findNonWords } from './georgian.js';
@@ -257,11 +257,15 @@ export function createApp(cfg) {
     }
     const bad = findNonWords(reply);
     if (bad.length) log.warn(`[georgian] ${speaker.id}: არარსებული სიტყვა პასუხში: ${bad.join(', ')}`);
+    // Round 4 §9: > 3 წინადადება — პასუხი სრულად რჩება, ოღონდ ლოგში WARN და ადმინში მთვლელი
+    const sentences = countSentences(reply);
+    const longReply = cfg.chat.trim_long_replies !== false && sentences > 3;
+    if (longReply) log.warn(`[long-reply] ${speaker.id}: ${sentences} წინადადება`);
 
     store.addUsage(clientId, bal.period_key, usage.input, usage.output);
     // გლობალური ხარჯი — რეალური usageMetadata-დან (mock-ში ყალბი usage-დან)
     store.addGlobal(gNow.period_key, usage.input, usage.output, costUsd(usage.input, usage.output, cfg.budget));
-    logExchange(store, cfg, { clientId, characterId: target.id, spokenBy: speaker.id, userText: last.content, reply, usage, gameState, userName, original });
+    logExchange(store, cfg, { clientId, characterId: target.id, spokenBy: speaker.id, userText: last.content, reply, usage, gameState, userName, original, longReply });
 
     const after = balance(store, cfg, clientId);
     send({

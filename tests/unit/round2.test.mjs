@@ -207,13 +207,14 @@ test('ტემპის ხაზი: შეტყობინებები, 
   assert.deepEqual(p.usedCatchphrases, [bela.catchphrases_ka[0]]);
   const line = pacingLine(p);
   assert.ok(line.startsWith('Messages in this chat so far: 3. Messages about the manuscript so far: 2. Catchphrases already used in this chat: [„'), line);
+  // Round 4 §9: + გამოყენებული საბაბები
   assert.equal(pacingLine({ messageCount: 1, manuscriptCount: 0, usedCatchphrases: [] }),
-    'Messages in this chat so far: 1. Messages about the manuscript so far: 0. Catchphrases already used in this chat: [none]');
+    'Messages in this chat so far: 1. Messages about the manuscript so far: 0. Catchphrases already used in this chat: [none]. Excuses already used in this chat: [none]');
   // მომხმარებლის შეტყობინებაში ნახსენები ფრაზა „გამოყენებულად“ არ ითვლება
   assert.deepEqual(pacingState([{ role: 'user', content: bela.catchphrases_ka[0] }], bela).usedCatchphrases, []);
   // პრომპტში — # PACING სექცია
   const s = buildPrompt({ speaker: bela, gameState: { day: 0 }, cfg: { game: {} }, pacing: p }).systemInstruction;
-  assert.ok(s.includes(`# PACING\n${line}\nLENGTH FOR THIS REPLY: at most 3 short sentences`));
+  assert.ok(s.includes(`# PACING\n${line}\nLENGTH FOR THIS REPLY: two beats — 2 sentences by default`)); // Round 4 §9
   // გადამისამართების ჩამკეტი: <3 → აკრძალულია, ≥3 → ნებადართული
   assert.ok(s.includes('REDIRECT GATE: the manuscript has come up 2 time(s) — fewer than 3. In THIS reply do NOT send the user to anyone else'));
   const s3 = buildPrompt({ speaker: bela, gameState: { day: 0 }, cfg: { game: {} }, pacing: { ...p, manuscriptCount: 3 } }).systemInstruction;

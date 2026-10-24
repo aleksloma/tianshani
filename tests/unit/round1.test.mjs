@@ -235,8 +235,9 @@ test('ზოგადი წესები: სცენური რემა�
   assert.ok(all.includes('wrapped in asterisks'));
   assert.ok(all.includes('30–50%'));
   const { systemInstruction: s } = buildPrompt({ speaker: byId.director, gameState: { season: 'autumn', crackStage: 0, lostCopies: 0, cycle: 1, day: 44 }, cfg: CFG });
-  assert.ok(s.includes('Stage-direction examples'));
-  assert.ok(s.includes('*(ყურმილს იღებს)'));
+  // Round 4 §9: მაგალითები ახლა ორ-ტაქტიანია (რემარკის მაგალითიც შედის)
+  assert.ok(s.includes('Reply-shape examples'));
+  assert.ok(s.includes('*(ყურმილს მხარით აჭერს)*'));
   assert.ok(s.includes('In-world date: 15 October 1983, autumn, day 45 of the season.'));
 });
 

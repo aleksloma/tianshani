@@ -68,11 +68,15 @@ export function adminRouter(cfg, store) {
     const top = db.prepare(`SELECT character_id, COUNT(*) AS n FROM messages WHERE role = 'user'
         GROUP BY character_id ORDER BY n DESC LIMIT 10`).all()
       .map((t) => ({ ...t, name: byId[t.character_id]?.short_name_ka || t.character_id }));
+    // Round 4 §9: „ზედმეტად გრძელი პასუხები“ (> 3 წინადადება) პერსონაჟების მიხედვით (ვინც რეალურად უპასუხა)
+    const longReplies = db.prepare(`SELECT COALESCE(spoken_by, character_id) AS character_id, COUNT(*) AS n
+        FROM messages WHERE role = 'assistant' AND long_reply = 1 GROUP BY 1 ORDER BY n DESC`).all()
+      .map((r) => ({ ...r, name: byId[r.character_id]?.short_name_ka || r.character_id }));
     // გლობალური თვიური ბიუჯეტი (FIXES_ROUND2 §3)
     const g = globalStatus(store, cfg);
     const proj = projectedMonthEnd(g.spent_usd);
     res.json({
-      totals, top_characters: top, period: cfg.limits.period, period_key: key, mock: cfg.gemini.mock,
+      totals, top_characters: top, long_replies: longReplies, period: cfg.limits.period, period_key: key, mock: cfg.gemini.mock,
       budget: {
         ...g,
         ...proj,

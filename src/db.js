@@ -65,6 +65,7 @@ export function openDb(dbPath) {
   addColumn('messages', 'user_name', 'TEXT');              // §1
   addColumn('messages', 'proofread_original', 'TEXT');     // §4 — პასუხი კორექტურამდე (თუ შეიცვალა)
   addColumn('messages', 'proofread_changed', 'INTEGER NOT NULL DEFAULT 0');
+  addColumn('messages', 'long_reply', 'INTEGER NOT NULL DEFAULT 0');          // Round 4 §9 — > 3 წინადადება
 
   // ინსტალაციის საიდუმლო: ადმინის cookie-ს ხელმოწერა და IP-ს ჰეში. რეპოში არასდროს ხვდება.
   let row = db.prepare('SELECT value FROM meta WHERE key = ?').get('secret');
@@ -81,8 +82,8 @@ export function openDb(dbPath) {
       INSERT INTO clients (client_id, first_seen, last_seen, user_agent, ip_hash) VALUES (@client_id, @now, @now, @ua, @ip)
       ON CONFLICT(client_id) DO UPDATE SET last_seen = @now, user_agent = COALESCE(@ua, user_agent), ip_hash = COALESCE(@ip, ip_hash)`),
     insertMessage: db.prepare(`
-      INSERT INTO messages (client_id, character_id, spoken_by, role, content, lang_guess, input_tokens, output_tokens, season, cycle, created_at, user_name, proofread_original, proofread_changed)
-      VALUES (@client_id, @character_id, @spoken_by, @role, @content, @lang_guess, @input_tokens, @output_tokens, @season, @cycle, @created_at, @user_name, @proofread_original, @proofread_changed)`),
+      INSERT INTO messages (client_id, character_id, spoken_by, role, content, lang_guess, input_tokens, output_tokens, season, cycle, created_at, user_name, proofread_original, proofread_changed, long_reply)
+      VALUES (@client_id, @character_id, @spoken_by, @role, @content, @lang_guess, @input_tokens, @output_tokens, @season, @cycle, @created_at, @user_name, @proofread_original, @proofread_changed, @long_reply)`),
     setClientName: db.prepare('UPDATE clients SET user_name = ? WHERE client_id = ?'),
     getUsage: db.prepare('SELECT * FROM usage WHERE client_id = ? AND period_key = ?'),
     addUsage: db.prepare(`
@@ -111,7 +112,7 @@ export function openDb(dbPath) {
     logMessage(m) {
       stmts.insertMessage.run({
         spoken_by: null, lang_guess: null, input_tokens: 0, output_tokens: 0, season: null, cycle: null, created_at: now(),
-        user_name: null, proofread_original: null, proofread_changed: 0, ...m,
+        user_name: null, proofread_original: null, proofread_changed: 0, long_reply: 0, ...m,
       });
     },
     setClientName(clientId, name) { if (name) stmts.setClientName.run(name, clientId); },

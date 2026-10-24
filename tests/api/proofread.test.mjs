@@ -92,6 +92,30 @@ test('§4 უცვლელი / უარყოფილი / შეცდო�
   mode = 'fix';
 });
 
+test('Round 4 §9: > 3 წინადადებიანი პასუხი სრულად მიდის, მაგრამ long_reply = 1 და ადმინის „ზედმეტად გრძელი პასუხები“-ში ჩანს', async () => {
+  const LONG = 'ძალიან კარგი.\nხვალ კომისიაა.\nზეგ ბანკში ვარ.\nმერე შვებულებაში მივდივარ.\nაბა, კარგად.';
+  const saved = fake.models.generateContentStream;
+  fake.models.generateContentStream = async () => (async function* s() { yield { text: LONG }; yield { text: '', usageMetadata: { promptTokenCount: 10, candidatesTokenCount: 20 } }; }());
+  mode = 'same';
+  const jar = cookieJar();
+  const r = await chat(S.base, { characterId: 'director', messages: userMsg('ხვალ მოვიდე?'), gameState: GS }, { jar });
+  fake.models.generateContentStream = saved;
+  mode = 'fix';
+  assert.equal(r.reply, LONG, 'სრულად სტრიმდება');
+  const row = S.store.db.prepare("SELECT long_reply FROM messages WHERE client_id = ? AND role = 'assistant' ORDER BY id DESC LIMIT 1").get(jar.get('tianshani_cid'));
+  assert.equal(row.long_reply, 1);
+  // მოკლე პასუხი — 0
+  const jar2 = cookieJar();
+  await chat(S.base, { characterId: 'vaso', messages: userMsg('როგორ ხართ?'), gameState: GS }, { jar: jar2 });
+  assert.equal(S.store.db.prepare("SELECT long_reply FROM messages WHERE client_id = ? AND role = 'assistant' ORDER BY id DESC LIMIT 1").get(jar2.get('tianshani_cid')).long_reply, 0);
+  const aj = cookieJar();
+  aj.store(await fetch(`${S.base}/api/admin/login`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password: 'test-admin-pass' }) }));
+  const st = await (await fetch(`${S.base}/api/admin/stats`, { headers: { cookie: aj.header() } })).json();
+  const d = st.long_replies.find((x) => x.character_id === 'director');
+  assert.ok(d && d.n >= 1 && d.name === 'ვაჟა ზაზაევიჩი', JSON.stringify(st.long_replies));
+  assert.ok(!st.long_replies.some((x) => x.character_id === 'vaso'));
+});
+
 test('§4 არაქართული ან მოკლე პასუხი — კორექტურა არ ეშვება', async () => {
   const n = proofCalls.length;
   const saved = fake.models.generateContentStream;

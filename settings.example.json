@@ -12,7 +12,7 @@
     "api_key": "PASTE_YOUR_KEY",
     "model": "gemini-3.8-flash",
     "temperature": 0.8,
-    "max_output_tokens": 250,
+    "max_output_tokens": 180,
     "request_timeout_ms": 60000,
     "thinking_budget": 0,
     "proofread": true,
@@ -37,8 +37,9 @@
   },
 
   "chat": {
-    "_comment": "history_window — რამდენი ბოლო შეტყობინება გაეგზავნოს მოდელს თითო მოთხოვნაზე.",
-    "history_window": 20
+    "_comment": "history_window — რამდენი ბოლო შეტყობინება გაეგზავნოს მოდელს თითო მოთხოვნაზე. trim_long_replies — 3 წინადადებაზე გრძელი პასუხი (რემარკების გარეშე) მაინც სრულად ჩანს, მაგრამ ლოგში WARN-ად იწერება და ადმინში „ზედმეტად გრძელი პასუხები“ ითვლება პერსონაჟების მიხედვით (false — გამორთვა).",
+    "history_window": 20,
+    "trim_long_replies": true
   },
 
   "game": {
