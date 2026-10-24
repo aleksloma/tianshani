@@ -106,11 +106,12 @@ test('უხილავი: ვინც ჩატში დაიწყო, �
   const { proxyMap } = await import('../../src/characters.js');
   const pref = proxyMap.givi[0];
   let same = 0;
-  for (let i = 0; i < 30; i++) {
+  // 100 ცდა (ადრე 30 — ~10%-იანი შემთხვევითი ჩავარდნა); მოსალოდნელი ≥ 0.7 + 0.3/n, ზღვარი 60
+  for (let i = 0; i < 100; i++) {
     const r = await chat(S.base, { characterId: 'givi', messages: userMsg('ისევ მე ვარ'), gameState: GS, lastSpokenBy: pref });
     if (r.done.spoken_by === pref) same++;
   }
-  assert.ok(same >= 18, `same=${same}/30`);
+  assert.ok(same >= 60, `same=${same}/100`);
 });
 
 test('client id: cookie პრიორიტეტულია X-Client-Id ჰედერზე; ჰედერი გამოიყენება cookie-ს გარეშე', async () => {

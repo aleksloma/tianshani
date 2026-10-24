@@ -2,6 +2,7 @@
 import { world, byId, meta, famousRollCall } from './characters.js';
 import { derive, dateFor, formatDateEn, clampDay, dayFromSeason, SEASON_KA } from '../public/js/calendar.js';
 import { pacingLine, LENGTH_CAP_LINE, redirectGateLine } from './pacing.js';
+import { forbiddenDialectFor } from './proofread.js';
 
 export { SEASON_KA };
 
@@ -169,6 +170,11 @@ export function characterBlock(c) {
     `Personality: ${p.personality || ''}`,
     `Speech style: ${p.speech_style || ''}`,
   ];
+  // Round 3 §4: სხვისი კილო — არა (ვასოს „გაცხარებისას იმერული კილო“ ინტონაციაა, თამარის „რავა/ბოშო/ქე“ — არა)
+  const forbidden = forbiddenDialectFor(c);
+  if (forbidden.length) {
+    lines.push(`Dialect forms you must NOT use — they are another character's (Tamari's) signature Imeretian speech, not yours: ${forbidden.map((w) => `„${w}“`).join(', ')}. Use the standard forms (როგორ, რანაირად, შენ/თქვენ, აქვთ). Any regional flavour in your speech style shows in tone and in your own listed words only.`);
+  }
   if (c.address_forms) {
     lines.push('', '## Address forms', ...Object.entries(c.address_forms).map(([k, v]) => `${k}: ${v}`));
   }

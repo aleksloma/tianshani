@@ -2,6 +2,32 @@
 import { test, expect } from '@playwright/test';
 import { openWall, openFrame, send, storage, frameRects, settle, e2eStore, SHOTS } from './helpers.js';
 
+// ---------- §6 დამატებითი ზომები (სქრინშოტები): 390×844 ტელეფონი, 768×1024 პლანშეტი ----------
+
+for (const [w, h, n] of [[390, 844, 6], [768, 1024, 9]]) {
+  test.describe(`§6 ${w}×${h}`, () => {
+    test.use({ viewport: { width: w, height: h }, isMobile: true, hasTouch: true });
+    test(`§6 ${w}×${h}: ${n} ჩარჩო, გადაფარვის გარეშე, ზოლი ერთ რიგში`, async ({ page }) => {
+      await openWall(page);
+      await settle(page);
+      const R = await frameRects(page);
+      expect(R.frames).toHaveLength(n);
+      for (let i = 0; i < R.frames.length; i++) {
+        for (let j = i + 1; j < R.frames.length; j++) {
+          const a = R.frames[i]; const b = R.frames[j];
+          expect(a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h, `${a.id}×${b.id}`).toBe(false);
+        }
+        expect(R.frames[i].x + R.frames[i].w).toBeLessThanOrEqual(w);
+      }
+      // სათაური და ინდიკატორები ერთ რიგში (mock ბანერი — ცალკე ხაზი)
+      const t = await page.locator('h1.title').boundingBox();
+      const s = await page.locator('#stat-tokens').boundingBox();
+      expect(Math.abs((t.y + t.height / 2) - (s.y + s.height / 2))).toBeLessThan(20);
+      await page.screenshot({ path: `${SHOTS}/R3-06-wall-${w}.png`, fullPage: true });
+    });
+  });
+}
+
 // ---------- §4 კორექტურა: { replace } — ბუშტი ჩუმად იცვლება ----------
 
 test('§4 { replace }: ბუშტი სრულად იკითხება, მერე იგივე ბუშტში ჩუმად ჩანაცვლდება; ისტორიაში შესწორებული ტექსტია', async ({ page }) => {

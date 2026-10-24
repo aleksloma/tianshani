@@ -88,7 +88,20 @@ test('§2 applyChatClose: შეტყობინების გარეშ�
 
 // ---------- §4 ----------
 import { NON_WORDS, findNonWords } from '../../src/georgian.js';
-import { allowlistFor, proofreadInstruction, shouldProofread, acceptCorrection, FILM_LEXICON } from '../../src/proofread.js';
+import { allowlistFor, proofreadInstruction, shouldProofread, acceptCorrection, FILM_LEXICON, forbiddenDialectFor } from '../../src/proofread.js';
+
+test('§4 სხვისი კილო: ვასოს „რავა/ბოშო/ქე“ ეკრძალება (პრომპტშიც, კორექტორშიც); თამარს — არა', () => {
+  assert.deepEqual(forbiddenDialectFor(byId.tamari), []);
+  const v = forbiddenDialectFor(byId.vaso);
+  for (const w of ['რავა', 'რაფერ', 'ბოშო', 'ქე', 'გაქვენ', 'ისთევლე']) assert.ok(v.includes(w), w);
+  const sv = buildPrompt({ speaker: byId.vaso, gameState: GS0, cfg: CFG }).systemInstruction;
+  assert.ok(sv.includes('Dialect forms you must NOT use') && sv.includes('„რავა“'));
+  const st = buildPrompt({ speaker: byId.tamari, gameState: GS0, cfg: CFG }).systemInstruction;
+  assert.ok(!st.includes('Dialect forms you must NOT use'));
+  const ins = proofreadInstruction(allowlistFor(byId.vaso), v);
+  assert.ok(ins.includes('do not belong to this speaker') && ins.includes('რავა'));
+  assert.ok(!proofreadInstruction(allowlistFor(byId.tamari), []).includes('do not belong'));
+});
 import { MOCK_STRINGS } from '../../src/mock.js';
 import { ABSENCE_FACTS_KA } from '../../src/prompt.js';
 import { diffWords } from '../../public/js/diff.js';

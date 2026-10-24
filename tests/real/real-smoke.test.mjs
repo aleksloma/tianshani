@@ -127,6 +127,8 @@ test('რეალური API (Round 3 §4): ვასო ×3, თამარ
     assert.equal(row.content, final, 'ლოგში — საბოლოო ტექსტი');
     if (replaced) { assert.equal(row.proofread_original, r.reply); assert.equal(row.proofread_changed, 1); }
     assert.doesNotMatch(final, /ჩემო სოსო/, `მომხმარებელს სოსოს ეძახის: ${final}`);
+    // ვასოს პირში თამარის იმერული ფორმები არ უნდა იყოს (FIXES_ROUND3 §4 — „რავა ვიქნები“)
+    if (id === 'vaso') assert.doesNotMatch(final, /(^|[^ა-ჰ])(რავა|რაფერ|ბოშო|ისთევლე)([^ა-ჰ]|$)/, `ვასო სხვის კილოზე: ${final}`);
   }
 });
 

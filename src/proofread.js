@@ -43,12 +43,28 @@ export function allowlistFor(speaker) {
   return [...set];
 }
 
+/** დიალექტური (იმერული) ფორმები, რომლებიც მონაცემებში მხოლოდ თამარს აქვს ჩამოწერილი. */
+export const DIALECT_FORMS = ['რავა', 'რაფერ', 'ბოშო', 'ქე', 'გაქვენ', 'ისთევლე'];
+
+/**
+ * ამ პერსონაჟისთვის აკრძალული დიალექტური ფორმები (Round 3 §4: ვასომ „რავა ვიქნები“ თქვა, თუმცა ეს თამარის მეტყველებაა).
+ * ვისაც საკუთარ მონაცემებში ≥ 2 ასეთი ფორმა უწერია (თამარი) — მისი კილოა, არაფერი იკრძალება.
+ */
+export function forbiddenDialectFor(speaker) {
+  const own = new Set(allowlistFor(speaker));
+  const mine = DIALECT_FORMS.filter((w) => own.has(w));
+  return mine.length >= 2 ? [] : DIALECT_FORMS.filter((w) => !own.has(w));
+}
+
 /** კორექტორის ინსტრუქცია (სპეცის ტექსტი + დაშვებულთა სია). */
-export function proofreadInstruction(allowlist) {
-  return [
+export function proofreadInstruction(allowlist, forbidden = []) {
+  const lines = [
     `Proofread this Georgian text. Fix only spelling, grammar, case endings and non-existent words. Keep all names, dialect words from this list [${allowlist.join(', ')}], stage directions in asterisks, line breaks and meaning exactly as they are. Return only the corrected text.`,
-    'Do not add, remove or reorder sentences. Do not translate. Do not add quotes, comments or explanations. If nothing needs fixing, return the text unchanged.',
-  ].join('\n');
+  ];
+  // სხვისი კილო ამ პერსონაჟის პირში — სტანდარტული ფორმით (მაგ. ვასოს „რავა“ → „როგორ“)
+  if (forbidden.length) lines.push(`These dialect forms do not belong to this speaker — replace each with its standard literary Georgian equivalent: ${forbidden.join(', ')}.`);
+  lines.push('Do not add, remove or reorder sentences. Do not translate. Do not add quotes, comments or explanations. If nothing needs fixing, return the text unchanged.');
+  return lines.join('\n');
 }
 
 /** ჩართულია? mock-ში — არა; gemini.proofread: false — არა; < 3 სიტყვა ან არაქართული პასუხი — არა. */
@@ -98,7 +114,7 @@ export async function proofread({ cfg, text, speaker, replyTokens = 0, signal = 
   const signals = [AbortSignal.timeout(timeoutMs), ...(signal ? [signal] : [])];
   const r = await geminiGenerate({
     cfg,
-    systemInstruction: proofreadInstruction(allow),
+    systemInstruction: proofreadInstruction(allow, forbiddenDialectFor(speaker)),
     contents: [{ role: 'user', content: text }],
     temperature: 0,
     maxOutputTokens,
