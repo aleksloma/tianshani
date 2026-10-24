@@ -1,7 +1,7 @@
-// კედლის განლაგება — სუფთა ფუნქციები (DOM-ის გარეშე), რომ Node-ის unit ტესტებმაც გამოიყენონ.
-// ჩარჩოები შემთხვევით, seed-ით: არა ბადეზე, არა სიმეტრიულად; collision check rotate-ის შემდეგი bounding box-ით.
+// áƒ™áƒ”áƒ“áƒšáƒ˜áƒ¡ áƒ’áƒáƒœáƒšáƒáƒ’áƒ”áƒ‘áƒ â€” áƒ¡áƒ£áƒ¤áƒ—áƒ áƒ¤áƒ£áƒœáƒ¥áƒªáƒ˜áƒ”áƒ‘áƒ˜ (DOM-áƒ˜áƒ¡ áƒ’áƒáƒ áƒ”áƒ¨áƒ”), áƒ áƒáƒ› Node-áƒ˜áƒ¡ unit áƒ¢áƒ”áƒ¡áƒ¢áƒ”áƒ‘áƒ›áƒáƒª áƒ’áƒáƒ›áƒáƒ˜áƒ§áƒ”áƒœáƒáƒœ.
+// áƒ©áƒáƒ áƒ©áƒáƒ”áƒ‘áƒ˜ áƒ¨áƒ”áƒ›áƒ—áƒ®áƒ•áƒ”áƒ•áƒ˜áƒ—, seed-áƒ˜áƒ—: áƒáƒ áƒ áƒ‘áƒáƒ“áƒ”áƒ–áƒ”, áƒáƒ áƒ áƒ¡áƒ˜áƒ›áƒ”áƒ¢áƒ áƒ˜áƒ£áƒšáƒáƒ“; collision check rotate-áƒ˜áƒ¡ áƒ¨áƒ”áƒ›áƒ“áƒ”áƒ’áƒ˜ bounding box-áƒ˜áƒ—.
 
-/** დეტერმინისტული PRNG (mulberry32). */
+/** áƒ“áƒ”áƒ¢áƒ”áƒ áƒ›áƒ˜áƒœáƒ˜áƒ¡áƒ¢áƒ£áƒšáƒ˜ PRNG (mulberry32). */
 export function mulberry32(seed) {
   let a = seed >>> 0;
   return function rnd() {
@@ -12,13 +12,13 @@ export function mulberry32(seed) {
   };
 }
 
-/** ბზარის მე-3/4 საფეხურზე ჩარჩო კიდევ ~3°-ით იხრება — ამ მარაგს წინასწარ ვითვალისწინებთ, რომ მაშინაც არაფერი გადაიფაროს. */
+/** áƒ‘áƒ–áƒáƒ áƒ˜áƒ¡ áƒ›áƒ”-3/4 áƒ¡áƒáƒ¤áƒ”áƒ®áƒ£áƒ áƒ–áƒ” áƒ©áƒáƒ áƒ©áƒ áƒ™áƒ˜áƒ“áƒ”áƒ• ~3Â°-áƒ˜áƒ— áƒ˜áƒ®áƒ áƒ”áƒ‘áƒ â€” áƒáƒ› áƒ›áƒáƒ áƒáƒ’áƒ¡ áƒ¬áƒ˜áƒœáƒáƒ¡áƒ¬áƒáƒ  áƒ•áƒ˜áƒ—áƒ•áƒáƒšáƒ˜áƒ¡áƒ¬áƒ˜áƒœáƒ”áƒ‘áƒ—, áƒ áƒáƒ› áƒ›áƒáƒ¨áƒ˜áƒœáƒáƒª áƒáƒ áƒáƒ¤áƒ”áƒ áƒ˜ áƒ’áƒáƒ“áƒáƒ˜áƒ¤áƒáƒ áƒáƒ¡. */
 export const TILT_RESERVE_DEG = 3;
 export const MIN_ROT = 5;
 export const MAX_ROT = 10;
 export const MOBILE_BREAKPOINT = 700;
 
-/** ზომის კლასი (Round 3 §5/§6) — CSS-ის media query-ებთან ერთად: phone < 700 ≤ tablet < 900 ≤ desktop. */
+/** áƒ–áƒáƒ›áƒ˜áƒ¡ áƒ™áƒšáƒáƒ¡áƒ˜ (Round 3 Â§5/Â§6) â€” CSS-áƒ˜áƒ¡ media query-áƒ”áƒ‘áƒ—áƒáƒœ áƒ”áƒ áƒ—áƒáƒ“: phone < 700 â‰¤ tablet < 900 â‰¤ desktop. */
 export const PHONE_MAX = 699;
 export const TABLET_MAX = 899;
 export function sizeClass(width) {
@@ -27,7 +27,7 @@ export function sizeClass(width) {
   return 'desktop';
 }
 
-/** w×h მართკუთხედის bounding box deg გრადუსით მობრუნების შემდეგ. */
+/** wÃ—h áƒ›áƒáƒ áƒ—áƒ™áƒ£áƒ—áƒ®áƒ”áƒ“áƒ˜áƒ¡ bounding box deg áƒ’áƒ áƒáƒ“áƒ£áƒ¡áƒ˜áƒ— áƒ›áƒáƒ‘áƒ áƒ£áƒœáƒ”áƒ‘áƒ˜áƒ¡ áƒ¨áƒ”áƒ›áƒ“áƒ”áƒ’. */
 export function rotatedSize(w, h, deg) {
   const r = (Math.abs(deg) * Math.PI) / 180;
   const c = Math.cos(r);
@@ -35,12 +35,12 @@ export function rotatedSize(w, h, deg) {
   return { bw: w * c + h * s, bh: w * s + h * c };
 }
 
-/** ორი მართკუთხედი ({x,y,w,h}) ეხება თუ არა ერთმანეთს gap დაშორების გათვალისწინებით. */
+/** áƒáƒ áƒ˜ áƒ›áƒáƒ áƒ—áƒ™áƒ£áƒ—áƒ®áƒ”áƒ“áƒ˜ ({x,y,w,h}) áƒ”áƒ®áƒ”áƒ‘áƒ áƒ—áƒ£ áƒáƒ áƒ áƒ”áƒ áƒ—áƒ›áƒáƒœáƒ”áƒ—áƒ¡ gap áƒ“áƒáƒ¨áƒáƒ áƒ”áƒ‘áƒ˜áƒ¡ áƒ’áƒáƒ—áƒ•áƒáƒšáƒ˜áƒ¡áƒ¬áƒ˜áƒœáƒ”áƒ‘áƒ˜áƒ—. */
 export function rectsOverlap(a, b, gap = 0) {
   return a.x < b.x + b.w + gap && b.x < a.x + a.w + gap && a.y < b.y + b.h + gap && b.y < a.y + a.h + gap;
 }
 
-/** ზომის კლასი რანგით: 0 დიდი, 1 საშუალო, 2 პატარა. */
+/** áƒ–áƒáƒ›áƒ˜áƒ¡ áƒ™áƒšáƒáƒ¡áƒ˜ áƒ áƒáƒœáƒ’áƒ˜áƒ—: 0 áƒ“áƒ˜áƒ“áƒ˜, 1 áƒ¡áƒáƒ¨áƒ£áƒáƒšáƒ, 2 áƒžáƒáƒ¢áƒáƒ áƒ. */
 export function tierForRank(rank, total) {
   if (rank < Math.max(2, Math.round(total * 0.25))) return 0;
   if (rank < Math.round(total * 0.6)) return 1;
@@ -48,32 +48,34 @@ export function tierForRank(rank, total) {
 }
 
 const BASE_W = { desktop: [205, 168, 140], mobile: [128, 108, 92] };
-export const FRAME_ASPECT = 1.42; // სიმაღლე / სიგანე (ფოტო + ფირფიტა)
+export const FRAME_ASPECT = 1.42; // áƒ¡áƒ˜áƒ›áƒáƒ¦áƒšáƒ” / áƒ¡áƒ˜áƒ’áƒáƒœáƒ” (áƒ¤áƒáƒ¢áƒ + áƒ¤áƒ˜áƒ áƒ¤áƒ˜áƒ¢áƒ)
 
 /**
- * მთავარი ალგორითმი.
+ * áƒ›áƒ—áƒáƒ•áƒáƒ áƒ˜ áƒáƒšáƒ’áƒáƒ áƒ˜áƒ—áƒ›áƒ˜.
  * @param {object} p
- * @param {number} p.width  — კედლის სიგანე
- * @param {number} p.height — ხილული სიმაღლე (თუ არ ჩაეტია, კედელი ქვემოთ იზრდება → სქროლი)
- * @param {Array<{id:string, rank:number}>} p.items — კონტენტის ქულის კლებით
+ * @param {number} p.width  â€” áƒ™áƒ”áƒ“áƒšáƒ˜áƒ¡ áƒ¡áƒ˜áƒ’áƒáƒœáƒ”
+ * @param {number} p.height â€” áƒ®áƒ˜áƒšáƒ£áƒšáƒ˜ áƒ¡áƒ˜áƒ›áƒáƒ¦áƒšáƒ” (áƒ—áƒ£ áƒáƒ  áƒ©áƒáƒ”áƒ¢áƒ˜áƒ, áƒ™áƒ”áƒ“áƒ”áƒšáƒ˜ áƒ¥áƒ•áƒ”áƒ›áƒáƒ— áƒ˜áƒ–áƒ áƒ“áƒ”áƒ‘áƒ â†’ áƒ¡áƒ¥áƒ áƒáƒšáƒ˜)
+ * @param {Array<{id:string, rank:number}>} p.items â€” áƒ™áƒáƒœáƒ¢áƒ”áƒœáƒ¢áƒ˜áƒ¡ áƒ¥áƒ£áƒšáƒ˜áƒ¡ áƒ™áƒšáƒ”áƒ‘áƒ˜áƒ—
  * @param {number} p.seed
  * @param {number} [p.headerHeight]
- * @param {(W:number,H:number)=>Array<{x,y,w,h,name?}>} [p.zones] — აკრძალული ზონები (ღილაკები, დაფა)
+ * @param {(W:number,H:number)=>Array<{x,y,w,h,name?}>} [p.zones] â€” áƒáƒ™áƒ áƒ«áƒáƒšáƒ£áƒšáƒ˜ áƒ–áƒáƒœáƒ”áƒ‘áƒ˜ (áƒ¦áƒ˜áƒšáƒáƒ™áƒ”áƒ‘áƒ˜, áƒ“áƒáƒ¤áƒ)
  */
-export function computeLayout({ width, height, items, seed, headerHeight = 0, zones = () => [] }) {
+export function computeLayout({ width, height, items, seed, headerHeight = 0, zones = () => [], sizeClass: cls = null }) {
+  // Round 3 Â§6: áƒ•áƒ˜áƒ¬áƒ áƒ áƒ”áƒ™áƒ áƒáƒœáƒ”áƒ‘áƒ¡ (phone/tablet) áƒ¡áƒáƒ™áƒ£áƒ—áƒáƒ áƒ˜, áƒ™áƒáƒ›áƒžáƒáƒ¥áƒ¢áƒ£áƒ áƒ˜ áƒ’áƒáƒœáƒšáƒáƒ’áƒ”áƒ‘áƒ áƒáƒ¥áƒ•áƒ¡; áƒ“áƒ”áƒ¡áƒ™áƒ¢áƒáƒžáƒ˜áƒ¡ áƒ’áƒ–áƒ áƒ£áƒªáƒ•áƒšáƒ”áƒšáƒ˜áƒ
+  if (cls === 'phone' || cls === 'tablet') return computeSlotLayout({ width, height, items, seed, headerHeight, zones, sizeClass: cls });
   const W = Math.max(280, Math.floor(width));
   const mobile = W < MOBILE_BREAKPOINT;
   const gap = mobile ? 12 : 24;
   const margin = mobile ? 10 : 18;
   const base = mobile ? BASE_W.mobile : BASE_W.desktop;
-  // განსაკუთრებული ელემენტები (მაგ. ნახატი): საკუთარი ზომა/პროპორცია/გადახრა — { size: {w, mw, aspect}, rot: [min, max] }
+  // áƒ’áƒáƒœáƒ¡áƒáƒ™áƒ£áƒ—áƒ áƒ”áƒ‘áƒ£áƒšáƒ˜ áƒ”áƒšáƒ”áƒ›áƒ”áƒœáƒ¢áƒ”áƒ‘áƒ˜ (áƒ›áƒáƒ’. áƒœáƒáƒ®áƒáƒ¢áƒ˜): áƒ¡áƒáƒ™áƒ£áƒ—áƒáƒ áƒ˜ áƒ–áƒáƒ›áƒ/áƒžáƒ áƒáƒžáƒáƒ áƒªáƒ˜áƒ/áƒ’áƒáƒ“áƒáƒ®áƒ áƒ â€” { size: {w, mw, aspect}, rot: [min, max] }
   const special = items.filter((it) => it.size);
   const plain = items.filter((it) => !it.size);
   const total = plain.length;
   const tiers = plain.map((it) => tierForRank(it.rank, total));
   const specialW = (it) => (mobile ? it.size.mw || it.size.w * 0.65 : it.size.w);
 
-  // მასშტაბი: დესკტოპზე ჩარჩოები კედლის ~26%-ს იკავებს; მობილურზე სიგანით
+  // áƒ›áƒáƒ¡áƒ¨áƒ¢áƒáƒ‘áƒ˜: áƒ“áƒ”áƒ¡áƒ™áƒ¢áƒáƒžáƒ–áƒ” áƒ©áƒáƒ áƒ©áƒáƒ”áƒ‘áƒ˜ áƒ™áƒ”áƒ“áƒšáƒ˜áƒ¡ ~26%-áƒ¡ áƒ˜áƒ™áƒáƒ•áƒ”áƒ‘áƒ¡; áƒ›áƒáƒ‘áƒ˜áƒšáƒ£áƒ áƒ–áƒ” áƒ¡áƒ˜áƒ’áƒáƒœáƒ˜áƒ—
   const sumArea = (tiers.reduce((n, t) => n + base[t] * base[t] * FRAME_ASPECT, 0)
     + special.reduce((n, it) => n + specialW(it) ** 2 * it.size.aspect, 0)) || 1;
   const usable = W * Math.max(200, height - headerHeight);
@@ -81,7 +83,7 @@ export function computeLayout({ width, height, items, seed, headerHeight = 0, zo
     ? Math.min(1.15, Math.max(0.8, W / 400))
     : Math.min(1.3, Math.max(0.55, Math.sqrt((0.26 * usable) / sumArea)));
 
-  // განსაკუთრებულები და დიდები ჯერ — ასე უფრო მეტი ადგილი რჩება
+  // áƒ’áƒáƒœáƒ¡áƒáƒ™áƒ£áƒ—áƒ áƒ”áƒ‘áƒ£áƒšáƒ”áƒ‘áƒ˜ áƒ“áƒ áƒ“áƒ˜áƒ“áƒ”áƒ‘áƒ˜ áƒ¯áƒ”áƒ  â€” áƒáƒ¡áƒ” áƒ£áƒ¤áƒ áƒ áƒ›áƒ”áƒ¢áƒ˜ áƒáƒ“áƒ’áƒ˜áƒšáƒ˜ áƒ áƒ©áƒ”áƒ‘áƒ
   const order = [
     ...special.map((it) => ({ ...it, tier: -1 })),
     ...plain.map((it, i) => ({ ...it, tier: tiers[i] })).sort((a, b) => a.tier - b.tier || a.rank - b.rank),
@@ -112,7 +114,7 @@ export function computeLayout({ width, height, items, seed, headerHeight = 0, zo
             break;
           }
         }
-        if (!found) { w *= 0.92; h *= 0.92; } // 200 ცდაში ვერ — ოდნავ ვამცირებთ
+        if (!found) { w *= 0.92; h *= 0.92; } // 200 áƒªáƒ“áƒáƒ¨áƒ˜ áƒ•áƒ”áƒ  â€” áƒáƒ“áƒœáƒáƒ• áƒ•áƒáƒ›áƒªáƒ˜áƒ áƒ”áƒ‘áƒ—
       }
       if (!found) { ok = false; break; }
       const cx = found.x + found.w / 2;
@@ -123,12 +125,135 @@ export function computeLayout({ width, height, items, seed, headerHeight = 0, zo
       });
     }
     if (ok) return { width: W, height: H, mobile, gap, frames: placed, zones: reserved, seed };
-    H = Math.round(H + Math.max(240, height * 0.25)); // არ ჩაეტია — კედელი იზრდება ქვემოთ
+    H = Math.round(H + Math.max(240, height * 0.25)); // áƒáƒ  áƒ©áƒáƒ”áƒ¢áƒ˜áƒ â€” áƒ™áƒ”áƒ“áƒ”áƒšáƒ˜ áƒ˜áƒ–áƒ áƒ“áƒ”áƒ‘áƒ áƒ¥áƒ•áƒ”áƒ›áƒáƒ—
   }
-  throw new Error('layout: ადგილი ვერ მოიძებნა');
+  throw new Error('layout: áƒáƒ“áƒ’áƒ˜áƒšáƒ˜ áƒ•áƒ”áƒ  áƒ›áƒáƒ˜áƒ«áƒ”áƒ‘áƒœáƒ');
 }
 
-/** ტესტებისა და დებაგისთვის: ხომ არ ფარავს რამე რამეს. */
+/**
+ * áƒ•áƒ˜áƒ¬áƒ áƒ áƒ”áƒ™áƒ áƒáƒœáƒ˜áƒ¡ áƒžáƒ áƒáƒ¤áƒ˜áƒšáƒ”áƒ‘áƒ˜ (Round 3 Â§6). áƒ¡áƒ˜áƒ’áƒáƒœáƒ”áƒ”áƒ‘áƒ˜ â€” W-áƒ˜áƒ¡ áƒ¬áƒ˜áƒšáƒ˜ áƒ–áƒáƒ›áƒ˜áƒ¡ áƒ™áƒšáƒáƒ¡áƒ˜áƒ¡ áƒ›áƒ˜áƒ®áƒ”áƒ“áƒ•áƒ˜áƒ— (áƒ“áƒ˜áƒ“áƒ˜/áƒ¡áƒáƒ¨áƒ£áƒáƒšáƒ/áƒžáƒáƒ¢áƒáƒ áƒ).
+ * áƒ¢áƒ”áƒšáƒ”áƒ¤áƒáƒœáƒ–áƒ” áƒ áƒ˜áƒ’áƒ¨áƒ˜ 2 áƒ©áƒáƒ áƒ©áƒáƒ, áƒžáƒšáƒáƒœáƒ¨áƒ”áƒ¢áƒ–áƒ” 3; áƒœáƒáƒ®áƒáƒ¢áƒ˜ áƒ¢áƒ”áƒšáƒ”áƒ¤áƒáƒœáƒ–áƒ” áƒªáƒáƒšáƒ™áƒ” áƒ áƒ˜áƒ’áƒ¨áƒ˜áƒ, áƒžáƒšáƒáƒœáƒ¨áƒ”áƒ¢áƒ–áƒ” 2 áƒ©áƒáƒ áƒ©áƒáƒ¡áƒ—áƒáƒœ áƒ”áƒ áƒ—áƒáƒ“.
+ */
+export const NARROW_PROFILES = {
+  phone: { perRow: 2, frac: [0.40, 0.38, 0.36], paintFrac: 0.54, paintRowSlots: 0, gap: 10, margin: 8, jitter: 5 },
+  tablet: { perRow: 3, frac: [0.27, 0.26, 0.25], paintFrac: 0.34, paintRowSlots: 2, gap: 12, margin: 10, jitter: 8 },
+};
+
+/**
+ * áƒ™áƒáƒ›áƒžáƒáƒ¥áƒ¢áƒ£áƒ áƒ˜ áƒ’áƒáƒœáƒšáƒáƒ’áƒ”áƒ‘áƒ áƒ•áƒ˜áƒ¬áƒ áƒ áƒ”áƒ™áƒ áƒáƒœáƒ–áƒ”: seed-áƒ˜áƒáƒœáƒ˜, â€žáƒ áƒ˜áƒ’áƒ”áƒ‘áƒáƒ“â€œ (áƒ áƒáƒ› ~áƒ”áƒ áƒ— áƒ”áƒ™áƒ áƒáƒœáƒ¨áƒ˜ áƒ©áƒáƒ”áƒ¢áƒ˜áƒáƒ¡), áƒ›áƒáƒ’áƒ áƒáƒ› áƒáƒ áƒ áƒ‘áƒáƒ“áƒ” â€”
+ * áƒ áƒ˜áƒ’áƒ˜áƒ¡ áƒ¨áƒ˜áƒ’áƒœáƒ˜áƒ— áƒáƒ“áƒ’áƒ˜áƒšáƒ”áƒ‘áƒ˜, áƒ™áƒ£áƒ—áƒ®áƒ”áƒ”áƒ‘áƒ˜ (5â€“10Â°), áƒ•áƒ”áƒ áƒ¢áƒ˜áƒ™áƒáƒšáƒ£áƒ áƒ˜ áƒ¬áƒáƒœáƒáƒªáƒ•áƒšáƒ”áƒ‘áƒ áƒ“áƒ áƒ áƒ˜áƒ’áƒ”áƒ‘áƒ¡ áƒ¨áƒáƒ áƒ˜áƒ¡ áƒ“áƒáƒ¨áƒáƒ áƒ”áƒ‘áƒ áƒ¨áƒ”áƒ›áƒ—áƒ®áƒ•áƒ”áƒ•áƒ˜áƒ—áƒ˜áƒ.
+ * áƒ¨áƒ”áƒ›áƒ—áƒ®áƒ•áƒ”áƒ•áƒ˜áƒ— áƒ«áƒ”áƒ‘áƒœáƒáƒ¡ áƒáƒ áƒ˜ ~40%-áƒ˜áƒáƒœáƒ˜ áƒ›áƒáƒ‘áƒ áƒ£áƒœáƒ”áƒ‘áƒ£áƒšáƒ˜ áƒ©áƒáƒ áƒ©áƒ 375px-áƒ¨áƒ˜ áƒ•áƒ”áƒ  â€žáƒžáƒáƒ£áƒšáƒáƒ‘áƒ¡â€œ (áƒ‘áƒáƒ¥áƒ¡áƒ˜ â‰ˆ 1.12â€“1.23 Ã— áƒ¡áƒ˜áƒ’áƒáƒœáƒ”), áƒáƒ›áƒ˜áƒ¢áƒáƒ› áƒ áƒ˜áƒ’áƒ”áƒ‘áƒ˜.
+ */
+export function computeSlotLayout({ width, height, items, seed, headerHeight = 0, zones = () => [], sizeClass: cls }) {
+  const W = Math.max(280, Math.floor(width));
+  const P = NARROW_PROFILES[cls];
+  const rnd = mulberry32(seed);
+  const span = W - 2 * P.margin;
+  const special = items.filter((it) => it.size);
+  const plain = items.filter((it) => !it.size);
+  const total = plain.length;
+
+  // áƒ©áƒáƒ áƒ©áƒáƒ”áƒ‘áƒ˜: áƒ–áƒáƒ›áƒ áƒ áƒáƒœáƒ’áƒ˜áƒ—, áƒ—áƒáƒœáƒ›áƒ˜áƒ›áƒ“áƒ”áƒ•áƒ áƒáƒ‘áƒ â€” seed-áƒ˜áƒáƒœáƒ˜ áƒáƒ áƒ”áƒ•áƒ (Fisherâ€“Yates)
+  const frames = plain.map((it) => {
+    const tier = tierForRank(it.rank, total);
+    return { ...it, tier, w: P.frac[tier] * W, aspect: FRAME_ASPECT, rotRange: [MIN_ROT, MAX_ROT] };
+  });
+  for (let i = frames.length - 1; i > 0; i--) {
+    const j = Math.floor(rnd() * (i + 1));
+    [frames[i], frames[j]] = [frames[j], frames[i]];
+  }
+  const paintings = special.map((it) => ({ ...it, tier: -1, w: P.paintFrac * W, aspect: it.size.aspect, rotRange: it.rot || [MIN_ROT, MAX_ROT] }));
+
+  // áƒ áƒ˜áƒ’áƒ”áƒ‘áƒ˜: áƒžáƒšáƒáƒœáƒ¨áƒ”áƒ¢áƒ–áƒ” áƒœáƒáƒ®áƒáƒ¢áƒ˜áƒ¡ áƒ áƒ˜áƒ’áƒ¨áƒ˜ 2 áƒ©áƒáƒ áƒ©áƒáƒª áƒ¯áƒ“áƒ”áƒ‘áƒ; áƒ“áƒáƒœáƒáƒ áƒ©áƒ”áƒœáƒ˜ áƒ—áƒáƒœáƒáƒ‘áƒ áƒáƒ“ (9 â†’ [áƒœáƒáƒ®áƒáƒ¢áƒ˜+2], 3, 2, 2; áƒ¢áƒ”áƒšáƒ”áƒ¤áƒáƒœáƒ–áƒ” 6 â†’ 2, 2, 2)
+  const take = paintings.length ? Math.min(P.paintRowSlots, frames.length) : 0;
+  const rest = frames.slice(take);
+  const nRows = Math.ceil(rest.length / P.perRow);
+  const rows = [];
+  for (let r = 0, k = 0; r < nRows; r++) {
+    const n = Math.floor(rest.length / nRows) + (r < rest.length % nRows ? 1 : 0);
+    rows.push(rest.slice(k, k + n));
+    k += n;
+  }
+  for (const [pi, p] of paintings.entries()) {
+    const row = [p, ...(pi === 0 ? frames.slice(0, take) : [])];
+    for (let i = row.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [row[i], row[j]] = [row[j], row[i]]; }
+    rows.splice(Math.floor(rnd() * (rows.length + 1)), 0, row);
+  }
+
+  // áƒ—áƒ˜áƒ—áƒ áƒ áƒ˜áƒ’áƒ˜: áƒ™áƒ£áƒ—áƒ®áƒ”áƒ”áƒ‘áƒ˜ â†’ (áƒ—áƒ£ áƒáƒ  áƒ”áƒ¢áƒ”áƒ•áƒ) áƒ™áƒ£áƒ—áƒ®áƒ˜áƒ¡ áƒ–áƒ¦áƒ•áƒáƒ áƒ˜ áƒ˜áƒ™áƒšáƒ”áƒ‘áƒ¡ 5Â°-áƒ›áƒ“áƒ” â†’ (áƒ—áƒ£ áƒ›áƒáƒ˜áƒœáƒª áƒáƒ áƒ) áƒ–áƒáƒ›áƒ áƒ˜áƒ™áƒšáƒ”áƒ‘áƒ¡
+  const laid = rows.map((row) => {
+    const drawn = row.map((it) => {
+      const [a, b] = it.rotRange;
+      return { it, sign: rnd() < 0.5 ? -1 : 1, mag: a + rnd() * (b - a), min: a };
+    });
+    let scale = 1;
+    let t = 1; // 1 → შემთხვევითი კუთხეები; 0 → ყველა მინიმალურზე (5°). პროპორციულად — კუთხეები ერთმანეთისგან განსხვავებული რჩება
+    const fit = () => drawn.map((d) => {
+      const w = d.it.w * scale;
+      const h = w * d.it.aspect;
+      const mag = d.min + (d.mag - d.min) * t;
+      return { ...d, w, h, mag, ...rotatedSize(w, h, mag) };
+    });
+    let cells = fit();
+    const need = () => cells.reduce((n, c) => n + c.bw, 0) + P.gap * (cells.length - 1);
+    while (need() > span && t > 0) { t = Math.max(0, t - 0.05); cells = fit(); }
+    while (need() > span && scale > 0.5) { scale *= 0.96; cells = fit(); }
+    // + jitter: ყველაზე მაღალ ჩარჩოსაც აქვს ვერტიკალური თავისუფლება — რიგი „სწორი ხაზი“ არ არის
+    return { cells, height: Math.max(...cells.map((c) => c.bh)) + P.jitter, free: span - need() };
+  });
+
+  // áƒ•áƒ”áƒ áƒ¢áƒ˜áƒ™áƒáƒšáƒ˜: áƒ áƒ˜áƒ’áƒ”áƒ‘áƒ¡ áƒ¨áƒáƒ áƒ˜áƒ¡ áƒ¨áƒ”áƒ›áƒ—áƒ®áƒ•áƒ”áƒ•áƒ˜áƒ—áƒ˜ áƒ“áƒáƒ¨áƒáƒ áƒ”áƒ‘áƒ; áƒ°áƒáƒ áƒ˜áƒ–áƒáƒœáƒ¢áƒáƒšáƒ˜: áƒ—áƒáƒ•áƒ˜áƒ¡áƒ£áƒ¤áƒáƒšáƒ˜ áƒáƒ“áƒ’áƒ˜áƒšáƒ˜ áƒ™áƒ˜áƒ“áƒ”áƒ”áƒ‘áƒ¡áƒ áƒ“áƒ áƒ©áƒáƒ áƒ©áƒáƒ”áƒ‘áƒ¡ áƒ¨áƒáƒ áƒ˜áƒ¡
+  const gaps = laid.map((_, i) => (i === 0 ? 0 : P.gap));
+  const hx = laid.map((row) => {
+    const wts = Array.from({ length: row.cells.length + 1 }, () => rnd());
+    const sum = wts.reduce((n, x) => n + x, 0) || 1;
+    return wts.map((x) => (row.free * x) / sum);
+  });
+  const vy = laid.map((row) => row.cells.map(() => rnd()));
+  const content = laid.reduce((n, r) => n + r.height, 0) + gaps.reduce((n, g) => n + g, 0);
+
+  /** áƒ’áƒáƒœáƒ—áƒáƒ•áƒ¡áƒ”áƒ‘áƒ áƒ›áƒáƒªáƒ”áƒ›áƒ£áƒšáƒ˜ áƒ“áƒáƒ›áƒáƒ¢áƒ”áƒ‘áƒ˜áƒ—áƒ˜ áƒ“áƒáƒ¨áƒáƒ áƒ”áƒ‘áƒ”áƒ‘áƒ˜áƒ— (extra[i] â€” i-áƒ” áƒ áƒ˜áƒ’áƒ˜áƒ¡ áƒ¬áƒ˜áƒœ). */
+  const place = (extra) => {
+    const out = [];
+    let y = headerHeight + P.margin;
+    laid.forEach((row, ri) => {
+      y += gaps[ri] + extra[ri];
+      let x = P.margin + hx[ri][0];
+      row.cells.forEach((c, ci) => {
+        const box = { x, y: y + vy[ri][ci] * (row.height - c.bh), w: c.bw, h: c.bh }; // áƒ áƒ˜áƒ’áƒ˜áƒ¡ áƒ¨áƒ˜áƒ’áƒœáƒ˜áƒ— áƒ–áƒ”áƒ›áƒáƒ—/áƒ¥áƒ•áƒ”áƒ›áƒáƒ—
+        const cx = box.x + box.w / 2;
+        const cy = box.y + box.h / 2;
+        out.push({ id: c.it.id, tier: c.it.tier, rank: c.it.rank, x: cx - c.w / 2, y: cy - c.h / 2, w: c.w, h: c.h, rotation: c.sign * c.mag, box });
+        x += c.bw + P.gap + hx[ri][ci + 1];
+      });
+      y += row.height;
+    });
+    return out;
+  };
+
+  // áƒ¡áƒ˜áƒ›áƒáƒ¦áƒšáƒ”: áƒ¨áƒ˜áƒ’áƒ—áƒáƒ•áƒ¡áƒ˜ + áƒ¥áƒ•áƒ”áƒ“áƒ áƒ™áƒ£áƒ—áƒ®áƒ”áƒ”áƒ‘áƒ˜áƒ¡ áƒ¦áƒ˜áƒšáƒáƒ™áƒ”áƒ‘áƒ˜ (áƒ›áƒ®áƒáƒšáƒáƒ“ áƒ—áƒ£ áƒ‘áƒáƒšáƒ áƒ áƒ˜áƒ’áƒ˜ áƒ›áƒáƒ— áƒ”áƒ®áƒ”áƒ‘áƒ); áƒ”áƒ™áƒ áƒáƒœáƒ–áƒ” áƒ›áƒáƒ™áƒšáƒ” áƒ™áƒ”áƒ“áƒ”áƒšáƒ˜ â€” áƒ–áƒ”áƒ“áƒ›áƒ”áƒ¢áƒ˜ áƒáƒ“áƒ’áƒ˜áƒšáƒ˜ áƒ áƒ˜áƒ’áƒ”áƒ‘áƒ¡ áƒ¨áƒáƒ áƒ˜áƒ¡
+  const bottom = headerHeight + P.margin + content + P.margin;
+  let H = Math.max(Math.floor(height), Math.ceil(bottom));
+  const extra = laid.map(() => 0);
+  const spread = (amount) => {
+    const wts = laid.map(() => 0.5 + rnd());
+    const sum = wts.reduce((n, x) => n + x, 0);
+    wts.forEach((x, i) => { extra[i] += (amount * x) / sum; });
+  };
+  if (H > bottom) spread(H - bottom);
+  const placed = place(extra);
+  for (let i = 0; i < 3; i++) {
+    const zs = zones(W, H);
+    const depth = Math.max(0, ...placed.flatMap((f) => zs.filter((z) => rectsOverlap(f.box, z, P.gap)).map((z) => f.box.y + f.box.h + P.gap - z.y)));
+    if (!depth) break;
+    H = Math.ceil(H + depth); // áƒ–áƒáƒœáƒ”áƒ‘áƒ˜ áƒ¥áƒ•áƒ”áƒ›áƒáƒ— áƒ˜áƒ¬áƒ”áƒ•áƒ¡ â€” áƒ©áƒáƒ áƒ©áƒáƒ”áƒ‘áƒ˜ áƒáƒ“áƒ’áƒ˜áƒšáƒ–áƒ” áƒ áƒ©áƒ”áƒ‘áƒ
+  }
+
+  const reserved = [{ x: 0, y: 0, w: W, h: headerHeight, name: 'header' }, ...zones(W, H)];
+  return { width: W, height: H, mobile: cls === 'phone', sizeClass: cls, gap: P.gap, frames: placed, zones: reserved, seed };
+}
+
+/** áƒ¢áƒ”áƒ¡áƒ¢áƒ”áƒ‘áƒ˜áƒ¡áƒ áƒ“áƒ áƒ“áƒ”áƒ‘áƒáƒ’áƒ˜áƒ¡áƒ—áƒ•áƒ˜áƒ¡: áƒ®áƒáƒ› áƒáƒ  áƒ¤áƒáƒ áƒáƒ•áƒ¡ áƒ áƒáƒ›áƒ” áƒ áƒáƒ›áƒ”áƒ¡. */
 export function findOverlaps(layout) {
   const out = [];
   const f = layout.frames;

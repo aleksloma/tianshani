@@ -41,7 +41,7 @@ export async function settle(page) {
 export async function frameRects(page) {
   return page.evaluate(() => {
     const r = (el) => { const b = el.getBoundingClientRect(); return { x: b.left + scrollX, y: b.top + scrollY, w: b.width, h: b.height }; };
-    const frames = [...document.querySelectorAll('#frames .frame')].map((el) => {
+    const frames = [...document.querySelectorAll('#frames .frame:not([hidden])')].map((el) => {
       const m = new DOMMatrix(getComputedStyle(el).transform);
       return { id: el.dataset.id, ...r(el), angle: (Math.atan2(m.b, m.a) * 180) / Math.PI };
     });

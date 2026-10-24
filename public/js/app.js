@@ -56,6 +56,8 @@ async function main() {
     $('copies-tip').textContent = notes.length ? notes.join(' · ') : 'ყველა ეგზემპლარი ჯერ ადგილზეა.';
     $('stat-copies').setAttribute('aria-label', `ეგზემპლარი ${copies}. ${$('copies-tip').textContent}`);
     $('cycle-val').textContent = String(game.cycle);
+    // Round 3 §6: ვიწრო ეკრანზე ბზარი/ეგზემპლარი/შენობა მხოლოდ ხის tooltip-შია (ეს ხაზი დესკტოპზე დამალულია)
+    $('season-tip-cycle').textContent = `შენობა №${game.cycle}`;
   }
 
   // --- ტოკენების მთვლელი (Round 2 §1): /api/state ჩატვირთვისას, done ყოველი პასუხის შემდეგ ---
@@ -103,8 +105,13 @@ async function main() {
 
   // --- კედელი, მენიუ, ჩატი ---
   let chat = null;
-  const menu = createOthersMenu({ characters: data.characters, onPick: (id) => (chat.isOpen() ? chat.switchTo(id) : chat.open(id)) });
-  const wall = createWall({
+  let wall = null;
+  const menu = createOthersMenu({
+    characters: data.characters,
+    onPick: (id) => (chat.isOpen() ? chat.switchTo(id) : chat.open(id)),
+    isOnWall: (id) => Boolean(wall?.isOnWall(id)), // ამ ეკრანის ზომაზე (Round 3 §6)
+  });
+  wall = createWall({
     characters: data.characters,
     wallCfg: { ...cfg.wall, layout_seed: cfg.wall.layout_seed + game.cycle },
     onOpen: (id, node) => chat.open(id, node),

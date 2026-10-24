@@ -52,8 +52,10 @@
   },
 
   "wall": {
-    "_comment": "characters_on_wall — რამდენი ჩარჩო ეკიდოს კედელზე (ტოპ N კონტენტის ქულით). layout_seed — განლაგების seed (seed + ციკლის ნომერი → დეტერმინისტული, მაგრამ არეული განლაგება). background_by_stage — კედლის ფოტო ბზარის თითო საფეხურზე (ინდექსი = crackStage 0..4); null → უახლოესი წინა სურათი. მაგ.: [\"assets/wall.jpg\", \"assets/wall_1.jpg\", \"assets/wall_2.jpg\", \"assets/wall_3.jpg\", \"assets/wall_4.jpg\"] — ჩადეთ ფაილები public/assets/-ში და შეავსეთ მასივი; სეზონის ცვლილებაზე ფონი ~1.5 წმ-ში გადადის. კოდის შეცვლა საჭირო არ არის.",
+    "_comment": "characters_on_wall — რამდენი ჩარჩო ეკიდოს კედელზე (ტოპ N კონტენტის ქულით). characters_on_wall_mobile / characters_on_wall_tablet — იგივე ტელეფონზე (< 700px, დეფოლტი 6) და პლანშეტზე (700–899px, დეფოლტი 9); დანარჩენები „ესაუბრე სხვას“ სიაშია. layout_seed — განლაგების seed (seed + ციკლის ნომერი → დეტერმინისტული, მაგრამ არეული განლაგება). background_by_stage — კედლის ფოტო ბზარის თითო საფეხურზე (ინდექსი = crackStage 0..4); null → უახლოესი წინა სურათი. მაგ.: [\"assets/wall.jpg\", \"assets/wall_1.jpg\", \"assets/wall_2.jpg\", \"assets/wall_3.jpg\", \"assets/wall_4.jpg\"] — ჩადეთ ფაილები public/assets/-ში და შეავსეთ მასივი; სეზონის ცვლილებაზე ფონი ~1.5 წმ-ში გადადის. კოდის შეცვლა საჭირო არ არის.",
     "characters_on_wall": 12,
+    "characters_on_wall_mobile": 6,
+    "characters_on_wall_tablet": 9,
     "layout_seed": 1983,
     "background_by_stage": ["assets/wall.jpg", null, null, null, null]
   },

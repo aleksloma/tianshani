@@ -27,6 +27,7 @@
           <span class="tooltip tree-tip" id="season-tip" role="tooltip">
             <span class="tip-date" id="season-tip-date"></span>
             <span class="tip-meta" id="season-tip-meta"></span>
+            <span class="tip-cycle" id="season-tip-cycle"></span>
           </span>
         </button>
         <span class="stat" id="stat-crack" title="ბზარი კედელში"><svg class="ico crack-ico" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1 L7 4 L9 6 L6 9 L8 11 L7 15" fill="none" stroke="currentColor" stroke-width="1.6"/></svg> <span id="crack-val">1/5</span></span>
@@ -53,8 +54,14 @@
 
       <aside id="noticeboard" class="pinned-note" aria-label="განცხადებების დაფა">
         <div class="pin" aria-hidden="true"></div>
-        <h2>განცხადებების დაფა</h2>
-        <ul id="rollcall"></ul>
+        <!-- ვიწრო ეკრანზე (Round 3 §6): დაფა პატარა ფურცლად იკეცება, შეხებით იშლება -->
+        <button type="button" id="noticeboard-toggle" class="note-toggle" aria-expanded="false" aria-controls="noticeboard-body" aria-label="განცხადებების დაფა">
+          <span class="note-lines" aria-hidden="true"></span>
+        </button>
+        <div id="noticeboard-body" class="note-body">
+          <h2>განცხადებების დაფა</h2>
+          <ul id="rollcall"></ul>
+        </div>
       </aside>
 
       <div id="others" class="door-note">

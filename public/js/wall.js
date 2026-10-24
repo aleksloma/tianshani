@@ -1,6 +1,6 @@
 // კედელი: ჩარჩოების რენდერი computeLayout-ის მიხედვით, „ესაუბრე სხვას“ მენიუ, განცხადებების დაფა.
 // Round 2 §7: დახატული SVG ბზარი ამოღებულია — ბზარი ახლა კედლის ფოტოებშია (background.js, wall.background_by_stage).
-import { computeLayout } from './layout.js';
+import { computeLayout, sizeClass } from './layout.js';
 
 export const SILHOUETTE = 'assets/silhouette.svg';
 
@@ -10,11 +10,14 @@ export const PAINTING = { id: 'painting', src: 'assets/painting.webp', size: { w
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 /** ფირფიტაზე გრძელი სიტყვა (მაგ. „მარკშეიდერი“) — შრიფტი მცირდება, სანამ არ ჩაეტევა. */
-export function fitText(el, min = 8.5) {
-  if (!el) return;
+export function fitText(el, min = 8.5, { height = false } = {}) {
+  if (!el || !el.clientWidth) return; // დამალული ჩარჩო — გაზომვა შეუძლებელია
   el.style.fontSize = '';
   let size = parseFloat(getComputedStyle(el).fontSize);
-  while (el.scrollWidth > el.clientWidth + 0.5 && size > min) {
+  // სიგანე (გრძელი სიტყვა); ვიწრო ეკრანზე სიმაღლეც (2 ხაზზე მეტი — line-clamp ჩუმად „…“-ს დაწერდა) — სახელი არასდროს იჭრება.
+  // დესკტოპზე სიმაღლის შემოწმება გამორთულია, რომ დამტკიცებული დესკტოპი პიქსელამდე უცვლელი დარჩეს (Round 3 §6).
+  const over = () => el.scrollWidth > el.clientWidth + 0.5 || (height && el.scrollHeight > el.clientHeight + 0.5);
+  while (over() && size > min) {
     size -= 0.5;
     el.style.fontSize = `${size}px`;
   }
@@ -54,7 +57,7 @@ function frameNode(c) {
 function zonesFor(othersEl, boardEl) {
   return (W, H) => {
     const ob = othersEl.getBoundingClientRect();
-    const bb = boardEl.getBoundingClientRect();
+    const bb = boardEl.getBoundingClientRect(); // ვიწრო ეკრანზე — მხოლოდ დაკეცილი „ხატულა“ (გაშლილი სია მის გარეთ ჩანს)
     const m = W < 700 ? 10 : 18;
     return [
       { name: 'others', x: W - ob.width - m, y: H - ob.height - m, w: ob.width, h: ob.height },
@@ -98,6 +101,29 @@ export function createWall({ characters, wallCfg, onOpen, painting = { fallen: f
   const pn = paintingNodes();
   framesEl.append(pn.ghost, pn.btn);
   pn.btn.addEventListener('click', () => drop());
+  let cls = 'desktop';
+  let visible = new Set(onWall.map((c) => c.id));
+
+  /** Round 3 §6: რამდენი ჩარჩო ეკიდოს — ტელეფონზე 6, პლანშეტზე 9, დესკტოპზე ყველა (characters_on_wall). */
+  function countFor(c) {
+    if (c === 'phone') return Number(wallCfg.characters_on_wall_mobile) || 6;
+    if (c === 'tablet') return Number(wallCfg.characters_on_wall_tablet) || 9;
+    return onWall.length;
+  }
+
+  // განცხადებების დაფა ვიწრო ეკრანზე — პატარა მიმაგრებული ფურცელი, შეხებით იშლება
+  const boardToggle = document.getElementById('noticeboard-toggle');
+  boardToggle?.addEventListener('click', () => {
+    const open = !boardEl.classList.contains('open');
+    boardEl.classList.toggle('open', open);
+    boardToggle.setAttribute('aria-expanded', String(open));
+  });
+  document.addEventListener('pointerdown', (e) => {
+    if (boardEl.classList.contains('open') && !boardEl.contains(e.target)) {
+      boardEl.classList.remove('open');
+      boardToggle?.setAttribute('aria-expanded', 'false');
+    }
+  });
 
   for (const c of onWall) {
     const n = frameNode(c);
@@ -164,11 +190,19 @@ export function createWall({ characters, wallCfg, onOpen, painting = { fallen: f
   function render() {
     const W = document.documentElement.clientWidth;
     const H = window.innerHeight;
+    // ზომის კლასი — window.innerWidth-ით, ზუსტად ისე, როგორც CSS media query-ები ითვლის
+    cls = sizeClass(window.innerWidth);
+    const shown = onWall.slice(0, countFor(cls));
+    visible = new Set(shown.map((c) => c.id));
+    for (const [id, n] of nodes) n.hidden = !visible.has(id);
+    const narrow = cls !== 'desktop';
+    boardEl.classList.toggle('collapsed', narrow);
+    if (!narrow) { boardEl.classList.remove('open'); boardToggle?.setAttribute('aria-expanded', 'false'); }
     const headerHeight = Math.ceil(topbar.getBoundingClientRect().height);
     layout = computeLayout({
-      width: W, height: H, headerHeight, seed,
+      width: W, height: H, headerHeight, seed, sizeClass: cls,
       // ნახატი ჩამოვარდნის შემდეგაც ინახავს ადგილს — კედელზე ღია ლაქა რჩება, სხვები არ ხტებიან
-      items: [{ id: PAINTING.id, rank: -1, size: PAINTING.size, rot: PAINTING.rot }, ...onWall.map((c, i) => ({ id: c.id, rank: i }))],
+      items: [{ id: PAINTING.id, rank: -1, size: PAINTING.size, rot: PAINTING.rot }, ...shown.map((c, i) => ({ id: c.id, rank: i }))],
       zones: zonesFor(othersEl, boardEl),
     });
     wallEl.style.height = `${layout.height}px`;
@@ -189,7 +223,8 @@ export function createWall({ characters, wallCfg, onOpen, painting = { fallen: f
       n.style.setProperty('--rot', `${f.rotation.toFixed(2)}deg`);
       n.classList.toggle('small', f.tier === 2);
       n.dataset.tier = String(f.tier);
-      fitText(n.querySelector('.plate-name'));
+      if (narrow) fitText(n.querySelector('.plate-name'), 9.5, { height: true });
+      else fitText(n.querySelector('.plate-name'));
     }
     showPainting();
     window.tianshani = { ...(window.tianshani || {}), layout };
@@ -205,7 +240,10 @@ export function createWall({ characters, wallCfg, onOpen, painting = { fallen: f
 
   return {
     render, setSeed, setPaintingFallen, dropPainting: drop,
-    frameNode: (id) => nodes.get(id) || null,
+    // ამ ზომაზე კედელზე არმყოფი (დამალული) ჩარჩო „არ არსებობს“ — ჩატი პორტრეტს ახლიდან აწყობს
+    frameNode: (id) => (visible.has(id) ? nodes.get(id) || null : null),
+    isOnWall: (id) => visible.has(id),
+    sizeClass: () => cls,
     get layout() { return layout; },
   };
 }
@@ -225,7 +263,7 @@ export function menuOrder(list) {
  * „ესაუბრე სხვას“ მენიუ — ერთი ბრტყელი სია ფოტოებით (Round 2 §6): ჯგუფების, ხაზების და 🔒-ის გარეშე.
  * variant 'wall' — კედელზე არმყოფნი; 'chat' — ყველა, გარდა მიმდინარისა.
  */
-export function createOthersMenu({ characters, onPick }) {
+export function createOthersMenu({ characters, onPick, isOnWall = (id) => characters.find((c) => c.id === id)?.on_wall }) {
   const menu = document.getElementById('others-menu');
   let anchor = null;
 
@@ -257,7 +295,8 @@ export function createOthersMenu({ characters, onPick }) {
 
   function open(anchorEl, { variant = 'wall', exclude = null } = {}) {
     anchor = anchorEl;
-    const pool = characters.filter((c) => c.id !== exclude && (variant === 'chat' || !c.on_wall));
+    // „კედელზე“ — ამ ეკრანის ზომაზე (Round 3 §6: ტელეფონზე 6, პლანშეტზე 9) — დანარჩენი სიაშია
+    const pool = characters.filter((c) => c.id !== exclude && (variant === 'chat' || !isOnWall(c.id)));
     menu.replaceChildren(...menuOrder(pool).map(item));
     menu.hidden = false;
     menu.dataset.variant = variant;
@@ -266,6 +305,13 @@ export function createOthersMenu({ characters, onPick }) {
     menu.querySelector('.menu-item')?.focus({ preventScroll: true });
   }
   function position() {
+    // ვიწრო ეკრანზე — სრული სიგანის „ქვედა ფურცელი“ (bottom sheet); ზომა/ადგილი CSS-შია
+    const sheet = sizeClass(window.innerWidth) !== 'desktop';
+    menu.classList.toggle('sheet', sheet);
+    if (sheet) {
+      for (const k of ['left', 'top', 'width', 'maxHeight']) menu.style[k] = '';
+      return;
+    }
     const r = anchor.getBoundingClientRect();
     const mw = Math.min(340, window.innerWidth - 20);
     menu.style.width = `${mw}px`;

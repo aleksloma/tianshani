@@ -250,7 +250,7 @@ export function createChat({ byId, api, getConfig, getGameState, onExchange, onO
     if (rects.mobile) {
       // კედლის ჩარჩოს ასლს ფირფიტის inline შრიფტი მოჰყვება — პატარა პორტრეტზე თავიდან ვარგებთ
       const name = portrait.querySelector('.plate-name');
-      if (name) { name.style.fontSize = ''; fitText(name, 8); }
+      if (name) { name.style.fontSize = ''; fitText(name, 8, { height: true }); }
     }
   }
 
