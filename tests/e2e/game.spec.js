@@ -70,7 +70,7 @@ test('§2 გაცვლა ჩატის შუაში დროს არ
   await expect(page.locator('body')).toHaveAttribute('data-season', 'winter');
   await expect(page.locator('#crack-val')).toHaveText('2/5');
   await expect(page.locator('#copies-val')).toHaveText('2/3');
-  await expect(page.locator('#copies-tip')).toHaveText('ერთი თინას უჯრაშია სამი თვე');
+  await expect(page.locator('#copies-tip')).toHaveText('ერთი ეგზემპლარი თინას უჯრაში დარჩა — სამი თვეა იქ დევს.'); // Round 4 §2
   const g = await storage(page, 'tianshani.game');
   expect(g).toMatchObject({ day: 90, cycle: 1, exchanges: 3 });
   expect(g.visited).toEqual(['tina', 'vaso']);

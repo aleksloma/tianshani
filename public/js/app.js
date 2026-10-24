@@ -6,7 +6,8 @@ import { createChat } from './chat.js';
 import {
   loadState, saveState, applyCharacterOpen, applyExchange, applyChatClose, nextCycle, showIntertitle, collapseScene, LOST_COPY_NOTES,
 } from './game.js';
-import { withDefaults, dateFor, formatDateKa, SEASON_KA } from './calendar.js';
+import { withDefaults, dateFor, formatDateKa, SEASON_KA, derive, dayFromSeason } from './calendar.js';
+import { createCopyNote } from './copyNote.js';
 import { treeMarkup, updateTree } from './tree.js';
 import { usedPercent, formatPercentKa, percentLevel, tokensTipLine } from './format.js';
 import { createLimitModal } from './limitModal.js';
@@ -32,6 +33,7 @@ async function main() {
   const byId = Object.fromEntries(data.characters.map((c) => [c.id, c]));
   let game = loadState(gameCfg);
   const modal = createLimitModal();
+  const copyNote = createCopyNote();
 
   // --- ზედა ზოლი: ხე + tooltip (თარიღი), ბზარი, ეგზემპლარები, შენობა ---
   $('season-tree-slot').innerHTML = treeMarkup();
@@ -127,13 +129,20 @@ async function main() {
     return n;
   };
 
-  /** სეზონის ცვლილება(ები) და/ან ჩამონგრევა — რაც კალენდარმა დააბრუნა. პასუხის დასრულების შემდეგ ეშვება. */
-  async function playEvents(events) {
+  /**
+   * სეზონის ცვლილება(ები) და/ან ჩამონგრევა — რაც კალენდარმა დააბრუნა. ჩატის დახურვის შემდეგ ეშვება.
+   * prevLost — დაკარგული ეგზემპლარები მოვლენამდე: თუ სეზონმა ახალი დაკარგა, ინტერტიტრის შემდეგ ფურცელი ჩნდება (Round 4 §2).
+   */
+  async function playEvents(events, prevLost = game.lostCopies) {
+    let lost = prevLost;
     for (const ev of events) {
       if (ev.type === 'season') {
         const p = showIntertitle(`${SEASON_KA[ev.season]}.`, 1500);
         setTimeout(() => { renderStatus(); background.set(game.crackStage); }, 300); // ფონი და ხე შავი ეკრანის მიღმა იცვლება
         await p;
+        const nowLost = derive(dayFromSeason(ev.season, gameCfg), gameCfg).lostCopies;
+        if (nowLost > lost && LOST_COPY_NOTES[nowLost - 1]) copyNote.show(LOST_COPY_NOTES[nowLost - 1]);
+        lost = nowLost;
       } else if (ev.type === 'collapse') {
         await chat.close({ instant: true, silent: true });
         await collapseScene();
@@ -153,18 +162,20 @@ async function main() {
 
   /** ჩატი გაიხსნა — დრო მიდის, თუ days_per_character_switch > 0 (Round 2-ის დეფოლტი 0). */
   async function onOpened(id) {
+    const prevLost = game.lostCopies;
     const { state: s, events } = applyCharacterOpen(game, gameCfg, id);
     game = { ...s, paintingFallen: game.paintingFallen };
     saveState(game);
-    await playEvents(events);
+    await playEvents(events, prevLost);
   }
 
   /** პასუხი დასრულდა — exchanges++ (სტატისტიკა); დრო მხოლოდ თუ days_per_exchange > 0 (Round 3: 0). */
   async function onExchange(id) {
+    const prevLost = game.lostCopies;
     const { state: s, events } = applyExchange(game, gameCfg, id);
     game = { ...s, paintingFallen: game.paintingFallen };
     saveState(game);
-    await playEvents(events);
+    await playEvents(events, prevLost);
   }
 
   /**
@@ -172,11 +183,12 @@ async function main() {
    * tooltip-ის თარიღი მაშინვე ახლდება; სეზონის/ჩამონგრევის ეფექტები — მის მერე. true → შენობა ჩამოინგრა.
    */
   async function onClosed(id, exchanges) {
+    const prevLost = game.lostCopies;
     const { state: s, events } = applyChatClose(game, gameCfg, id, exchanges);
     game = { ...s, paintingFallen: game.paintingFallen };
     saveState(game);
     $('season-tip-date').textContent = formatDateKa(dateFor(gameCfg, game.day));
-    return playEvents(events);
+    return playEvents(events, prevLost);
   }
 
   chat = createChat({

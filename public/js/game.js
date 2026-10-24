@@ -4,7 +4,12 @@
 import { getJSON, setJSON, KEYS } from './storage.js';
 import { derive, advanceDays, withDefaults, clampDay, dayFromSeason } from './calendar.js';
 
-export const LOST_COPY_NOTES = ['ერთი თინას უჯრაშია სამი თვე', 'ერთი ბანკში დარჩა', 'ერთი ოთხად გაიყო'];
+// Round 4 §2: ფილმის საბაბები — ეგზემპლარების tooltip-იც და დაკარგვისას გამოჩენილი ფურცელიც
+export const LOST_COPY_NOTES = [
+  'ერთი ეგზემპლარი თინას უჯრაში დარჩა — სამი თვეა იქ დევს.',
+  'ერთი ეგზემპლარი ბანკში (ან ცირკში) დარჩა.',
+  'ერთი ეგზემპლარი ოთხად გაიყო — თითო ნაწილი თითო კოლეგასთან.',
+];
 export const COLLAPSE_TEXT = 'შენობა ჩამოინგრა. ახალი შენობა. ყველაფერი თავიდან.';
 
 export function initialState(cycle = 1) {
