@@ -10,6 +10,25 @@ async function talkAndClose(page, id, text) {
   await expect(page.locator('#chat')).toBeHidden();
 }
 
+// ---------- §6 ქვედა კიდე: 390×844 და 768×1024 ----------
+
+for (const [w, h] of [[390, 844], [768, 1024]]) {
+  test.describe(`§6 ${w}×${h}`, () => {
+    test.use({ viewport: { width: w, height: h }, isMobile: true, hasTouch: true });
+    test(`§6 ${w}×${h}: კედლის ქვემოთ ნაცრისფერი ზოლი არ არის`, async ({ page }) => {
+      await openWall(page);
+      await page.waitForTimeout(300);
+      const m = await page.evaluate(() => ({ doc: document.documentElement.scrollHeight, wall: Math.round(document.getElementById('wall').getBoundingClientRect().height), body: getComputedStyle(document.body).backgroundColor }));
+      expect(Math.abs(m.doc - m.wall)).toBeLessThanOrEqual(1);
+      expect(m.body).toBe('rgb(176, 163, 130)');
+      await page.evaluate(() => window.scrollTo(0, 99999));
+      await page.waitForTimeout(250);
+      expect(await page.evaluate(([vw, vh]) => document.elementFromPoint(vw / 2, vh - 1)?.closest('#wall') !== null, [w, h])).toBe(true);
+      await page.screenshot({ path: `${SHOTS}/R4-06-mobile-bottom-${w}.png` });
+    });
+  });
+}
+
 // ---------- §2 ეგზემპლარები ----------
 
 test('§2 პირველი სეზონის ცვლილება → ერთხელ ჩნდება ფურცელი თინას საბაბით, მთვლელი 2/3; ~4 წმ-ში ქრება', async ({ page }) => {

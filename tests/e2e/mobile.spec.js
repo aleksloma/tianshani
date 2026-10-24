@@ -98,6 +98,30 @@ test('§6 დაფა იკეცება და შეხებით იშ
   await expect(page.locator(`#frames .frame[data-id="${pick.id}"]`)).toBeHidden();
 });
 
+test('Round 4 §6: კედლის ქვემოთ ნაცრისფერი ზოლი არ არის — დოკუმენტი = კედელი, body — ბათქაშის ფერი', async ({ page }) => {
+  await openWall(page);
+  await settle(page);
+  const m = await page.evaluate(() => ({
+    doc: document.documentElement.scrollHeight,
+    wall: Math.round(document.getElementById('wall').getBoundingClientRect().height),
+    body: getComputedStyle(document.body).backgroundColor,
+    html: getComputedStyle(document.documentElement).backgroundColor,
+  }));
+  expect(Math.abs(m.doc - m.wall)).toBeLessThanOrEqual(1);
+  expect(m.body).toBe('rgb(176, 163, 130)');
+  expect(m.html).toBe('rgb(176, 163, 130)');
+  await page.evaluate(() => window.scrollTo(0, 99999));
+  await page.waitForTimeout(250);
+  const vp = page.viewportSize();
+  // ბოლო რიგები კედელს ეკუთვნის (ფოტო/ზონები), არა body-ს
+  const bottom = await page.evaluate(([w, h]) => [2, w / 2, w - 2].map((x) => {
+    const el = document.elementFromPoint(x, h - 1);
+    return el && (el.closest('#wall') !== null);
+  }), [vp.width, vp.height]);
+  expect(bottom).toEqual([true, true, true]);
+  await page.screenshot({ path: `${SHOTS}/R4-06-mobile-bottom-${tag()}.png` });
+});
+
 test('§5 ჩატი ჩანს: ჩარჩო → sheet (opacity 1, ეკრანში) → პასუხი ჩანს → ✕ → ჩარჩო თავის ადგილას', async ({ page }) => {
   await openWall(page);
   const vp = page.viewportSize();

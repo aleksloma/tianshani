@@ -188,7 +188,9 @@ async function main() {
   async function onClosed(id, exchanges) {
     const prevLost = game.lostCopies;
     const { state: s, events } = applyChatClose(game, gameCfg, id, exchanges);
-    game = { ...s, paintingFallen: game.paintingFallen };
+    // Round 4 §5: ჩამოვარდნილი „გრენლანდია“ ჩატის დახურვისას ისევ თავის ლურსმანზეა (როგორც ჩარჩოები — Round 1 §1)
+    if (game.paintingFallen) wall.setPaintingFallen(false);
+    game = { ...s, paintingFallen: false };
     saveState(game);
     $('season-tip-date').textContent = formatDateKa(dateFor(gameCfg, game.day));
     return playEvents(events, prevLost);

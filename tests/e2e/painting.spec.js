@@ -51,6 +51,46 @@ test('დაჭერა → ნახატი ვარდება და ქ
   expect(after).toEqual(before);
 });
 
+test('Round 4 §5: ჩამოვარდნილი ნახატი ჩატის დახურვის შემდეგ ისევ ეკიდება; ვარდნისას ჩარჩოებსა და „ესაუბრე სხვას“-ს არ ფარავს; ტექსტი ქართულად', async ({ page }) => {
+  await openWall(page);
+  const btn = page.locator('#painting');
+  await expect(btn).toHaveAttribute('aria-label', 'სურათი „გრენლანდია“ — ყანყალებს. დააჭირეთ და ჩამოვარდება');
+  await expect(btn).toHaveAttribute('title', 'გრენლანდია. ოცდაშვიდი წელია ყანყალებს…');
+  await btn.click();
+  // ვარდნის დროს: ნახატი ჩარჩოების ქვეშ იხატება (DOM-ში მათზე ადრეა, z-index არ აქვს), „ესაუბრე სხვას“ ზემოთაა
+  const order = await page.evaluate(() => {
+    const p = document.getElementById('painting');
+    const frames = [...document.querySelectorAll('#frames .frame:not([hidden])')];
+    const others = document.getElementById('others');
+    const ob = others.getBoundingClientRect();
+    return {
+      before: frames.every((f) => p.compareDocumentPosition(f) & Node.DOCUMENT_POSITION_FOLLOWING),
+      z: getComputedStyle(p).zIndex,
+      othersZ: Number(getComputedStyle(others).zIndex),
+      framesZ: Number(getComputedStyle(document.getElementById('frames')).zIndex),
+      othersTop: document.elementFromPoint(ob.x + ob.width / 2, ob.y + ob.height / 2)?.closest('#others') !== null,
+    };
+  });
+  expect(order.before).toBe(true);
+  expect(order.z).toBe('auto');
+  expect(order.othersZ).toBeGreaterThan(order.framesZ);
+  expect(order.othersTop).toBe(true);
+  for (let i = 0; i < 6; i++) { // მთელი ვარდნის განმავლობაში
+    const hit = await page.evaluate(() => { const ob = document.getElementById('others').getBoundingClientRect(); return document.elementFromPoint(ob.x + ob.width / 2, ob.y + ob.height / 2)?.closest('#others') !== null; });
+    expect(hit).toBe(true);
+    await page.waitForTimeout(250);
+  }
+  await expect(btn).toBeHidden({ timeout: 5000 });
+  await expect(page.locator('.painting-ghost')).toBeVisible();
+  // ჩატი → დახურვა (შეტყობინების გარეშეც) → ისევ ლურსმანზეა
+  await openFrame(page, 'tina');
+  await page.keyboard.press('Escape');
+  await expect(page.locator('#chat')).toBeHidden();
+  await expect(btn).toBeVisible();
+  await expect(page.locator('.painting-ghost')).toBeHidden();
+  expect(await page.evaluate(() => window.tianshani.game.paintingFallen)).toBe(false);
+});
+
 test('ჩამონგრევის შემდეგ ახალ შენობაში ნახატი ისევ ეკიდება', async ({ page }) => {
   await page.addInitScript(() => {
     if (!sessionStorage.getItem('seeded')) {

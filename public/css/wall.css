@@ -24,11 +24,14 @@ body[data-season='spring'] { --season-tint: rgba(225, 205, 80, 0.16); }
 body[data-season='summer'] { --season-tint: rgba(255, 225, 160, 0.14); }
 
 * { box-sizing: border-box; }
+/* Round 4 §6: html/body — კედლის ქვედა კიდის ბათქაშის ფერი (wall.jpg-ის ბოლო რიგების საშუალო, #b0a382), რომ კედლის ქვემოთ
+   (მობილურის overscroll/„ბოლო ზოლი“) ნაცრისფერი ზოლი არასდროს გამოჩნდეს. ჩვეულებრივ რენდერში body-ს კედელი ფარავს. */
+html { background: #b0a382; }
 html, body { margin: 0; }
 body {
   font-family: var(--font);
   color: var(--ink);
-  background: #9aa4a3;
+  background: #b0a382;
   min-height: 100vh;
   overflow-x: hidden;
 }
