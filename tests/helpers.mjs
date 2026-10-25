@@ -33,7 +33,7 @@ function deepMerge(a, b) {
 export async function startTestServer(overrides = {}) {
   const { file } = tempSettings(overrides);
   process.env.SETTINGS_PATH = file;
-  for (const k of ['PORT', 'HOST', 'GEMINI_API_KEY', 'ADMIN_PASSWORD', 'DB_PATH', 'GEMINI_MOCK', 'GLOBAL_MONTHLY_USD']) delete process.env[k];
+  for (const k of ['PORT', 'HOST', 'GEMINI_API_KEY', 'ADMIN_PASSWORD', 'DB_PATH', 'GEMINI_MOCK', 'GLOBAL_MONTHLY_USD', 'GLOBAL_MONTHLY_TOKENS']) delete process.env[k];
   const { loadConfig } = await import('../src/config.js');
   const { createApp } = await import('../src/server.js');
   const cfg = loadConfig();

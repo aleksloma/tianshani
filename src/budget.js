@@ -1,9 +1,9 @@
-// გლობალური თვიური ბიუჯეტი (FIXES_ROUND2 §3): ყველა მომხმარებლის ჯამური ხარჯი USD-ში, კალენდარული თვე (UTC).
-// ფასები კონფიგშია — Gemini 3.8 Flash-ის intro ფასი 2027-01-01-დან ორმაგდება.
+// გლობალური თვიური ლიმიტი (Round 7 §2, ცვლის FIXES_ROUND2 §3-ის დოლარებს): ყველა მომხმარებლის ჯამური ტოკენები
+// (შემავალი + გამომავალი), კალენდარული თვე (UTC). ფასები კონფიგში მხოლოდ ადმინის დოლარის შეფასებისთვისაა — არაფერს კეტავს.
 
 export const MSG_BUDGET = 'ბიუჯეტში გარღვევა გვაქვს, თვის ბოლომდე დავიცადოთ.';
 
-/** ხარჯი USD: input/1e6 × price_in + output/1e6 × price_out. */
+/** ხარჯის შეფასება USD: input/1e6 × price_in + output/1e6 × price_out (მხოლოდ საჩვენებლად). */
 export function costUsd(input, output, prices) {
   const pi = Number(prices?.price_input_per_1m_usd) || 0;
   const po = Number(prices?.price_output_per_1m_usd) || 0;
@@ -25,55 +25,57 @@ export function estimateTokens(text) {
   return Math.ceil(String(text || '').length / 4);
 }
 
-/** რამდენი შეიძლება დაჯდეს ეს მოთხოვნა ყველაზე ცუდ შემთხვევაში (პრომპტი + max_output_tokens). */
-export function reserveUsd({ promptTokens, maxOutputTokens, prices }) {
-  return costUsd(promptTokens, maxOutputTokens, prices);
+/** რამდენი ტოკენი შეიძლება დაჯდეს ეს მოთხოვნა ყველაზე ცუდ შემთხვევაში (პრომპტი + max_output_tokens). */
+export function reserveTokens({ promptTokens, maxOutputTokens }) {
+  return Math.max(0, promptTokens | 0) + Math.max(0, maxOutputTokens | 0);
 }
 
-/** ბიუჯეტი ჩართულია? (0 ან უარყოფითი = გამორთული). */
+/** ლიმიტი ჩართულია? (0 ან უარყოფითი = გამორთული). */
 export function budgetEnabled(cfg) {
-  return Number(cfg.budget?.global_monthly_usd) > 0;
+  return Number(cfg.budget?.global_monthly_tokens) > 0;
 }
 
-/** მიმდინარე თვის მდგომარეობა. */
+/** მიმდინარე თვის მდგომარეობა (ტოკენებში) + დოლარის შეფასება. */
 export function globalStatus(store, cfg, now = new Date()) {
   const key = globalPeriodKey(now);
   const g = store.getGlobal(key);
-  const budget = Number(cfg.budget?.global_monthly_usd) || 0;
-  const enabled = budget > 0;
-  const percent = enabled ? (g.cost_usd / budget) * 100 : 0;
+  const limit = Number(cfg.budget?.global_monthly_tokens) || 0;
+  const enabled = limit > 0;
+  const used = (g.input_tokens | 0) + (g.output_tokens | 0);
+  const percent = enabled ? (used / limit) * 100 : 0;
   const warnAt = Number(cfg.budget?.warn_at_percent) || 80;
-  // მინიმალური რეზერვი: ერთი სრული პასუხის (max_output_tokens) ფასი. თუ ეს აღარ ეტევა, არც ერთი მოთხოვნა არ გავა —
-  // ბიუჯეტი ფაქტობრივად ამოწურულია და მოდალი ყველას ჩატვირთვისთანავე უნდა გამოუჩნდეს.
-  const minReserve = costUsd(0, Number(cfg.gemini?.max_output_tokens) || 0, cfg.budget);
+  // მინიმალური რეზერვი: ერთი სრული პასუხი (max_output_tokens). თუ ესეც აღარ ეტევა, არც ერთი მოთხოვნა არ გავა —
+  // ლიმიტი ფაქტობრივად ამოწურულია და მოდალი ყველას ჩატვირთვისთანავე უნდა გამოუჩნდეს.
+  const minReserve = Number(cfg.gemini?.max_output_tokens) || 0;
   return {
     period_key: key,
     enabled,
-    budget_usd: budget,
-    spent_usd: g.cost_usd,
+    tokens_limit: limit,
+    tokens_used: used,
     input_tokens: g.input_tokens,
     output_tokens: g.output_tokens,
     requests: g.requests,
     percent: Math.round(percent * 10) / 10,
-    exhausted: enabled && (g.cost_usd >= budget || g.cost_usd + minReserve > budget),
+    exhausted: enabled && (used >= limit || used + minReserve > limit),
     warn: enabled && percent >= warnAt,
     warn_at_percent: warnAt,
     resets_at: nextMonthISO(now),
+    estimated_usd: costUsd(g.input_tokens, g.output_tokens, cfg.budget),
   };
 }
 
-/** ბოლო მოთხოვნამ ბიუჯეტი არ უნდა გადააჭარბოს: თუ ხარჯი + რეზერვი ≥ ბიუჯეტი → უარი. */
+/** ბოლო მოთხოვნამ ლიმიტი არ უნდა გადააჭარბოს: თუ გამოყენებული + რეზერვი ≥ ლიმიტი → უარი. */
 export function wouldOvershoot(status, reserve) {
   if (!status.enabled) return false;
-  return status.spent_usd + reserve >= status.budget_usd;
+  return status.tokens_used + reserve >= status.tokens_limit;
 }
 
-/** თვის ბოლოს პროგნოზი (წრფივი: გასული დღეების მიხედვით). */
-export function projectedMonthEnd(spentUsd, now = new Date()) {
+/** თვის ბოლოს პროგნოზი (წრფივი: გასული დღეების მიხედვით) — ნებისმიერი დაგროვებადი სიდიდისთვის (ტოკენები). */
+export function projectedMonthEnd(value, now = new Date()) {
   const daysInMonth = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 0)).getUTCDate();
   const elapsed = now.getUTCDate() - 1 + (now.getUTCHours() * 60 + now.getUTCMinutes()) / 1440; // დღის წილიც
-  const perDay = elapsed > 0 ? spentUsd / elapsed : spentUsd;
-  return { projected_usd: Math.round(perDay * daysInMonth * 10000) / 10000, days_elapsed: Math.round(elapsed * 10) / 10, days_in_month: daysInMonth };
+  const perDay = elapsed > 0 ? value / elapsed : value;
+  return { projected: Math.round(perDay * daysInMonth), days_elapsed: Math.round(elapsed * 10) / 10, days_in_month: daysInMonth };
 }
 
 /** გაფრთხილება ლოგში დღეში ერთხელ, როცა warn_at_percent გადაილახა. */
@@ -85,7 +87,7 @@ export function createWarnLogger(logger) {
       const day = now.toISOString().slice(0, 10);
       if (day === lastDay) return false;
       lastDay = day;
-      logger.warn(`[budget] თვიური ბიუჯეტის ${status.percent}% დახარჯულია ($${status.spent_usd.toFixed(2)} / $${status.budget_usd}) — ${status.period_key}`);
+      logger.warn(`[budget] თვიური ლიმიტის ${status.percent}% დახარჯულია (${status.tokens_used} / ${status.tokens_limit} ტოკენი) — ${status.period_key}`);
       return true;
     },
   };

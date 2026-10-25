@@ -2,7 +2,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  costUsd, globalPeriodKey, nextMonthISO, estimateTokens, reserveUsd, globalStatus, wouldOvershoot, projectedMonthEnd,
+  costUsd, globalPeriodKey, nextMonthISO, estimateTokens, reserveTokens, globalStatus, wouldOvershoot, projectedMonthEnd,
   createWarnLogger, budgetEnabled, MSG_BUDGET,
 } from '../../src/budget.js';
 import { resetsAt, MSG_LIMIT, periodKey } from '../../src/limits.js';
@@ -39,52 +39,57 @@ test('გლობალური პერიოდი: UTC კალენდ�
   assert.equal(periodKey('lifetime'), 'all');
 });
 
-function fakeStore(cost, input = 0, output = 0) {
-  return { getGlobal: () => ({ cost_usd: cost, input_tokens: input, output_tokens: output, requests: 1 }) };
+/** Round 7 §2: გლობალური მთვლელი ტოკენებში (cost_usd — მხოლოდ ისტორია). */
+function fakeStore(input = 0, output = 0) {
+  return { getGlobal: () => ({ cost_usd: 0, input_tokens: input, output_tokens: output, requests: 1 }) };
 }
 
-test('რეზერვი: პრომპტის შეფასება + max_output_tokens; ბოლო მოთხოვნა ბიუჯეტს არ გადააჭარბებს', () => {
+test('რეზერვი (Round 7 §2 — ტოკენებში): პრომპტის შეფასება + max_output_tokens; ბოლო მოთხოვნა ლიმიტს არ გადააჭარბებს', () => {
   assert.equal(estimateTokens('a'.repeat(400)), 100);
   assert.equal(estimateTokens(''), 0);
-  const r = reserveUsd({ promptTokens: 4000, maxOutputTokens: 250, prices: PRICES });
-  assert.ok(near(r, costUsd(4000, 250, PRICES)));
-  const cfg = { budget: { global_monthly_usd: 50, warn_at_percent: 80, ...PRICES } };
+  const r = reserveTokens({ promptTokens: 4000, maxOutputTokens: 250 });
+  assert.equal(r, 4250);
+  const cfg = { budget: { global_monthly_tokens: 1_000_000, warn_at_percent: 80, ...PRICES }, gemini: { max_output_tokens: 180 } };
   const now = new Date('2026-10-15T12:00:00Z');
-  // ხარჯი ბიუჯეტამდე ძალიან ახლოს → რეზერვი გადააჭარბებს → უარი
-  const s1 = globalStatus(fakeStore(50 - r / 2), cfg, now);
+  // ლიმიტამდე ძალიან ახლოს → რეზერვი გადააჭარბებს → უარი
+  const s1 = globalStatus(fakeStore(1_000_000 - 2000, 0), cfg, now);
   assert.equal(s1.exhausted, false);
   assert.equal(wouldOvershoot(s1, r), true);
   // საკმარისი ადგილი → ნებადართულია
-  const s2 = globalStatus(fakeStore(10), cfg, now);
-  assert.equal(wouldOvershoot(s2, r), false);
-  // ამოწურული
-  const s3 = globalStatus(fakeStore(50), cfg, now);
+  assert.equal(wouldOvershoot(globalStatus(fakeStore(100_000, 5000), cfg, now), r), false);
+  // ამოწურული: input + output ≥ ლიმიტი; ან ერთი სრული პასუხიც (max_output_tokens) აღარ ეტევა
+  const s3 = globalStatus(fakeStore(900_000, 100_000), cfg, now);
   assert.equal(s3.exhausted, true);
+  assert.equal(s3.tokens_used, 1_000_000);
   assert.equal(s3.resets_at, '2026-11-01T00:00:00.000Z');
-  // გაფრთხილება 80%-ზე
-  assert.equal(globalStatus(fakeStore(39.9), cfg, now).warn, false);
-  assert.equal(globalStatus(fakeStore(40), cfg, now).warn, true);
-  assert.equal(globalStatus(fakeStore(40), cfg, now).percent, 80);
+  assert.equal(globalStatus(fakeStore(1_000_000 - 179, 0), cfg, now).exhausted, true);
+  assert.equal(globalStatus(fakeStore(1_000_000 - 180, 0), cfg, now).exhausted, false);
+  // გაფრთხილება 80%-ზე (ტოკენებიდან)
+  assert.equal(globalStatus(fakeStore(799_999, 0), cfg, now).warn, false);
+  assert.equal(globalStatus(fakeStore(700_000, 100_000), cfg, now).warn, true);
+  assert.equal(globalStatus(fakeStore(700_000, 100_000), cfg, now).percent, 80);
+  // დოლარის შეფასება — იგივე ფასის ფორმულით
+  assert.ok(near(globalStatus(fakeStore(700_000, 100_000), cfg, now).estimated_usd, costUsd(700_000, 100_000, PRICES)));
 });
 
-test('ბიუჯეტი 0 ან უარყოფითი → გამორთულია (არასდროს ბლოკავს)', () => {
+test('ლიმიტი 0 ან უარყოფითი → გამორთულია (არასდროს ბლოკავს)', () => {
   for (const v of [0, -1, undefined]) {
-    const cfg = { budget: { global_monthly_usd: v, ...PRICES } };
+    const cfg = { budget: { global_monthly_tokens: v, ...PRICES } };
     assert.equal(budgetEnabled(cfg), false);
-    const s = globalStatus(fakeStore(1000), cfg);
+    const s = globalStatus(fakeStore(1e9, 1e9), cfg);
     assert.equal(s.exhausted, false);
     assert.equal(wouldOvershoot(s, 1000), false);
   }
 });
 
 test('თვის ბოლოს პროგნოზი და დღეში ერთი გაფრთხილება', () => {
-  const p = projectedMonthEnd(10, new Date('2026-10-11T00:00:00Z')); // 10 დღე გავიდა, 31-დღიანი თვე
+  const p = projectedMonthEnd(10_000_000, new Date('2026-10-11T00:00:00Z')); // 10 დღე გავიდა, 31-დღიანი თვე
   assert.equal(p.days_in_month, 31);
   assert.equal(p.days_elapsed, 10);
-  assert.ok(near(p.projected_usd, 31, 1e-9));
+  assert.equal(p.projected, 31_000_000);
   const logs = [];
   const w = createWarnLogger({ warn: (m) => logs.push(m) });
-  const st = { warn: true, percent: 85, spent_usd: 42.5, budget_usd: 50, period_key: '2026-10' };
+  const st = { warn: true, percent: 85, tokens_used: 38_250_000, tokens_limit: 45_000_000, period_key: '2026-10' };
   assert.equal(w.check(st, new Date('2026-10-11T01:00:00Z')), true);
   assert.equal(w.check(st, new Date('2026-10-11T20:00:00Z')), false, 'იმავე დღეს მეორედ არა');
   assert.equal(w.check(st, new Date('2026-10-12T01:00:00Z')), true);

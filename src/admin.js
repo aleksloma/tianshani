@@ -72,15 +72,19 @@ export function adminRouter(cfg, store) {
     const longReplies = db.prepare(`SELECT COALESCE(spoken_by, character_id) AS character_id, COUNT(*) AS n
         FROM messages WHERE role = 'assistant' AND long_reply = 1 GROUP BY 1 ORDER BY n DESC`).all()
       .map((r) => ({ ...r, name: byId[r.character_id]?.short_name_ka || r.character_id }));
-    // გლობალური თვიური ბიუჯეტი (FIXES_ROUND2 §3)
+    // გლობალური თვიური ლიმიტი (Round 7 §2: ტოკენებში; დოლარი — მხოლოდ შეფასება დღევანდელი ფასებით)
     const g = globalStatus(store, cfg);
-    const proj = projectedMonthEnd(g.spent_usd);
+    const proj = projectedMonthEnd(g.tokens_used);
+    const share = g.tokens_used > 0 ? proj.projected / g.tokens_used : 0; // პროგნოზი იგივე შემ./გამ. თანაფარდობით
     res.json({
       totals, top_characters: top, long_replies: longReplies, period: cfg.limits.period, period_key: key, mock: cfg.gemini.mock,
       budget: {
         ...g,
-        ...proj,
-        projected_percent: g.budget_usd > 0 ? Math.round((proj.projected_usd / g.budget_usd) * 1000) / 10 : 0,
+        projected_tokens: proj.projected,
+        projected_percent: g.tokens_limit > 0 ? Math.round((proj.projected / g.tokens_limit) * 1000) / 10 : 0,
+        projected_usd: Math.round(g.estimated_usd * share * 10000) / 10000,
+        days_elapsed: proj.days_elapsed,
+        days_in_month: proj.days_in_month,
         prices: { input_per_1m: cfg.budget.price_input_per_1m_usd, output_per_1m: cfg.budget.price_output_per_1m_usd },
       },
     });
@@ -100,7 +104,7 @@ export function adminRouter(cfg, store) {
     res.json({ total, rows });
   });
 
-  /** მიმდინარე თვის გლობალური მთვლელის განულება (ბრაუზერების მთვლელები უცვლელი რჩება). */
+  /** მიმდინარე თვის გლობალური მთვლელის (ტოკენები) განულება (ბრაუზერების მთვლელები უცვლელი რჩება). */
   r.post('/budget/reset', (req, res) => {
     const removed = store.resetGlobal(globalPeriodKey());
     res.json({ ok: true, removed });
@@ -128,7 +132,7 @@ export function adminRouter(cfg, store) {
       clients: rows.map((c) => ({
         ...c,
         limit_pct: Math.min(100, Math.round(100 * Math.max(c.input_tokens / li, c.output_tokens / lo))),
-        // ხარჯი USD — იგივე ფორმულით, რაც გლობალურ ბიუჯეტში (მიმდინარე პერიოდი და სულ)
+        // ხარჯის შეფასება USD — დღევანდელი ფასებით (მიმდინარე პერიოდი და სულ)
         cost_usd: Math.round(costUsd(c.input_tokens, c.output_tokens, cfg.budget) * 10000) / 10000,
         total_cost_usd: Math.round(costUsd(c.total_input_tokens, c.total_output_tokens, cfg.budget) * 10000) / 10000,
       })),

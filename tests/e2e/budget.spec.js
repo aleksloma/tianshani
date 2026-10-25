@@ -219,7 +219,7 @@ test('§3 გლობალური ბიუჯეტი: ორ სხვა
   const ctxB = await browser.newContext({ baseURL, viewport: { width: 1366, height: 860 }, locale: 'ka-GE' });
   const admin = await pwRequest.newContext({ baseURL });
   try {
-    store.addGlobal(monthKey(), 0, 0, 1000); // თვის ხარჯი > $50
+    store.addGlobal(monthKey(), 45_000_000, 0, 0); // Round 7 §2: თვის ტოკენები = ლიმიტი (45 000 000)
     const pages = [await ctxA.newPage(), await ctxB.newPage()];
     const ids = [];
     for (const p of pages) {
@@ -265,21 +265,25 @@ test('§3 გლობალური ბიუჯეტი: ორ სხვა
   }
 });
 
-test('§3 ადმინის ბიუჯეტის ბარათი: ხარჯი, %, ტოკენები, პროგნოზი; ყვითელი ბანერი 80%-ზე; განულება', async ({ page }) => {
+test('§3 ადმინის ბიუჯეტის ბარათი (Round 7 §2 — ტოკენებში): გამოყენებული / ლიმიტი, %, პროგნოზი, „≈ $… დღევანდელი ფასებით“; ყვითელი ბანერი 80%-ზე; განულება', async ({ page }) => {
   const store = e2eStore();
   try {
     store.resetGlobal(monthKey());
-    store.addGlobal(monthKey(), 1_234_567, 98_765, 41.25); // 82.5%
+    store.addGlobal(monthKey(), 37_000_000, 125_000, 0); // 37 125 000 / 45 000 000 = 82.5%
     await page.goto('/admin');
     await page.locator('#pw').fill('e2e-admin-pass');
     await page.locator('#login-form button').click();
     await expect(page.locator('#app')).toBeVisible();
     const card = page.locator('#budget-card');
     await expect(card).toBeVisible();
-    await expect(page.locator('#b-spent')).toHaveText('$41.25 / $50');
+    await expect(page.locator('#b-spent')).toHaveText(/^37[\s,]125[\s,]000 \/ 45[\s,]000[\s,]000$/);
     await expect(page.locator('#b-pct')).toHaveText('82.5%');
-    await expect(page.locator('#b-tokens')).toContainText('234');
-    await expect(page.locator('#b-proj')).toContainText('$');
+    await expect(page.locator('#b-tokens')).toHaveText(/^37[\s,]000[\s,]000 \/ 125[\s,]000$/);
+    await expect(page.locator('#b-proj')).toHaveText(/^[\d\s,]+ \([\d.]+%\)$/);
+    expect(await page.locator('#b-proj').textContent()).not.toContain('$');
+    // 37M × 0.75 + 0.125M × 3.75 = $28.21875 → „≈ $28,22 დღევანდელი ფასებით“ (მეორადი ხაზი)
+    await expect(page.locator('#b-usd')).toHaveText('≈ $28,22 დღევანდელი ფასებით');
+    await expect(page.locator('#b-spent')).not.toContainText('$');
     await expect(page.locator('#budget-warn')).toBeVisible();
     await expect(page.locator('#budget-warn')).toContainText('82.5%');
     const bg = await page.locator('#budget-warn').evaluate((el) => getComputedStyle(el).backgroundColor);
@@ -291,8 +295,7 @@ test('§3 ადმინის ბიუჯეტის ბარათი: ხ
     expect(cardTop).toBeLessThan(statsTop);
     // კლიენტების სიაში ხარჯი
     await expect(page.locator('#client-list .cmeta.cost').first()).toContainText('$');
-    await page.screenshot({ path: `${SHOTS}/R2-05-admin-budget.png`, fullPage: true });
-    await card.screenshot({ path: `${SHOTS}/R2-05-admin-budget-card.png` });
+    await card.screenshot({ path: `${SHOTS}/R7-02-admin-budget-tokens.png` });
 
     await page.locator('#budget-reset').click();
     await expect(page.locator('#budget-reset')).toHaveText('განულებულია ✓');

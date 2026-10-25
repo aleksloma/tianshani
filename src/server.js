@@ -12,7 +12,7 @@ import { buildPrompt, sanitizeGameState, annotateForProxy, pickStageMode, cleanU
 import { openDb } from './db.js';
 import { balance, createRateLimiter, MSG_LIMIT, MSG_RATE, MSG_TOO_LONG } from './limits.js';
 import {
-  MSG_BUDGET, costUsd, globalStatus, wouldOvershoot, reserveUsd, estimateTokens, createWarnLogger,
+  MSG_BUDGET, costUsd, globalStatus, wouldOvershoot, reserveTokens, estimateTokens, createWarnLogger,
 } from './budget.js';
 import { detectRedirect } from './redirect.js';
 import { pacingState, countSentences } from './pacing.js';
@@ -137,8 +137,11 @@ export function createApp(cfg) {
       client_id: req.clientId,
       mock: cfg.gemini.mock,
       provider,
-      // გლობალური ბიუჯეტი — მოდალი გვერდის ჩატვირთვისთანავე ყველას უჩანს (ხარჯის თანხა კლიენტს არ ვუჩვენებთ ტექსტად, მხოლოდ სტატუსი)
-      global: { budget_usd: g.budget_usd, spent_usd: Math.round(g.spent_usd * 10000) / 10000, exhausted: g.exhausted, resets_at: g.resets_at },
+      // გლობალური თვიური ლიმიტი (Round 7 §2: ტოკენებში) — მოდალი გვერდის ჩატვირთვისთანავე ყველას უჩანს (UI მხოლოდ სტატუსს იყენებს)
+      global: {
+        tokens_limit: g.tokens_limit, tokens_used: g.tokens_used, exhausted: g.exhausted, resets_at: g.resets_at,
+        estimated_usd: Math.round(g.estimated_usd * 10000) / 10000,
+      },
     });
   });
 
@@ -160,7 +163,7 @@ export function createApp(cfg) {
     if (last.content.length > cfg.limits.max_message_chars) return res.status(413).json({ error: MSG_TOO_LONG });
 
     if (!rate.allow(clientId)) return res.status(429).json({ error: MSG_RATE, code: 'rate' });
-    // 1) გლობალური თვიური ბიუჯეტი (ყველასთვის ერთი)
+    // 1) გლობალური თვიური ლიმიტი ტოკენებში (ყველასთვის ერთი)
     const gNow = globalStatus(store, cfg);
     budgetWarn.check(gNow);
     if (gNow.exhausted) return res.status(429).json(limitBody('global_budget', gNow.resets_at));
@@ -192,14 +195,14 @@ export function createApp(cfg) {
       : clean;
     const contents = [...fewShot, ...convo];
 
-    // 3) რეზერვი: ბოლო მოთხოვნამ ბიუჯეტი არ უნდა გადააჭარბოს (პრომპტი + max_output_tokens უარეს შემთხვევაში;
+    // 3) რეზერვი: ბოლო მოთხოვნამ ლიმიტი არ უნდა გადააჭარბოს (პრომპტი + max_output_tokens უარეს შემთხვევაში;
     //    კორექტურა — დაახლ. +600 შემავალი + პასუხის სიგრძე და 1.5× გამომავალი, Round 3 §4)
     const maxOut = cfg.gemini.max_output_tokens;
     const pr = !cfg.gemini.mock && cfg.gemini.proofread !== false;
     const promptTokens = estimateTokens(systemInstruction) + contents.reduce((n, m) => n + estimateTokens(m.content), 0) + (pr ? 600 + maxOut : 0);
-    const reserve = reserveUsd({ promptTokens, maxOutputTokens: pr ? maxOut + proofreadMaxTokens(maxOut) : maxOut, prices: cfg.budget });
+    const reserve = reserveTokens({ promptTokens, maxOutputTokens: pr ? maxOut + proofreadMaxTokens(maxOut) : maxOut });
     if (wouldOvershoot(gNow, reserve)) {
-      log.warn(`[budget] მოთხოვნა უარყოფილია: ხარჯი $${gNow.spent_usd.toFixed(4)} + რეზერვი $${reserve.toFixed(4)} ≥ $${gNow.budget_usd}`);
+      log.warn(`[budget] მოთხოვნა უარყოფილია: გამოყენებული ${gNow.tokens_used} + რეზერვი ${reserve} ≥ ${gNow.tokens_limit} ტოკენი`);
       return res.status(429).json(limitBody('global_budget', gNow.resets_at));
     }
 
@@ -264,7 +267,7 @@ export function createApp(cfg) {
     if (longReply) log.warn(`[long-reply] ${speaker.id}: ${sentences} წინადადება`);
 
     store.addUsage(clientId, bal.period_key, usage.input, usage.output);
-    // გლობალური ხარჯი — რეალური usageMetadata-დან (mock-ში ყალბი usage-დან)
+    // გლობალური მთვლელი — რეალური usageMetadata-დან (mock-ში ყალბი usage-დან); cost_usd — მხოლოდ შეფასება/ისტორია
     store.addGlobal(gNow.period_key, usage.input, usage.output, costUsd(usage.input, usage.output, cfg.budget));
     logExchange(store, cfg, { clientId, characterId: target.id, spokenBy: speaker.id, userText: last.content, reply, usage, gameState, userName, original, longReply });
 
@@ -315,4 +318,9 @@ export async function start(cfg = loadConfig()) {
 }
 
 const isMain = process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
-if (isMain) start();
+if (isMain) {
+  // კონფიგის შეცდომა (მაგ. Round 7 §2: ძველი budget.global_monthly_usd) — მკაფიო ტექსტი და გაჩერება
+  let cfg;
+  try { cfg = loadConfig(); } catch (e) { log.error(e.message); process.exit(1); }
+  start(cfg);
+}

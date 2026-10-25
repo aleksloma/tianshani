@@ -62,9 +62,11 @@ test('არარსებული მოდელი → უახლეს�
   assert.ok(req.config.systemInstruction.includes('# PACING\nMessages in this chat so far: 1. Messages about the manuscript so far: 1.'));
   const st = await (await fetch(`${S.base}/api/state`, { headers: { cookie: jar.header() } })).json();
   assert.deepEqual([st.used.input, st.used.output, st.used.requests], [1234, 60, 1]);
-  // Round 2 §3: გლობალური ხარჯი რეალური usage-ით
-  assert.ok(Math.abs(S.store.getGlobal(new Date().toISOString().slice(0, 7)).cost_usd - (1234 / 1e6 * 0.75 + 60 / 1e6 * 3.75)) < 1e-12);
-  assert.equal(st.global.spent_usd, 0.0012, '/api/state — 4 ციფრამდე დამრგვალებული');
+  // Round 7 §2: გლობალური მთვლელი ტოკენებში (შემ. + გამ.) რეალური usage-ით; დოლარი — შეფასება
+  const g = S.store.getGlobal(new Date().toISOString().slice(0, 7));
+  assert.deepEqual([g.input_tokens, g.output_tokens], [1234, 60]);
+  assert.equal(st.global.tokens_used, 1294);
+  assert.equal(st.global.estimated_usd, 0.0012, '/api/state — 4 ციფრამდე დამრგვალებული');
   // მე-3 შეტყობინება ხელნაწერზეც → redirect
   const r3 = await chat(S.base, {
     characterId: 'director',

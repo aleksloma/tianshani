@@ -80,14 +80,17 @@ async function loadStats() {
 }
 
 const usd = (v) => `$${Number(v || 0).toFixed(Number(v) < 1 ? 4 : 2)}`;
+/** Round 7 §2: დოლარის შეფასება ქართული მძიმით — „≈ $12,40 დღევანდელი ფასებით“ (ცენტზე ნაკლები — 4 ციფრი). */
+const usdKa = (v) => { const n = Number(v) || 0; return `$${n.toFixed(n > 0 && n < 0.01 ? 4 : 2).replace('.', ',')}`; };
 
-/** „ბიუჯეტი“ ბარათი + ყვითელი ბანერი warn_at_percent-ზე. */
+/** „ბიუჯეტი“ ბარათი (ტოკენებში) + ყვითელი ბანერი warn_at_percent-ზე. */
 function renderBudget(b) {
   if (!b) return;
-  $('b-spent').textContent = `${usd(b.spent_usd)} / $${b.budget_usd}`;
+  $('b-spent').textContent = `${fmt.format(b.tokens_used)} / ${fmt.format(b.tokens_limit)}`;
   $('b-pct').textContent = `${b.percent}%`;
   $('b-tokens').textContent = `${fmt.format(b.input_tokens)} / ${fmt.format(b.output_tokens)}`;
-  $('b-proj').textContent = `${usd(b.projected_usd)} (${b.projected_percent}%)`;
+  $('b-proj').textContent = `${fmt.format(b.projected_tokens)} (${b.projected_percent}%)`;
+  $('b-usd').textContent = `≈ ${usdKa(b.estimated_usd)} დღევანდელი ფასებით`;
   const bar = $('b-bar');
   bar.style.width = `${Math.min(100, b.percent)}%`;
   bar.className = b.exhausted ? 'hot' : b.warn ? 'warn' : '';

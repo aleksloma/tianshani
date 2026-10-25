@@ -1,5 +1,5 @@
 // settings.json ჩატვირთვა + ვალიდაცია. იკითხება ერთხელ, სტარტზე.
-// გარემოს ცვლადები (PORT, HOST, GEMINI_API_KEY, ADMIN_PASSWORD, DB_PATH) გადაფარავენ settings.json-ის ველებს,
+// გარემოს ცვლადები (PORT, HOST, GEMINI_API_KEY, ADMIN_PASSWORD, DB_PATH, GLOBAL_MONTHLY_TOKENS) გადაფარავენ settings.json-ის ველებს,
 // რომ ჰოსტინგზე settings.json საერთოდ არ დასჭირდეს.
 import fs from 'node:fs';
 import path from 'node:path';
@@ -10,6 +10,11 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 export const ROOT = path.resolve(__dirname, '..');
 
 const PLACEHOLDER_KEYS = new Set(['', 'PASTE_YOUR_KEY', 'YOUR_KEY', 'CHANGE_ME']);
+
+/** Round 7 §2: გლობალური ლიმიტი ახლა ტოკენებშია — ძველი დოლარის გასაღები სტარტს აჩერებს. */
+export const MSG_OLD_BUDGET_KEY = 'budget.global_monthly_usd აღარ გამოიყენება — გლობალური თვიური ლიმიტი ახლა ტოკენებშია. '
+  + 'წაშალეთ global_monthly_usd და ჩაწერეთ budget.global_monthly_tokens (შემავალი + გამომავალი ტოკენების ჯამი თვეში, მაგ. 45000000); '
+  + 'გარემოს ცვლადი: GLOBAL_MONTHLY_TOKENS (GLOBAL_MONTHLY_USD-ის ნაცვლად).';
 
 /** JSON-ის წაკითხვა `_comment` ველების იგნორირებით (ისინი მხოლოდ ადამიანისთვისაა). */
 function readJson(file) {
@@ -69,15 +74,19 @@ export function loadConfig(overrides = {}) {
   if (env.GEMINI_MOCK === '1' || env.GEMINI_MOCK === 'true') cfg.gemini.mock = true;
   cfg.site = cfg.site || {};
   if (env.PUBLIC_URL) cfg.site.public_url = env.PUBLIC_URL; // Round 4 §8: Open Graph-ის სრული მისამართი
-  // --- ბიუჯეტი (FIXES_ROUND2 §3): env, რიცხვები, დეფოლტები ---
+  // --- გლობალური თვიური ლიმიტი (Round 7 §2: ტოკენებში; FIXES_ROUND2 §3-ის დოლარის გასაღები აღარ არსებობს) ---
+  // ძველი გასაღები → სტარტი ჩერდება, რომ მფლობელმა იცოდეს: ლიმიტი აღარ ითვლება დოლარებში
+  if (user.budget && Object.hasOwn(user.budget, 'global_monthly_usd')) throw new Error(`${settingsPath}: ${MSG_OLD_BUDGET_KEY}`);
+  if (env.GLOBAL_MONTHLY_USD !== undefined && env.GLOBAL_MONTHLY_USD !== '') throw new Error(`env GLOBAL_MONTHLY_USD: ${MSG_OLD_BUDGET_KEY}`);
   cfg.budget = cfg.budget || {};
-  if (env.GLOBAL_MONTHLY_USD !== undefined && env.GLOBAL_MONTHLY_USD !== '') cfg.budget.global_monthly_usd = Number(env.GLOBAL_MONTHLY_USD);
+  delete cfg.budget.global_monthly_usd;
+  if (env.GLOBAL_MONTHLY_TOKENS !== undefined && env.GLOBAL_MONTHLY_TOKENS !== '') cfg.budget.global_monthly_tokens = Number(env.GLOBAL_MONTHLY_TOKENS);
   const num = (v, d) => (Number.isFinite(Number(v)) ? Number(v) : d);
-  cfg.budget.global_monthly_usd = num(cfg.budget.global_monthly_usd, 50);
+  cfg.budget.global_monthly_tokens = num(cfg.budget.global_monthly_tokens, 45_000_000);
   cfg.budget.price_input_per_1m_usd = num(cfg.budget.price_input_per_1m_usd, 0.75);
   cfg.budget.price_output_per_1m_usd = num(cfg.budget.price_output_per_1m_usd, 3.75);
   cfg.budget.warn_at_percent = num(cfg.budget.warn_at_percent, 80);
-  if (cfg.budget.global_monthly_usd <= 0) warnings.push('budget.global_monthly_usd ≤ 0 — გლობალური ბიუჯეტი გამორთულია (ხარჯი მაინც ითვლება).');
+  if (cfg.budget.global_monthly_tokens <= 0) warnings.push('budget.global_monthly_tokens ≤ 0 — გლობალური თვიური ლიმიტი გამორთულია (ტოკენები მაინც ითვლება).');
 
   // --- ვალიდაცია ---
   const hasKey = typeof cfg.gemini.api_key === 'string' && !PLACEHOLDER_KEYS.has(cfg.gemini.api_key.trim());
