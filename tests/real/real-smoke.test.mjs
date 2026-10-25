@@ -263,14 +263,18 @@ test('რეალური API (Round 8): ვასოს ეგზემპლ
     return { r, reply };
   }
 
-  // ვასო: გადაცემა → საუბარი → უკან
+  // ვასო: გადაცემა (Round 9 §1: სიტყვით) → საუბარი → უკან
   let store = M.initialCopies(G, 1);
   const vaso = [];
-  let t = await turn('vaso', vaso, store, M.actionText('hand_over', 'ნინო', byId.vaso.short_name_ka), { type: 'hand_over', copyId: 1, integrity: 'full' });
+  let t = await turn('vaso', vaso, store, M.actionMessage(M.actionText('hand_over', 'ნინო', byId.vaso.short_name_ka), 'მალე წაიკითხავთ?'), { type: 'hand_over', copyId: 1, integrity: 'full' });
   assert.equal(t.r.done.action_result.outcome, 'accepted');
   store = M.applyHandOver(store, 1, 'vaso', GS.day);
   t = await turn('vaso', vaso, store, 'როგორაა საქმე?');
   assert.doesNotMatch(t.reply, FINISHED, t.reply);
+  // Round 9 §4.1 (რბილი შემოწმება — მხოლოდ ლოგი): მთელი ეგზემპლარის მფლობელი „გვერდები აკლია“-ს არ უნდა ამბობდეს
+  const softFail = /გვერდ/.test(t.reply) && /(აკლია|არ ჩანს|გადადის)/.test(t.reply);
+  log.manuscript.at(-1).soft_fail_missing_pages = softFail;
+  if (softFail) console.warn(`[soft] ვასო, მთელი ეგზემპლარი, მაგრამ „აკლია“: ${t.reply}`);
   t = await turn('vaso', vaso, store, M.actionText('retrieve', 'ნინო', byId.vaso.short_name_ka), { type: 'retrieve', copyId: 1, integrity: 'full' });
   assert.equal(t.r.done.action_result.outcome, 'returned');
   for (const x of log.manuscript) assert.equal(x.finished_claim, false, x.reply);

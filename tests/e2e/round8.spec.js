@@ -22,11 +22,13 @@ async function seedStorage(page, entries) {
   }, entries);
 }
 
-/** 📄 ღილაკზე დაჭერა და პასუხის დასრულება. */
+/** ეგზემპლარის ღილაკი → (Round 9) მიმაგრება ველზე → Enter (ტექსტის გარეშე) → პასუხის დასრულება. */
 async function clickCopy(page) {
   const before = await page.locator('#chat-log .msg.char:not(.streaming)').count();
   const resp = page.waitForResponse((r) => r.url().endsWith('/api/chat'));
   await page.locator('#chat-copy').click();
+  await expect(page.locator('#chat-attach')).toBeVisible();
+  await page.locator('#chat-input').press('Enter');
   await expect(page.locator('#chat-log .msg.char:not(.streaming)')).toHaveCount(before + 1, { timeout: 15_000 });
   await expect(page.locator('#chat-send')).toBeEnabled();
   const text = await (await resp).text();
@@ -62,7 +64,7 @@ test.describe('Round 8 — დესკტოპი 1280×800', () => {
     await expect(btn).toBeVisible();
     await expect(btn).toHaveAttribute('aria-label', 'ეგზემპლარის გადაცემა');
     await expect(btn).toHaveAttribute('title', 'ეგზემპლარის გადაცემა');
-    await expect(btn).not.toHaveClass(/retrieve/);
+    await expect(btn).toHaveAttribute('data-mode', 'give');
     const b = await btn.boundingBox();
     const t = await page.locator('#chat-input').boundingBox();
     expect(b.x + b.width).toBeLessThanOrEqual(t.x);
@@ -85,9 +87,9 @@ test.describe('Round 8 — დესკტოპი 1280×800', () => {
     expect(await row.locator('.bubble').evaluate((el) => [getComputedStyle(el).borderTopStyle, getComputedStyle(el).backgroundColor])).toEqual(['dashed', 'rgba(0, 0, 0, 0)']);
     await expect(page.locator('#chat-log .msg.char').last()).toContainText('კარგი, დამიტოვე, ამაღამვე დავიწყებ.');
     await expect(page.locator('#chat-copy-status')).toHaveText('ეგზემპლარი №1 ვასოსთანაა 0 დღეა');
-    await expect(page.locator('#chat-copy')).toHaveClass(/retrieve/);
+    await expect(page.locator('#chat-copy')).toHaveAttribute('data-mode', 'take');
     await expect(page.locator('#chat-copy')).toHaveAttribute('aria-label', 'ეგზემპლარის გამორთმევა');
-    expect(await page.locator('#chat-copy .ico').evaluate((el) => getComputedStyle(el).textDecorationLine)).toBe('underline');
+    await expect(page.locator('#chat-copy .ico svg')).toHaveCount(1); // Round 9 §2: რეჟიმი — ხატულა და data-mode (ხაზგასმა აღარ არის)
     await expect(page.locator('#copies-val')).toHaveText('3/3');
     expect((await copies(page)).copies[0]).toMatchObject({ status: 'held', holder: 'vaso', givenDay: 0, integrity: 'full' });
     // ისტორიაში action-ით ინახება და გადატვირთვის მერეც რემარკად ჩანს
@@ -148,7 +150,7 @@ test.describe('Round 8 — დესკტოპი 1280×800', () => {
     const done = await clickCopy(page);
     expect(done.action_result).toEqual({ type: 'retrieve', copyId: 1, outcome: 'returned', integrity: 'half' });
     await expect(page.locator('#chat-log .msg.user.action .stage').last()).toHaveText('ნინო ვასოს ეგზემპლარს უკან სთხოვს.');
-    await expect(page.locator('#chat-copy')).not.toHaveClass(/retrieve/);
+    await expect(page.locator('#chat-copy')).toHaveAttribute('data-mode', 'give');
     await expect(page.locator('#chat-copy-status')).toBeHidden();
     expect((await copies(page)).copies[0]).toMatchObject({ status: 'in_hand', holder: null, integrity: 'half' });
     await expect(page.locator('#copies-tip')).toHaveText('№1 — თქვენთან (ნახევარი) · №2 — თქვენთან · №3 — თქვენთან');
@@ -188,7 +190,7 @@ test.describe('Round 8 — დესკტოპი 1280×800', () => {
     await expect(page.locator('#copy-note')).toHaveText('ბელა: ლერიმ წაიღო სახლში!', { timeout: 5000 });
     await expect(page.locator('#copies-tip')).toHaveText('№1 — ბელას თქმით, ბელას ქმარს გადასცა · №2 — თქვენთან · №3 — თქვენთან');
     await openAny(page, 'leri');
-    await expect(page.locator('#chat-copy')).toHaveClass(/retrieve/);
+    await expect(page.locator('#chat-copy')).toHaveAttribute('data-mode', 'take');
     await expect(page.locator('#chat-copy-status')).toHaveText('ეგზემპლარი №1 ბელას ქმართანაა 0 დღეა');
     await closeChat(page); // გაცვლის გარეშე — დრო არ მიდის
     await expect(page.locator('#copies-tip')).toHaveText('№1 — ბელას ქმართან 16 ოქტომბრიდან · №2 — თქვენთან · №3 — თქვენთან');
@@ -201,11 +203,12 @@ test.describe('Round 8 — დესკტოპი 1280×800', () => {
     await clickCopy(page);
     await closeChat(page);
     await expect(page.locator('#copy-note')).toHaveText('ბელა: ლერიმ წაიღო სახლში!', { timeout: 5000 });
-    await expect(page.locator('#copies-val')).toHaveText('2/3');
+    await expect(page.locator('#copies-val')).toHaveText('3/3'); // Round 9 §4.2: ავტორმა ჯერ არ იცის
     await expect(page.locator('#copies-tip')).toContainText('№1 — ბელას თქმით, ბელას ქმარს გადასცა');
     await openAny(page, 'leri');
-    await expect(page.locator('#chat-copy')).not.toHaveClass(/retrieve/);
+    await expect(page.locator('#chat-copy')).toHaveAttribute('data-mode', 'give');
     await closeChat(page);
+    await expect(page.locator('#copies-val')).toHaveText('2/3');
     await expect(page.locator('#copies-tip')).toHaveText('№1 — დაკარგულია: ბელას ქმარი ამბობს, არაფერი მიუღია. · №2 — თქვენთან · №3 — თქვენთან');
     expect(await ledgerTexts(page)).toEqual(['№1 — დაკარგულია: ბელას ქმარი ამბობს, არაფერი მიუღია.', '№2 — თქვენთან', '№3 — თქვენთან']);
   });
@@ -218,7 +221,7 @@ test.describe('Round 8 — დესკტოპი 1280×800', () => {
     await expect(page.locator('#chat-log .msg.user.action .stage')).toHaveText('ნინო ქალბატონ თამარს ხელნაწერის ეგზემპლარს აწვდის.');
     await expect(page.locator('#chat-log .msg.char').last()).toContainText('სად მცალია ნეტავ მაგისთვის');
     await expect(page.locator('#chat-copy')).toBeVisible();
-    await expect(page.locator('#chat-copy')).not.toHaveClass(/retrieve/);
+    await expect(page.locator('#chat-copy')).toHaveAttribute('data-mode', 'give');
     await expect(page.locator('#chat-copy-status')).toBeHidden();
     await expect(page.locator('#copies-val')).toHaveText('3/3');
     expect((await copies(page)).copies.map((c) => c.status)).toEqual(['in_hand', 'in_hand', 'in_hand']);
@@ -282,7 +285,7 @@ test.describe('Round 8 — ტელეფონი 375×812', () => {
     await page.screenshot({ path: `${SHOTS}/R8-01-chat-copy-button-375.png` });
     await clickCopy(page);
     await expect(page.locator('#chat-copy-status')).toHaveText('ეგზემპლარი №1 ვასოსთანაა 0 დღეა');
-    await expect(btn).toHaveClass(/retrieve/);
+    await expect(btn).toHaveAttribute('data-mode', 'take');
     await page.screenshot({ path: `${SHOTS}/R8-02-chat-retrieve-status-375.png` });
     await page.locator('#chat-close').tap();
     await expect(page.locator('#chat')).toBeHidden();

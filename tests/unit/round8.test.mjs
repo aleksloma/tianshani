@@ -14,7 +14,7 @@ import { dative, toward, genitive } from '../../public/js/names.js';
 import { setJSON, KEYS } from '../../public/js/storage.js';
 import { byId, characters, manuscriptBehaviour as BEH } from '../../src/characters.js';
 import {
-  buildPrompt, sanitizeManuscript, decideAction, parseAction, manuscriptBlock, actionBlock,
+  buildPrompt, sanitizeManuscript, decideAction, parseAction, manuscriptBlock, actionBlock, WHOLE_COPY_LINE, OWN_WORDS_LINE,
 } from '../../src/prompt.js';
 import { pacingState, redirectGateLine, isManuscriptMessage } from '../../src/pacing.js';
 import { composeMockReply, MOCK_NOBODY_GAVE, MOCK_STRAY_PAGES } from '../../src/mock.js';
@@ -489,9 +489,11 @@ test('§7.3 # ACTION: ოთხივე შედეგი, პრომპტ�
   };
   for (const [outcome, [id, extra, line]] of Object.entries(cases)) {
     const result = { type: outcome.includes('return') ? 'retrieve' : 'hand_over', copyId: 1, outcome, ...extra };
-    assert.equal(actionBlock(result, byId[id]), `# ACTION\n${line}`, outcome);
+    // Round 9: მთელი ეგზემპლარის ხაზი (accepted/full) და „ავტორის სიტყვები“ ყველა შედეგზე
+    const full = `${line}${outcome === 'accepted' ? ` ${WHOLE_COPY_LINE}` : ''} ${OWN_WORDS_LINE}`;
+    assert.equal(actionBlock(result, byId[id]), `# ACTION\n${full}`, outcome);
     const s = prompt(byId[id], m, { actionResult: result, stageMode: 'none' });
-    assert.ok(s.trimEnd().endsWith(`# ACTION\n${line}`), outcome);
+    assert.ok(s.trimEnd().endsWith(`# ACTION\n${full}`), outcome);
     assert.ok(s.indexOf('# PACING') < s.indexOf('# ACTION'));
   }
   assert.equal(actionBlock(null, byId.vaso), null);
