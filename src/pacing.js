@@ -190,7 +190,9 @@ export function mixesAddress(c) {
  * გადამისამართების „ჩამკეტი“ ამ პასუხისთვის: ზოგადი წესი საკმარისი არ აღმოჩნდა (რეალური smoke: ბელამ ხელნაწერის
  * პირველსავე შეტყობინებაზე „ვასოსთან გადადი“ თქვა). მთვლელი სერვერზეა, ამიტომ პირდაპირ ვეუბნებით, რა შეიძლება ახლა.
  */
-export function redirectGateLine(p) {
+export function redirectGateLine(p, { allow = false } = {}) {
+  // Round 8 §7.3: ეგზემპლარი ვერ დააბრუნა და მისი ამბავი ხილულ პერსონაჟს ასახელებს — გადამისამართება ამ პასუხში ნებადართულია
+  if (allow) return 'REDIRECT GATE: open for this reply — you may send the user to the ONE person your story about the copy names. If the user then changes the subject, talk gladly.';
   if (p.manuscriptCount < 3) {
     return `REDIRECT GATE: the manuscript has come up ${p.manuscriptCount} time(s) — fewer than 3. In THIS reply do NOT send the user to anyone else (no "go to X", "take it to X", "X has it"), do NOT say you are leaving or busy. Engage: react, ask, promise something small.`;
   }

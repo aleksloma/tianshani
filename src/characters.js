@@ -16,6 +16,12 @@ const CATCHPHRASE_TRIGGERS = (() => {
     return JSON.parse(fs.readFileSync(path.join(ROOT, 'src', 'data', 'catchphrase_triggers.json'), 'utf8')).characters || {};
   } catch { return {}; }
 })();
+// Round 8 §6: ვინ იღებს ეგზემპლარს, როგორ კარგავს — { id: { accepts, chain_only, min_days, p_event, accept_ka, return_ka, refuse_ka, events } }
+export const manuscriptBehaviour = (() => {
+  try {
+    return JSON.parse(fs.readFileSync(path.join(ROOT, 'src', 'data', 'manuscript_behaviour.json'), 'utf8')).characters || {};
+  } catch { return {}; }
+})();
 export const DEFAULT_TRIGGER = 'rarely; only if it fits';
 
 /** ფრაზის „როდის“ — ფაილიდან; თუ არ არის, „იშვიათად, მხოლოდ თუ ჯდება“. */

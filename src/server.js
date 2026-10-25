@@ -7,8 +7,10 @@ import express from 'express';
 import cookieParser from 'cookie-parser';
 
 import { loadConfig, ROOT } from './config.js';
-import { byId, publicList, pickProxy, famousRollCall, meta } from './characters.js';
-import { buildPrompt, sanitizeGameState, annotateForProxy, pickStageMode, cleanUserName, SEASON_KA } from './prompt.js';
+import { byId, publicList, pickProxy, famousRollCall, meta, manuscriptBehaviour } from './characters.js';
+import {
+  buildPrompt, sanitizeGameState, annotateForProxy, pickStageMode, cleanUserName, SEASON_KA, sanitizeManuscript, parseAction, decideAction,
+} from './prompt.js';
 import { openDb } from './db.js';
 import { balance, createRateLimiter, MSG_LIMIT, MSG_RATE, MSG_TOO_LONG } from './limits.js';
 import {
@@ -121,6 +123,8 @@ export function createApp(cfg) {
         seasons_ka: SEASON_KA,
       },
       roll_call: famousRollCall?.lines || [],
+      // Round 8 §6: ეგზემპლარების ქცევის ცხრილი (კლიენტის დროის ნაბიჯისთვის)
+      manuscript_behaviour: manuscriptBehaviour,
       // კედლის ფოტოები ბზარის საფეხურის მიხედვით (Round 2 §7); არარსებული ფაილი → null (კლიენტი წინა სურათს აიღებს)
       wall_backgrounds: wallBackgrounds,
       wall_image: wallBackgrounds[0] || null,
@@ -162,6 +166,20 @@ export function createApp(cfg) {
     if (!last || last.role !== 'user' || !last.content.trim()) return res.status(400).json({ error: 'ბოლო შეტყობინება მომხმარებლისა უნდა იყოს.' });
     if (last.content.length > cfg.limits.max_message_chars) return res.status(413).json({ error: MSG_TOO_LONG });
 
+    // Round 8 §3.3: ეგზემპლარის გადაცემა/გამორთმევა. შედეგს სერვერი წყვეტს (არა მოდელი).
+    const action = parseAction(req.body.action, cfg);
+    if (action === false) return res.status(400).json({ error: 'ასეთი მოქმედება არ არსებობს.' });
+    const ms = sanitizeManuscript(req.body.manuscript, cfg);
+    if (!ms.ok) return res.status(400).json({ error: 'ეგზემპლარების აღრიცხვა არეულია.' });
+    const manuscript = ms.summary;
+    let actionResult = null;
+    if (action) {
+      if (!target.reachable) return res.status(400).json({ error: 'not_reachable' });
+      const d = decideAction(action, manuscript, target);
+      if (d.error) return res.status(d.status).json({ error: d.error });
+      actionResult = d.result;
+    }
+
     if (!rate.allow(clientId)) return res.status(429).json({ error: MSG_RATE, code: 'rate' });
     // 1) გლობალური თვიური ლიმიტი ტოკენებში (ყველასთვის ერთი)
     const gNow = globalStatus(store, cfg);
@@ -188,7 +206,7 @@ export function createApp(cfg) {
 
     const stageMode = pickStageMode({ invisible, historyLen: clean.length - 1 });
     const pacing = pacingState(clean, speaker);
-    const { systemInstruction, fewShot } = buildPrompt({ speaker, invisible, gameState, cfg, stageMode, pacing, userName });
+    const { systemInstruction, fewShot } = buildPrompt({ speaker, invisible, gameState, cfg, stageMode, pacing, userName, manuscript, actionResult });
     // წარმომადგენლის ჩატში მომხმარებლის შეტყობინებებს (მხოლოდ მოდელისთვის) ემატება „ვის მიმართავს“ შენიშვნა; ლოგში — ორიგინალი
     const convo = invisible
       ? clean.map((m) => (m.role === 'user' ? { ...m, content: annotateForProxy(m.content, invisible, speaker) } : m))
@@ -223,7 +241,7 @@ export function createApp(cfg) {
     let usage = { input: 0, output: 0 };
     try {
       const gen = cfg.gemini.mock
-        ? mockStream({ systemInstruction, contents, speaker, invisible, userText: last.content, gameState, signal: ac.signal, historyLen: clean.length - 1, manuscriptCount: pacing.manuscriptCount, userName })
+        ? mockStream({ systemInstruction, contents, speaker, invisible, userText: last.content, gameState, signal: ac.signal, historyLen: clean.length - 1, manuscriptCount: pacing.manuscriptCount, userName, manuscript, actionResult })
         : geminiStream({ cfg, systemInstruction, contents, signal: ac.signal });
       for await (const ev of gen) {
         if (ev.delta) { reply += ev.delta; send({ delta: ev.delta }); }
@@ -269,7 +287,11 @@ export function createApp(cfg) {
     store.addUsage(clientId, bal.period_key, usage.input, usage.output);
     // გლობალური მთვლელი — რეალური usageMetadata-დან (mock-ში ყალბი usage-დან); cost_usd — მხოლოდ შეფასება/ისტორია
     store.addGlobal(gNow.period_key, usage.input, usage.output, costUsd(usage.input, usage.output, cfg.budget));
-    logExchange(store, cfg, { clientId, characterId: target.id, spokenBy: speaker.id, userText: last.content, reply, usage, gameState, userName, original, longReply });
+    logExchange(store, cfg, {
+      clientId, characterId: target.id, spokenBy: speaker.id, userText: last.content, reply, usage, gameState, userName, original, longReply,
+      action: actionResult ? `${actionResult.type}:${actionResult.outcome}` : null,
+      manuscript: (req.body.manuscript || action) ? JSON.stringify(manuscript) : null,
+    });
 
     const after = balance(store, cfg, clientId);
     send({
@@ -288,6 +310,13 @@ export function createApp(cfg) {
       suggested_redirect: detectRedirect({ speaker, reply, currentId: target.id, userName }),
       spoken_by: speaker.id,
       spoken_by_name: speaker.short_name_ka,
+      // Round 8 §3.3 (4): კლიენტი ეგზემპლარების მდგომარეობას მხოლოდ ამის მიხედვით ცვლის
+      ...(actionResult ? {
+        action_result: {
+          type: actionResult.type, copyId: actionResult.copyId, outcome: actionResult.outcome, integrity: actionResult.integrity,
+          ...(['not_returned', 'refused'].includes(actionResult.outcome) ? { reason_ka: actionResult.reason_ka } : {}),
+        },
+      } : {}),
     });
     res.end();
   });

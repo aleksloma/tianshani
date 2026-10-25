@@ -1,7 +1,8 @@
 // MOCK პროვაიდერი: როცა Gemini-ს გასაღები არ არის. პასუხს აწყობს characters.json-ის მონაცემებიდან
 // (sample_dialogues, excuse_repertoire_ka, catchphrases_ka) და სტრიმავს სიტყვა-სიტყვით — იგივე ინტერფეისით, რაც gemini.js.
-import { byId, characters } from './characters.js';
+import { byId, characters, manuscriptBehaviour } from './characters.js';
 import { ABSENCE_FACTS_KA } from './prompt.js';
+import { isManuscriptMessage } from './pacing.js';
 import { findMentions } from './names.js';
 import { toward } from '../public/js/names.js';
 import { guessLang, mentionsManuscript } from './lang.js';
@@ -125,9 +126,44 @@ export function sendTo({ speaker, invisible, userText }) {
   return found.length ? found[found.length - 1].id : null;
 }
 
-export function composeMockReply({ speaker, invisible, userText, historyLen, gameState, manuscriptCount = 0, userName = '', history = [] }) {
-  const parts = composeParts({ speaker, invisible, userText, historyLen, gameState, manuscriptCount });
-  const to = sendTo({ speaker, invisible, userText });
+// Round 8 §7.5: ეგზემპლარების ფრაზები (ცხრილის თესლების გარდა)
+export const MOCK_NOBODY_GAVE = 'ჩემთვის არავის არაფერი მოუცია.';
+export const MOCK_STRAY_PAGES = 'რაღაც ფურცლები მიდევს მაგიდაზე, არ ვიცი ვისია.';
+MOCK_STRINGS.push(MOCK_NOBODY_GAVE, MOCK_STRAY_PAGES);
+
+/** მოქმედების პასუხი: თესლი სიტყვასიტყვით + ერთი შტრიხი; not_returned ხილულ პერსონაჟზე → „<სახელი>-სთან ჩაიარეთ.“ */
+function actionParts({ speaker, actionResult, gameState, h }) {
+  const B = manuscriptBehaviour[speaker.id] || {};
+  const seed = {
+    accepted: B.accept_ka, refused: actionResult.reason_ka || B.refuse_ka, returned: B.return_ka, not_returned: actionResult.reason_ka,
+  }[actionResult.outcome];
+  const parts = [stageFor(speaker), scriptLines(seed || '…'), pick(SEASON_LINES[gameState.season] || [], h >>> 5)];
+  const to = actionResult.outcome === 'not_returned' ? actionResult.to : null;
+  if (to && byId[to]?.reachable) parts.push(`${toward(byId[to].short_name_ka)} ჩაიარეთ.`);
+  return parts;
+}
+
+/** მოსაუბრეს ეგზემპლარი აქვს და ხელნაწერზე ეკითხებიან → მისი ბოლო სიტყვა მასზე (ან პირველი „stalled“ საბაბი). */
+function holderLine(speaker, manuscript) {
+  const c = manuscript?.copies.find((x) => x.status === 'held' && x.holder === speaker.id);
+  if (!c) return null;
+  const own = c.events.filter((e) => e.actor === speaker.id && e.day >= c.givenDay).at(-1);
+  return own?.text_ka || (manuscriptBehaviour[speaker.id]?.events || []).find((e) => e.kind === 'stalled')?.text_ka || null;
+}
+
+export function composeMockReply({ speaker, invisible, userText, historyLen, gameState, manuscriptCount = 0, userName = '', history = [], manuscript = null, actionResult = null }) {
+  const h = hash(`${speaker.id}|${userText}|${historyLen}`);
+  const parts = actionResult
+    ? actionParts({ speaker, actionResult, gameState, h })
+    : composeParts({ speaker, invisible, userText, historyLen, gameState, manuscriptCount });
+  if (!actionResult && !invisible && isManuscriptMessage(userText) && ['ka', 'unknown'].includes(guessLang(userText))) {
+    // ჯაჭვი არ შედგა → T-მ არაფერი იცის; მფლობელი → თავისი ამბავი (ხელნაწერის ხაზის ნაცვლად)
+    const failed = manuscript?.copies.some((c) => c.claim && c.claim.to === speaker.id && c.claim.arrived === false);
+    const line = failed ? MOCK_NOBODY_GAVE : holderLine(speaker, manuscript);
+    if (line) parts.splice(1, 1, line);
+  }
+  if (historyLen === 0 && !invisible && manuscript?.strayPages.some((p) => p.character === speaker.id)) parts.push(MOCK_STRAY_PAGES);
+  const to = actionResult ? null : sendTo({ speaker, invisible, userText });
   if (to) parts.push(`${toward(byId[to].short_name_ka)} ჩაიარეთ.`);
   const title = recallTitle(userText, history);
   if (title) {
@@ -205,12 +241,12 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 /**
  * იგივე ინტერფეისი, რაც gemini.streamChat: async generator → { delta } ... ბოლოს { usage }.
  */
-export async function* mockStream({ systemInstruction, contents, speaker, invisible, userText, gameState, signal, historyLen: convLen, manuscriptCount = 0, userName = '' }) {
+export async function* mockStream({ systemInstruction, contents, speaker, invisible, userText, gameState, signal, historyLen: convLen, manuscriptCount = 0, userName = '', manuscript = null, actionResult = null }) {
   // საუბრის სიგრძე few-shot-ის გარეშე (წინა შეტყობინებების რაოდენობა); ძველი გამოძახებისთვის — contents.length
   const historyLen = Number.isInteger(convLen) ? convLen : contents.length;
   // საუბარი few-shot-ის გარეშე: ბოლო historyLen + 1 (მიმდინარე) ელემენტი — წინა შეტყობინებები, ისევე როგორც მოდელი იღებს
   const history = contents.slice(Math.max(0, contents.length - historyLen - 1), -1);
-  const text = composeMockReply({ speaker, invisible, userText, historyLen, gameState, manuscriptCount, userName, history });
+  const text = composeMockReply({ speaker, invisible, userText, historyLen, gameState, manuscriptCount, userName, history, manuscript, actionResult });
   const delay = Number(process.env.MOCK_DELAY_MS ?? 25);
   // სიტყვა + მისი მომდევნო სივრცე ერთ delta-დ
   const words = text.match(/\S+\s*/g) || [text];

@@ -1,6 +1,9 @@
 // System prompt-ის აწყობა (სპეცი §4.1): სამყარო → ზოგადი წესები → პერსონაჟი → სეზონი → (უხილავის შემთხვევაში) წარმომადგენლის ბლოკი.
-import { world, byId, meta, famousRollCall, triggerFor } from './characters.js';
-import { derive, dateFor, formatDateEn, clampDay, dayFromSeason, SEASON_KA } from '../public/js/calendar.js';
+import { world, byId, meta, famousRollCall, triggerFor, manuscriptBehaviour } from './characters.js';
+import { derive, dateFor, formatDateEn, clampDay, dayFromSeason, withDefaults, SEASON_KA } from '../public/js/calendar.js';
+import {
+  INTEGRITY, INTEGRITY_EN, STATUSES, EVENT_KINDS, ACTION_TYPES, initialCopies, summaryForServer, retrievableFrom, lastEventBy,
+} from '../public/js/manuscript.js';
 import { pacingLine, LENGTH_CAP_LINE, redirectGateLine, phraseCore, touchPoolLine, catchphraseGateLine, BEAT2_LINE } from './pacing.js';
 import { forbiddenDialectFor, allowlistFor, DIALECT_FORMS } from './proofread.js';
 
@@ -252,14 +255,16 @@ export function characterBlock(c) {
   return lines.join('\n');
 }
 
-/** სეზონისა და შენობის მდგომარეობის ხაზი + შიდა თარიღი. */
-export function stateBlock(gs, cfg) {
+/** სეზონისა და შენობის მდგომარეობის ხაზი + შიდა თარიღი + (Round 8 §7.1) ავტორის ეგზემპლარები. */
+export function stateBlock(gs, cfg, manuscript = null) {
   const stages = cfg.game.crack_stages;
   const d = derive(gs.day, cfg.game);
+  const m = manuscript || allInHand(cfg);
   const lines = [
     '# CURRENT STATE OF THE BUILDING',
     `In-world date: ${formatDateEn(dateFor(cfg.game, gs.day))}, ${gs.season}, day ${d.dayInSeason + 1} of the season.`,
-    `Current season: ${gs.season}. The crack in the wall has grown to stage ${gs.crackStage + 1} of ${stages}. Copies of the manuscript lost so far: ${gs.lostCopies} of ${cfg.game.copies}.`,
+    `Current season: ${gs.season}. The crack in the wall has grown to stage ${gs.crackStage + 1} of ${stages}.`,
+    `The author owns ${m.total} copies of the manuscript: ${m.inHand} in his hands, ${m.total - m.inHand - m.lost} handed to colleagues, ${m.lost} lost.`,
     SEASON_FLAVOR_EN[gs.season] || '',
   ];
   if (gs.paintingFallen) {
@@ -333,7 +338,157 @@ export function pickStageMode({ invisible, historyLen, rnd = Math.random }) {
   return rnd() < 0.55 ? 'none' : 'optional';
 }
 
-export function buildPrompt({ speaker, invisible = null, gameState, cfg, stageMode = null, pacing = null, userName = '' }) {
+// ---------- Round 8: ხელნაწერის ეგზემპლარები ----------
+
+const MANUSCRIPT_SEED_NOBODY = 'ჩემთვის არავის არაფერი მოუცია.';
+const quote = (s) => `"${s}"`;
+const nameOf = (id) => byId[id]?.short_name_ka || id;
+
+/** ყველა ეგზემპლარი ავტორის ხელში (ძველი კლიენტი, რომელიც manuscript-ს არ აგზავნის). */
+function allInHand(cfg) {
+  return summaryForServer(initialCopies(cfg.game, 1));
+}
+
+/**
+ * §3.3 / §7.4: კლიენტის manuscript-ის ვალიდაცია. აბრუნებს { ok: true, summary } ან { ok: false }.
+ * არ არის → ყველა ხელშია. inHand/lost/total ხელახლა ითვლება — კლიენტის რიცხვებს არ ვენდობით.
+ */
+export function sanitizeManuscript(raw, cfg, chars = byId, behaviour = manuscriptBehaviour) {
+  if (raw === undefined || raw === null) return { ok: true, summary: allInHand(cfg) };
+  if (typeof raw !== 'object' || Array.isArray(raw) || !Array.isArray(raw.copies)) return { ok: false };
+  const n = withDefaults(cfg.game).copies;
+  if (raw.copies.length !== n) return { ok: false };
+  const known = (id) => typeof id === 'string' && Object.hasOwn(chars, id);
+  const day = (v) => clampDay(v, cfg.game);
+  const seen = new Set();
+  const copies = [];
+  for (const c of raw.copies) {
+    if (!c || typeof c !== 'object' || !Number.isInteger(c.id) || c.id < 1 || c.id > n || seen.has(c.id)) return { ok: false };
+    seen.add(c.id);
+    if (!STATUSES.includes(c.status) || !INTEGRITY.includes(c.integrity)) return { ok: false };
+    const holder = c.status === 'in_hand' ? null : c.holder;
+    if (holder !== null && !(typeof holder === 'string' && Object.hasOwn(behaviour, holder))) return { ok: false };
+    let claim = null;
+    if (c.claim !== null && c.claim !== undefined) {
+      if (typeof c.claim !== 'object' || !known(c.claim.from) || !known(c.claim.to)) return { ok: false };
+      claim = { from: c.claim.from, to: c.claim.to, kind: 'passed_on', day: day(c.claim.day), verified: c.claim.verified === true, arrived: c.claim.arrived === true };
+    }
+    if (c.events !== undefined && !Array.isArray(c.events)) return { ok: false };
+    const events = [];
+    for (const e of (c.events || []).slice(-6)) {
+      if (!e || typeof e !== 'object' || !known(e.actor) || !EVENT_KINDS.includes(e.kind) || typeof e.text_ka !== 'string') return { ok: false };
+      if (e.to !== null && e.to !== undefined && !known(e.to)) return { ok: false };
+      events.push({ day: day(e.day), actor: e.actor, kind: e.kind, text_ka: e.text_ka.slice(0, 200), to: e.to || null });
+    }
+    copies.push({
+      id: c.id, status: c.status, holder, integrity: c.integrity,
+      givenDay: c.status === 'held' ? day(c.givenDay) : (c.givenDay === null || c.givenDay === undefined ? null : day(c.givenDay)),
+      claim, lossVerified: c.lossVerified === true, events,
+    });
+  }
+  copies.sort((a, b) => a.id - b.id);
+  if (raw.strayPages !== undefined && !Array.isArray(raw.strayPages)) return { ok: false };
+  const strayPages = [];
+  for (const p of raw.strayPages || []) {
+    if (!p || !known(p.character) || !Number.isInteger(p.copyId) || p.copyId < 1 || p.copyId > n) return { ok: false };
+    if (!strayPages.some((x) => x.character === p.character)) strayPages.push({ character: p.character, copyId: p.copyId });
+  }
+  return { ok: true, summary: summaryForServer({ copies, strayPages }) };
+}
+
+/**
+ * §3.3 (2): მოქმედების შედეგს სერვერი წყვეტს, არასდროს მოდელი.
+ * აბრუნებს { result: { type, copyId, outcome, integrity, reason_ka, to } } ან { status, error }.
+ */
+export function decideAction(action, summary, speaker, behaviour = manuscriptBehaviour) {
+  const B = behaviour[speaker.id];
+  if (action.type === 'hand_over') {
+    if (summary.copies.some((c) => c.status === 'held' && c.holder === speaker.id)) return { status: 409, error: 'already_holds' };
+    const copy = summary.copies.find((c) => c.id === action.copyId);
+    const integrity = copy ? copy.integrity : (INTEGRITY.includes(action.integrity) ? action.integrity : 'full');
+    if (B && B.accepts === true) return { result: { type: 'hand_over', copyId: action.copyId, outcome: 'accepted', integrity, reason_ka: null, to: null } };
+    return { result: { type: 'hand_over', copyId: action.copyId, outcome: 'refused', integrity, reason_ka: B?.refuse_ka || null, to: null } };
+  }
+  const copy = retrievableFrom(summary, speaker.id)
+    || summary.copies.find((c) => c.status === 'lost' && c.holder === speaker.id);
+  if (!copy) return { status: 409, error: 'nothing_to_retrieve' };
+  if (copy.status === 'held' && copy.holder === speaker.id) {
+    return { result: { type: 'retrieve', copyId: copy.id, outcome: 'returned', integrity: copy.integrity, reason_ka: null, to: null } };
+  }
+  const ev = lastEventBy(copy, speaker.id);
+  return { result: { type: 'retrieve', copyId: copy.id, outcome: 'not_returned', integrity: copy.integrity, reason_ka: ev?.text_ka || null, to: ev?.to || null } };
+}
+
+/** action-ის ფორმის ვალიდაცია (§3.3 (1)): null → არ არის; false → არასწორია. */
+export function parseAction(raw, cfg) {
+  if (raw === undefined || raw === null) return null;
+  if (typeof raw !== 'object' || !ACTION_TYPES.includes(raw.type)) return false;
+  const n = withDefaults(cfg.game).copies;
+  if (!Number.isInteger(raw.copyId) || raw.copyId < 1 || raw.copyId > n) return false;
+  return { type: raw.type, copyId: raw.copyId, integrity: INTEGRITY.includes(raw.integrity) ? raw.integrity : null };
+}
+
+/** not_returned, რომლის ამბავი ხილულ პერსონაჟს ასახელებს → გადამისამართება ამ პასუხში ნებადართულია (§7.3). */
+export function actionOpensRedirect(result) {
+  return Boolean(result && result.outcome === 'not_returned' && result.to && byId[result.to]?.reachable);
+}
+
+/** §7.2: # MANUSCRIPT COPIES AND YOU — მხოლოდ ის ხაზები, რაც ამ მოსაუბრეს ეხება; არაფერი → null. */
+export function manuscriptBlock(speaker, manuscript, cfg, { action = null, behaviour = manuscriptBehaviour } = {}) {
+  if (!manuscript) return null;
+  const me = speaker.id;
+  const day = (d) => formatDateEn(dateFor(cfg.game, d));
+  const lines = [];
+  for (const c of manuscript.copies) {
+    if (c.status === 'held' && c.holder === me) {
+      const age = Math.max(0, (manuscript.today ?? c.givenDay) - c.givenDay);
+      const chain = c.claim && c.claim.to === me && c.claim.arrived;
+      lines.push(`You currently have copy №${c.id} (${INTEGRITY_EN[c.integrity] || c.integrity}). ${chain
+        ? `${nameOf(c.claim.from)} handed it to you on ${day(c.givenDay)}, ${age} days ago (the author gave it to ${nameOf(c.claim.from)} first).`
+        : `The author handed it to you on ${day(c.givenDay)}, ${age} days ago.`}`);
+      lines.push('You have NOT read it (two pages at most) and you never will; if asked how it is going, use your usual excuses.');
+      const said = c.events.filter((e) => e.actor === me && e.day >= c.givenDay).map((e) => quote(e.text_ka));
+      if (said.length) lines.push(`What you tell the author about it, in order (these are facts of this conversation, state them as your own words when relevant): ${said.join(', ')}`);
+    } else if ((c.status === 'lost' && c.holder === me) || (c.claim && c.claim.from === me)) {
+      const ev = lastEventBy(c, me);
+      const arrived = c.claim && c.claim.from === me && c.claim.arrived;
+      lines.push(arrived
+        ? `You had copy №${c.id} and it is no longer with you. What you say happened: ${quote(ev?.text_ka || '')}. Stick to this story.`
+        : `You had copy №${c.id} and it is gone. What you say happened: ${quote(ev?.text_ka || '')}. Stick to this story; you will not admit it is lost.`);
+      if (c.claim && c.claim.from === me) {
+        lines.push(`You say you gave it to ${nameOf(c.claim.to)}. (Truth: ${c.claim.arrived ? 'it arrived' : 'it never arrived'} — the author cannot know this from you.)`);
+      }
+    }
+    if (c.claim && c.claim.to === me && c.claim.arrived === false) {
+      lines.push(`${nameOf(c.claim.from)} claims to have given you copy №${c.id}. That is not true: nobody gave you anything. If asked, say so plainly (seed: „${MANUSCRIPT_SEED_NOBODY}“).`);
+    }
+  }
+  if (manuscript.strayPages.some((p) => p.character === me)) {
+    lines.push('A few loose pages of a typescript titled „ტიანშანი“ turned up on your desk; you do not know who left them or why. Mention it once in this chat, in your beat 2, if it fits naturally — do not offer to return them.');
+  }
+  const B = behaviour[me];
+  if (!action && B && B.accepts !== true && B.refuse_ka) {
+    lines.push(`If the author tries to leave a copy with you, you do not take it. Your reason: ${quote(B.refuse_ka)}.`);
+  }
+  return lines.length ? `# MANUSCRIPT COPIES AND YOU\n${lines.join('\n')}` : null;
+}
+
+/** §7.3: # ACTION — მხოლოდ მოქმედების პასუხზე, პრომპტის ბოლოს. */
+export function actionBlock(result, speaker, behaviour = manuscriptBehaviour) {
+  if (!result) return null;
+  const B = behaviour[speaker.id] || {};
+  const n = result.copyId;
+  const what = INTEGRITY_EN[result.integrity] || result.integrity;
+  const line = {
+    accepted: `THIS TURN: the author just handed you copy №${n} (${what}). You take it. Reply in character with your attitude to the manuscript; seed phrase: ${quote(B.accept_ka || '')}. Do not promise a date you will keep; do not start reading on the spot.`,
+    refused: `THIS TURN: the author just tried to hand you copy №${n}. You do NOT take it; it stays with him. Reason, seed phrase: ${quote(result.reason_ka || B.refuse_ka || '')}. Say it in character, with one excuse only.`,
+    returned: `THIS TURN: the author asks for copy №${n} back. You give it back (what is left of it: ${what}). Seed phrase: ${quote(B.return_ka || '')}. Never claim you finished it.`,
+    not_returned: `THIS TURN: the author asks for copy №${n} back. You cannot give it: ${quote(result.reason_ka || '')}. Say this in character; do not invent a different fate for it.`,
+  }[result.outcome];
+  return line ? `# ACTION\n${line}` : null;
+}
+
+export function buildPrompt({ speaker, invisible = null, gameState, cfg, stageMode = null, pacing = null, userName = '', manuscript = null, actionResult = null }) {
   const parts = [
     worldBlock(),
     '# GENERAL INSTRUCTIONS',
@@ -346,13 +501,19 @@ export function buildPrompt({ speaker, invisible = null, gameState, cfg, stageMo
     // სცენა თავიდანვე: სანამ პერსონაჟის საკუთარ „ხელნაწერზე რეაქციას“ წაიკითხავს
     parts.push(`# THIS CONVERSATION: the user is talking to ${invisible.short_name_ka} (absent), and you, ${speaker.short_name_ka}, answer on ${invisible.short_name_ka}'s behalf in the third person. Your own reaction to manuscript requests below applies only if the user explicitly turns to you. See SPECIAL SITUATION at the end.`);
   }
-  parts.push(characterBlock(speaker), stateBlock(gameState, cfg));
+  parts.push(characterBlock(speaker), stateBlock(gameState, cfg, manuscript));
   // უხილავის system_prompt_en ხმად არასდროს გამოიყენება — მხოლოდ ფაქტებად proxyBlock-ში.
   if (invisible) parts.push(proxyBlock(invisible, speaker));
+  // Round 8 §7.2: ეგზემპლარები და ეს მოსაუბრე (proxy-ს შემთხვევაში — proxy-სთვის)
+  const mBlock = manuscriptBlock(speaker, manuscript && { ...manuscript, today: gameState.day }, cfg, { action: actionResult });
+  if (mBlock) parts.push(mBlock);
   parts.push(userBlock(userName)); // Round 3 §1: ვის ელაპარაკება (სოსოდ ყველას აღარ ვთვლით)
   // ტემპის ხაზი (FIXES_ROUND2 §8): სერვერზე ისტორიიდან გამოთვლილი
-  if (pacing) parts.push(`# PACING\n${pacingLine(pacing)}\n${LENGTH_CAP_LINE}\n${BEAT2_LINE}\n${catchphraseGateLine(pacing)}\n${touchPoolLine(speaker, pacing)}\n${redirectGateLine(pacing)}`);
+  if (pacing) parts.push(`# PACING\n${pacingLine(pacing)}\n${LENGTH_CAP_LINE}\n${BEAT2_LINE}\n${catchphraseGateLine(pacing)}\n${touchPoolLine(speaker, pacing)}\n${redirectGateLine(pacing, { allow: actionOpensRedirect(actionResult) })}`);
   if (stageMode && STAGE_MODE_LINES[stageMode]) parts.push(STAGE_MODE_LINES[stageMode]);
+  // Round 8 §7.3: მოქმედების შედეგი — ბოლოს
+  const aBlock = actionBlock(actionResult, speaker);
+  if (aBlock) parts.push(aBlock);
   const shots = invisible ? [...fewShot(speaker), ...proxyExample(invisible, speaker)] : fewShot(speaker);
   return { systemInstruction: parts.join('\n\n'), fewShot: shots };
 }
@@ -365,7 +526,7 @@ export function sanitizeGameState(gs, cfg) {
     const n = Number.parseInt(v, 10);
     return Number.isFinite(n) ? Math.min(hi, Math.max(lo, n)) : d;
   };
-  // დღე არის სიმართლის წყარო: თუ კლიენტმა გამოგზავნა, სეზონი/ბზარი/ეგზემპლარები მისგან ითვლება;
+  // დღე არის სიმართლის წყარო: თუ კლიენტმა გამოგზავნა, სეზონი/ბზარი მისგან ითვლება (ეგზემპლარები — manuscript, Round 8);
   // თუ არა (ძველი კლიენტი ან ტესტი) — სეზონის პირველი დღე და კლიენტის ველები.
   const hasDay = Number.isFinite(Number.parseInt(g.day, 10));
   const season = seasons.includes(g.season) ? g.season : seasons[0];
@@ -375,7 +536,6 @@ export function sanitizeGameState(gs, cfg) {
     day,
     season: hasDay ? d.season : season,
     crackStage: hasDay ? d.crackStage : int(g.crackStage, 0, cfg.game.crack_stages - 1, 0),
-    lostCopies: hasDay ? d.lostCopies : int(g.lostCopies, 0, cfg.game.copies, 0),
     cycle: int(g.cycle, 1, 9999, 1),
     paintingFallen: g.paintingFallen === true,
   };
