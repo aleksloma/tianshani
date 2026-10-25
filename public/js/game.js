@@ -1,25 +1,19 @@
-// თამაშის მექანიკა: შიდა კალენდარი (დღეები), სეზონები, ბზარი, ეგზემპლარები, ჩამონგრევა.
+// თამაშის მექანიკა: შიდა კალენდარი (დღეები), სეზონები, ბზარი, ჩამონგრევა (ეგზემპლარები — manuscript.js, Round 8).
 // მდგომარეობა localStorage-ში (tianshani.game): მხოლოდ { cycle, day, exchanges, lastCharacterId, visited }.
-// ყველაფერი, რაც დღიდან გამომდინარეობს (სეზონი, ბზარი, ეგზემპლარები), ხელახლა ითვლება; ჩარჩოების/ნახატის მდგომარეობა არასდროს ინახება.
+// ყველაფერი, რაც დღიდან გამომდინარეობს (სეზონი, ბზარი), ხელახლა ითვლება; ჩარჩოების/ნახატის მდგომარეობა არასდროს ინახება.
 import { getJSON, setJSON, KEYS } from './storage.js';
 import { derive, advanceDays, withDefaults, clampDay, dayFromSeason } from './calendar.js';
 
-// Round 4 §2: ფილმის საბაბები — ეგზემპლარების tooltip-იც და დაკარგვისას გამოჩენილი ფურცელიც
-export const LOST_COPY_NOTES = [
-  'ერთი ეგზემპლარი თინას უჯრაში დარჩა — სამი თვეა იქ დევს.',
-  'ერთი ეგზემპლარი ბანკში (ან ცირკში) დარჩა.',
-  'ერთი ეგზემპლარი ოთხად გაიყო — თითო ნაწილი თითო კოლეგასთან.',
-];
 export const COLLAPSE_TEXT = 'შენობა ჩამოინგრა. ახალი შენობა. ყველაფერი თავიდან.';
 
 export function initialState(cycle = 1) {
   return { cycle, day: 0, exchanges: 0, lastCharacterId: null, visited: [], paintingFallen: false };
 }
 
-/** მდგომარეობა + გამოთვლილი ველები (season, crackStage, lostCopies, dayInSeason, daysLeft, progress). */
+/** მდგომარეობა + გამოთვლილი ველები (season, crackStage, dayInSeason, daysLeft, progress). ეგზემპლარები — manuscript.js. */
 export function withDerived(state, cfgRaw) {
   const d = derive(state.day, cfgRaw);
-  return { ...state, season: d.season, seasonIndex: d.seasonIndex, dayInSeason: d.dayInSeason, daysLeft: d.daysLeft, progress: d.progress, crackStage: d.crackStage, lostCopies: d.lostCopies };
+  return { ...state, season: d.season, seasonIndex: d.seasonIndex, dayInSeason: d.dayInSeason, daysLeft: d.daysLeft, progress: d.progress, crackStage: d.crackStage };
 }
 
 export function loadState(cfgRaw) {

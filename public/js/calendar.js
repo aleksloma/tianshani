@@ -1,4 +1,4 @@
-// შიდა კალენდარი (FIXES_ROUND1 §4): დღე → სეზონი/ბზარი/ეგზემპლარები, დღეების წინსვლა საზღვრების გადაკვეთით, თარიღი.
+// შიდა კალენდარი (FIXES_ROUND1 §4): დღე → სეზონი/ბზარი, დღეების წინსვლა საზღვრების გადაკვეთით, თარიღი.
 // სუფთა ფუნქციები, DOM-ის გარეშე — იყენებს კლიენტი (game.js, tree), სერვერი (prompt.js) და unit ტესტები.
 
 export const MONTHS_KA = ['იანვარი', 'თებერვალი', 'მარტი', 'აპრილი', 'მაისი', 'ივნისი', 'ივლისი', 'აგვისტო', 'სექტემბერი', 'ოქტომბერი', 'ნოემბერი', 'დეკემბერი'];
@@ -16,9 +16,10 @@ const DEFAULTS = {
   start_date: '1983-09-01',
   crack_stages: 5,
   copies: 3,
-  // Round 4 §2: რამდენ სეზონში იკარგება ერთი ეგზემპლარი (1 — ყოველ სეზონზე; 2 — ყოველ მეორეზე). არასდროს > 1 სეზონში.
-  seasons_per_lost_copy: 1,
 };
+
+// Round 8 §8.3: „15 ოქტომბრიდან“ — თვე „-დან“ ფორმით (ეგზემპლარების სია)
+export const MONTHS_KA_FROM = ['იანვრიდან', 'თებერვლიდან', 'მარტიდან', 'აპრილიდან', 'მაისიდან', 'ივნისიდან', 'ივლისიდან', 'აგვისტოდან', 'სექტემბრიდან', 'ოქტომბრიდან', 'ნოემბრიდან', 'დეკემბრიდან'];
 
 /** კონფიგის ნორმალიზაცია დეფოლტებით (ძველი settings.json-ის ან ნაკლული ველების შემთხვევაშიც მუშაობს). */
 export function withDefaults(cfg = {}) {
@@ -30,8 +31,6 @@ export function withDefaults(cfg = {}) {
   if (!Array.isArray(out.seasons) || !out.seasons.length) out.seasons = DEFAULTS.seasons;
   if (out.days_per_season < 1) out.days_per_season = DEFAULTS.days_per_season;
   if (out.crack_stages < 1) out.crack_stages = DEFAULTS.crack_stages;
-  const spl = Number(out.seasons_per_lost_copy);
-  out.seasons_per_lost_copy = Number.isFinite(spl) && spl >= 1 ? Math.floor(spl) : DEFAULTS.seasons_per_lost_copy;
   if (!/^\d{4}-\d{2}-\d{2}$/.test(String(out.start_date))) out.start_date = DEFAULTS.start_date;
   return out;
 }
@@ -58,8 +57,8 @@ export function dayFromSeason(season, cfgRaw) {
 
 /**
  * დღე → ყველაფერი, რაც მისგან გამომდინარეობს.
- * crackStage და lostCopies სეზონის ინდექსიდან ითვლება (შემოდგომა 0, ზამთარი 1, …) — ზუსტად როგორც ადრე, ოღონდ ტრიგერი დღეებია.
- * Round 4 §2: lostCopies = min(copies, floor(seasonIndex / seasons_per_lost_copy)) — სეზონის შუაში და ჩატის დროს არასდროს.
+ * crackStage სეზონის ინდექსიდან ითვლება (შემოდგომა 0, ზამთარი 1, …).
+ * Round 8 §1: ეგზემპლარები სეზონზე აღარ იკარგება — მათ მდგომარეობას manuscript.js მართავს.
  */
 export function derive(day, cfgRaw) {
   const cfg = withDefaults(cfgRaw);
@@ -75,7 +74,6 @@ export function derive(day, cfgRaw) {
     daysLeft: dps - dayInSeason,
     progress: dayInSeason / dps, // 0 … <1 სეზონის შიგნით (ხის ფერისთვის)
     crackStage: Math.min(cfg.crack_stages - 1, seasonIndex),
-    lostCopies: Math.min(cfg.copies, Math.floor(seasonIndex / cfg.seasons_per_lost_copy)),
   };
 }
 

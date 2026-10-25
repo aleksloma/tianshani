@@ -105,6 +105,11 @@ export function loadConfig(overrides = {}) {
   if (!Array.isArray(cfg.game.seasons) || cfg.game.seasons.length === 0) {
     cfg.game.seasons = ['autumn', 'winter', 'spring', 'summer'];
   }
+  // Round 8 §1: ეგზემპლარები სეზონზე აღარ იკარგება — ძველი გასაღები ჩუმად იგნორირდება (ერთი ჩანაწერი ლოგში)
+  if (Object.hasOwn(cfg.game, 'seasons_per_lost_copy')) {
+    delete cfg.game.seasons_per_lost_copy;
+    warnings.push('seasons_per_lost_copy is no longer used');
+  }
   const port = Number(cfg.server.port);
   cfg.server.port = Number.isInteger(port) && port >= 0 ? port : 3000; // 0 = თავისუფალი პორტი (ტესტები)
   cfg.logging.db_path = path.isAbsolute(cfg.logging.db_path) ? cfg.logging.db_path : path.join(ROOT, cfg.logging.db_path);

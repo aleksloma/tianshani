@@ -10,7 +10,7 @@ try {
   available = false;
 }
 
-export const KEYS = { chats: 'tianshani.chats', game: 'tianshani.game', client: 'tianshani.client_id', userName: 'tianshani.user_name' };
+export const KEYS = { chats: 'tianshani.chats', game: 'tianshani.game', client: 'tianshani.client_id', userName: 'tianshani.user_name', copies: 'tianshani.copies' };
 
 // --- Round 3 §1: მომხმარებლის სახელი (მაქს. 40 სიმბოლო) ---
 export const USER_NAME_MAX = 40;

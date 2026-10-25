@@ -1,0 +1,140 @@
+{
+  "_source": "FIXES_ROUND8.md §6 — ეგზემპლარების ქცევის ცხრილი (არ არის კანონი). accept_ka / return_ka / refuse_ka და ყოველი text_ka — მოდელისთვის „თესლი“ (ფრაზა, რომლის გარშემოც პასუხს აგებს); mock LLM პირდაპირ იყენებს.",
+  "characters": {
+    "soso": {
+      "accepts": true, "chain_only": false, "min_days": 20, "p_event": 0.10,
+      "accept_ka": "რა თქმა უნდა, დღესვე დავიწყებ. ჩემსაც წაიკითხავ?",
+      "return_ka": "აი, შენი. ჩემი ხომ არ გინდა, ერთ ეგზემპლარს დაგიტოვებ.",
+      "refuse_ka": null,
+      "events": [
+        { "kind": "stalled", "to": null, "weight": 3, "text_ka": "ვმუშაობდი, ვერ მოვასწარი — ხვალ აუცილებლად." },
+        { "kind": "passed_on", "to": "irodioni", "weight": 1, "text_ka": "იროდიონს მივეცი, საბჭოს წევრია, ჯერ მან უნდა წაიკითხოს." }
+      ]
+    },
+    "director": {
+      "accepts": true, "chain_only": false, "min_days": 20, "p_event": 0.45,
+      "accept_ka": "დატოვე, დატოვე. თინა, ჩაიწერე — ავტორმა ეგზემპლარი დატოვა.",
+      "return_ka": "აი, აიღე. ალაგ-ალაგ წავიკითხე ძირითადი მომენტები.",
+      "refuse_ka": null,
+      "events": [
+        { "kind": "misplaced", "to": null, "weight": 3, "text_ka": "ბანკში დამრჩა. სესხბანკში თუ მშენბანკში — ვერ გეტყვი." },
+        { "kind": "passed_on", "to": "tina", "weight": 2, "text_ka": "თინას მივეცი, უჯრაში ჩადო, როგორც წესია." },
+        { "kind": "stalled", "to": null, "weight": 1, "text_ka": "ჯერ დანარჩენებმა წაიკითხონ, მერე მე." }
+      ]
+    },
+    "tina": {
+      "accepts": true, "chain_only": false, "min_days": 60, "p_event": 0.40,
+      "accept_ka": "დატოვე, შევუტან, როგორც მოვა.",
+      "return_ka": "აიღე, აიღე. სამი თვეა აქა დევს, დირექტორი ვერ მოიცალა.",
+      "refuse_ka": null,
+      "events": [
+        { "kind": "passed_on", "to": "director", "weight": 3, "text_ka": "დირექტორს შევუტანე ბოლოს და ბოლოს." },
+        { "kind": "misplaced", "to": null, "weight": 1, "text_ka": "უჯრაში ჩავდე და აღარ არის. შენი ბრალია, ჩამარაზვინე." },
+        { "kind": "stalled", "to": null, "weight": 2, "text_ka": "უჯრაში დევს, დირექტორი მივლინებაშია." }
+      ]
+    },
+    "vaso": {
+      "accepts": true, "chain_only": false, "min_days": 20, "p_event": 0.40,
+      "accept_ka": "კარგი, დამიტოვე, ამაღამვე დავიწყებ.",
+      "return_ka": "აი, აიღე. ბოლომდე ვერ მოვასწარი, ჯერ ეს სურათი გაიტანონ.",
+      "refuse_ka": null,
+      "events": [
+        { "kind": "fragment", "to": "kote", "weight": 3, "text_ka": "პირველი მეოთხედი კოტეს გავატანე." },
+        { "kind": "fragment", "to": "bela", "weight": 2, "text_ka": "ნახევარი ბელას მივეცი, ახალგაზრდაა, სწრაფად კითხულობს." },
+        { "kind": "fragment", "to": null, "weight": 2, "text_ka": "ბოლო მერვედიც არ ჩანს — ვის შეაქვს და ვის გამოაქვს ჩემი ოთახიდან!" },
+        { "kind": "passed_on", "to": "boria", "weight": 1, "text_ka": "ბორიამ წაიღო სახლში, ალიონზე მოიტანსო." },
+        { "kind": "damaged", "to": null, "weight": 1, "text_ka": "ბზარის გვერდით მილი გასკდა და ქაღალდი დასველდა — აღარ იკითხება." }
+      ]
+    },
+    "bela": {
+      "accepts": true, "chain_only": false, "min_days": 20, "p_event": 0.40,
+      "accept_ka": "რა კარგია! დღესვე დავიწყებ, მხოლოდ ერთი უნდა დავრეკო.",
+      "return_ka": "აი, აიღე. დავიწყე და გავწყვიტე — ტელეფონი.",
+      "refuse_ka": null,
+      "events": [
+        { "kind": "fragment", "to": "khaburdzania", "weight": 2, "text_ka": "ნახევრის ნახევარი აღმოჩნდა ჩემთან, დანარჩენი ხაბურძანიას წაუღია." },
+        { "kind": "passed_on", "to": "leri", "weight": 2, "text_ka": "ლერიმ წაიღო სახლში!" },
+        { "kind": "misplaced", "to": null, "weight": 1, "text_ka": "მაგიდაზე მედო, შესვენებიდან რომ დავბრუნდი, აღარ იყო." }
+      ]
+    },
+    "otari": {
+      "accepts": true, "chain_only": false, "min_days": 20, "p_event": 0.40,
+      "accept_ka": "დატოვე. წონით რამდენია? კარგი, წავიკითხავ.",
+      "return_ka": "აიღე. მთებზეა, ფიზკულტურის ინსტიტუტში უნდა წაგეღო.",
+      "refuse_ka": null,
+      "events": [
+        { "kind": "passed_on", "to": "kopaleishvili", "weight": 3, "text_ka": "წავიკითხე, მომეწონა, კოპალეიშვილს გადავეცი — სად არის, არ ვიცი." },
+        { "kind": "damaged", "to": null, "weight": 2, "text_ka": "მარანში დამრჩა, შაბიამანი დაეღვარა და გალურჯდა — ვეღარაფერს გაარჩევ." },
+        { "kind": "damaged", "to": null, "weight": 1, "text_ka": "ეზოში დარჩა, დაობდა. მზეში დატოვე, გაშრება." }
+      ]
+    },
+    "irodioni": {
+      "accepts": true, "chain_only": false, "min_days": 40, "p_event": 0.12,
+      "accept_ka": "დატოვე, სეიფში ჩავდებ. შვებულებაში ვარ ფაქტიურად, მაგრამ მოვასწრებ.",
+      "return_ka": "აი, სეიფიდან. ჩემთან არაფერი არ იკარგება.",
+      "refuse_ka": null,
+      "events": [
+        { "kind": "stalled", "to": null, "weight": 3, "text_ka": "დავიწყებ და დავამთავრებ, ჯერ შვებულება გავიარო." },
+        { "kind": "passed_on", "to": "tsverava", "weight": 1, "text_ka": "წავიკითხე და წვერავას გადავეცი — ჯარშია ჯერ." }
+      ]
+    },
+    "kako": {
+      "accepts": true, "chain_only": false, "min_days": 20, "p_event": 0.45,
+      "accept_ka": "ვთქვათ, ავიღე… მერე? კარგი, დატოვე.",
+      "return_ka": "აი. ვთქვათ, წავიკითხე… მერე?",
+      "refuse_ka": null,
+      "events": [
+        { "kind": "fragment", "to": null, "weight": 3, "text_ka": "ნახევარი ციხისძირში დამრჩა, დღეისსწორს ჩამოვიტან." },
+        { "kind": "passed_on", "to": "boria", "weight": 1, "text_ka": "ბორიას მივეცი, პოეტია, უკეთ გაიგებს." }
+      ]
+    },
+    "boria": {
+      "accepts": true, "chain_only": false, "min_days": 20, "p_event": 0.45,
+      "accept_ka": "კარგი, წავიღებ სახლში, ალიონზე მოგიტანთ.",
+      "return_ka": "აი, რამდენჯერაც წავიღე, იმდენჯერ დაგიბრუნეთ.",
+      "refuse_ka": null,
+      "events": [
+        { "kind": "stalled", "to": null, "weight": 2, "text_ka": "სახლში დამრჩა, ალიონზე მოგიტანთ." },
+        { "kind": "fragment", "to": "kako", "weight": 2, "text_ka": "ნახევარი კაკოს წაუღია." },
+        { "kind": "passed_on", "to": "vaso", "weight": 1, "text_ka": "ვასოს დავუბრუნე, მისი ოთახიდან იყო." }
+      ]
+    },
+    "kote": {
+      "accepts": true, "chain_only": false, "min_days": 20, "p_event": 0.40,
+      "accept_ka": "კარგი, ჯერ ფორმალურად განვიხილოთ.",
+      "return_ka": "აი. ოფისში ვერ გავატარე, ნუ იჩქარებ დიდი კრუგის დანიშვნას.",
+      "refuse_ka": null,
+      "events": [
+        { "kind": "misplaced", "to": null, "weight": 3, "text_ka": "ერთი ცალი ოფისში გავატარე, საჭიროა — იქ დარჩა." },
+        { "kind": "fragment", "to": "kako", "weight": 1, "text_ka": "ნახევარი კაკოს გავუცვალე, გაცვლითი წესით." }
+      ]
+    },
+    "mikho": {
+      "accepts": true, "chain_only": false, "min_days": 20, "p_event": 0.15,
+      "accept_ka": "მომეცი, დილამდე წავიკითხავ!",
+      "return_ka": "აი, დავიწყე! კარგი რამეა. როცა გინდათ, გავიტან სურათს.",
+      "refuse_ka": null,
+      "events": [
+        { "kind": "stalled", "to": null, "weight": 2, "text_ka": "სახლში წავიღე, დილამდე." },
+        { "kind": "damaged", "to": null, "weight": 1, "text_ka": "საღებავი დაეღვარა, ბოდიში." }
+      ]
+    },
+    "leri": {
+      "accepts": false, "chain_only": true, "min_days": 0, "p_event": 0.70,
+      "accept_ka": null,
+      "return_ka": "აიღეთ და თავი დაანებეთ ჩემს ცოლს!",
+      "refuse_ka": "დაანებეთ ჩემს ცოლს თავი!",
+      "events": [
+        { "kind": "misplaced", "to": null, "weight": 1, "text_ka": "სახლში დევს სადღაც — არ ვიცი და არც მაინტერესებს." }
+      ]
+    },
+    "shukri": { "accepts": false, "refuse_ka": "მე არ წავიკითხავ! პრინციპულად." },
+    "grisha": { "accepts": false, "refuse_ka": "განცხადება დაწერეთ დირექტორის სახელზე. მე სამეურნეო ნაწილი ვარ, ლიტერატურა არ მეხება." },
+    "tamari": { "accepts": false, "refuse_ka": "სად მცალია ნეტავ მაგისთვის — ხელფასები ვერ დამირიგებია. ვინმე სხვას მიეცი." },
+    "marksheideri": { "accepts": false, "refuse_ka": "უკაცრავად, მე მხოლოდ დირექტორს ველოდები. ჯერ ეს ბიძგი გავარკვიოთ." },
+    "lali": { "accepts": false, "refuse_ka": "ახლა გაკვეთილი მაქვს, ჯერ ზმნები უნდა გავიმეორო. გაკვეთილის მერე." },
+    "tengizi": { "accepts": false, "refuse_ka": "ახლა ვერ, ხედავ, საქმე მაქვს. ამის მერე." },
+    "chachanidze": { "accepts": false, "refuse_ka": "ჯერ ჩემი მოუსმინეთ, ლირიკაა. დღეში ორჯერ ვვარჯიშობთ, დრო არ მრჩება." },
+    "two_big_men": { "accepts": false, "refuse_ka": "გივის გადაეცით, ჩვენ ვიყავით." }
+  }
+}

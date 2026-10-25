@@ -1,4 +1,4 @@
-// Round 7 §1: „→ მივიდე <სახელი>-სთან“ — სახელი თანდებულით „-თან“ (DOM-ის გარეშე: ტესტები და mock-იც იყენებს).
+// Round 7 §1: „→ მივიდე <სახელი>-სთან“ — სახელი თანდებულით „-თან“; Round 8: მიცემითი „-ს“ (DOM-ის გარეშე: ტესტები და mock-იც იყენებს).
 
 const CONSONANT = /[ბგდვზთკლმნპჟრსტფქღყშჩცძწჭხჯჰ]/;
 
@@ -18,12 +18,36 @@ function vowelStemI(word, single) {
  * წინა სიტყვები (წოდება, რიცხვითი, ზედსართავი) ბოლო „ი“-ს კარგავს; ბოლო სიტყვა — „-თან“ / „-სთან“.
  */
 export function toward(shortName) {
+  return inflect(shortName, 'სთან', 'თან');
+}
+
+/**
+ * Round 8 §3.2: მიცემითი „-ს“ — იგივე ფუძე, რაც toward()-ში, „თან“-ის გარეშე: ვასო → ვასოს, ოთარი → ოთარს,
+ * გივი → გივის, ქალბატონი თამარი → ქალბატონ თამარს, ბელას ქმარი → ბელას ქმარს.
+ */
+export function dative(shortName) {
+  return inflect(shortName, 'ს', 'ს');
+}
+
+/**
+ * ნათესაობითი „-ის“ / „-ს“ („… თქმით“): ოთარი → ოთარის, ვაჟა ზაზაევიჩი → ვაჟა ზაზაევიჩის, ვასო → ვასოს, გივი → გივის.
+ * „-ძე“ გვარი ე-ს კარგავს (ჩაჩანიძე → ჩაჩანიძის). კუმშვადი ფუძე (ქმარი → ქმრის) არ მუშავდება —
+ * მხოლოდ ეგზემპლარის გადამცემებისთვის გამოიყენება, მათ შორის ასეთი არავინაა.
+ */
+export function genitive(shortName) {
+  const s = String(shortName || '').trim();
+  if (s.endsWith('ძე')) return `${s.slice(0, -1)}ის`;
+  return inflect(s, 'ს', 'ის');
+}
+
+/** ბოლო სიტყვა: ხმოვანფუძიანს ემატება afterVowel, თანხმოვანფუძიანს (ბოლო „ი“-ს გარეშე) — afterConsonant. */
+function inflect(shortName, afterVowel, afterConsonant) {
   const words = String(shortName || '').trim().split(/\s+/);
   const last = words.pop() || '';
   const head = words.map((w) => (w.endsWith('ი') && w.length > 2 ? w.slice(0, -1) : w));
   let tail;
-  if (last.endsWith('ი')) tail = vowelStemI(last, head.length === 0) ? `${last}სთან` : `${last.slice(0, -1)}თან`;
-  else if (CONSONANT.test(last.at(-1) || '')) tail = `${last}თან`;
-  else tail = `${last}სთან`;
+  if (last.endsWith('ი')) tail = vowelStemI(last, head.length === 0) ? `${last}${afterVowel}` : `${last.slice(0, -1)}${afterConsonant}`;
+  else if (CONSONANT.test(last.at(-1) || '')) tail = `${last}${afterConsonant}`;
+  else tail = `${last}${afterVowel}`;
   return [...head, tail].join(' ');
 }
