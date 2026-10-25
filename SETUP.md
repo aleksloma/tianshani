@@ -46,6 +46,10 @@ npm start
 
 `settings.json → game`: `start_date` (1983-09-01), `days_per_season` (90), `days_per_character_switch` (20 — დრო მიდის, როცა სხვა პერსონაჟთან გადადიხართ), `days_per_exchange` (0 — შეტყობინებები დროს არ ამოძრავებს). 360-ე დღეს შენობა ინგრევა. სეზონი ზედა ზოლის ხეზე ჩანს; დეტალები — ხეზე მიტანით (მობილურზე — შეხებით).
 
+### ხელნაწერის ეგზემპლარები (Round 8)
+
+`settings.json → game.manuscript` (ნაგულისხმევები `settings.example.json`-შია): `probability_scale` (1 — ალბათობები როგორც `src/data/manuscript_behaviour.json`-შია; 0 — ეგზემპლარებს არაფერი ემართება; 1000 — მოვლენა ყოველ დახურვაზე), `stray_page_probability` (0.4), `chain_floor` (0.15), `chain_ceiling` (0.9), `chain_override` (`null` / `"arrive"` / `"lose"`), `event_override` (`null` / `"stalled"`, `"fragment"`, `"passed_on"`, `"misplaced"`, `"damaged"`). ბოლო ორი მხოლოდ ტესტებისთვისაა. `game.seasons_per_lost_copy` აღარ გამოიყენება.
+
 ### ადმინის პაროლი
 
 `settings.json → admin.password`. სანამ მნიშვნელობა `CHANGE_ME`-ა, `/admin` დაკეტილია (403).
