@@ -218,5 +218,5 @@ test('სტატიკა და 404', async () => {
   assert.equal(nf.status, 404);
   assert.ok((await nf.json()).error);
   const health = await (await fetch(`${S.base}/api/health`)).json();
-  assert.deepEqual(health, { ok: true, provider: 'mock', model: 'mock' });
+  assert.deepEqual(health, { ok: true, provider: 'mock', model: 'mock', secure: false, proto: null }); // Round 11 §2: + secure, proto
 });

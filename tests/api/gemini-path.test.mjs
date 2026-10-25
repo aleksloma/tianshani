@@ -80,7 +80,7 @@ test('არარსებული მოდელი → უახლეს�
   assert.equal(r3.done.suggested_redirect, 'tina');
   assert.ok(calls.at(-1).config.systemInstruction.includes('Messages in this chat so far: 3. Messages about the manuscript so far: 3.'));
   const health = await (await fetch(`${S.base}/api/health`)).json();
-  assert.deepEqual(health, { ok: true, provider: 'gemini', model: 'gemini-3.5-flash' });
+  assert.deepEqual(health, { ok: true, provider: 'gemini', model: 'gemini-3.5-flash', secure: false, proto: null }); // Round 11 §2: + secure, proto
 });
 
 test('thinking_budget-ს თუ მოდელი არ იღებს — მეორე ცდა thinkingConfig-ის გარეშე', async () => {
