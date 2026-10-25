@@ -43,10 +43,12 @@
             <span class="tip-date" id="season-tip-date"></span>
             <span class="tip-meta" id="season-tip-meta"></span>
             <span class="tip-cycle" id="season-tip-cycle"></span>
+            <!-- Round 8 §8.3: ვიწრო ეკრანზე ეგზემპლარების სია აქ (დესკტოპზე დამალულია) -->
+            <ol class="tip-ledger" id="season-tip-ledger"></ol>
           </span>
         </button>
         <span class="stat" id="stat-crack" title="ბზარი კედელში"><svg class="ico crack-ico" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1 L7 4 L9 6 L6 9 L8 11 L7 15" fill="none" stroke="currentColor" stroke-width="1.6"/></svg> <span id="crack-val">1/5</span></span>
-        <span class="stat" id="stat-copies" tabindex="0"><span class="ico">📄</span> ეგზემპლარი: <span id="copies-val">3/3</span>
+        <span class="stat" id="stat-copies" tabindex="0" role="button" aria-controls="copy-ledger" aria-expanded="false"><span class="ico">📄</span> ეგზემპლარი: <span id="copies-val">3/3</span>
           <span class="tooltip" id="copies-tip" role="tooltip"></span>
         </span>
         <span class="stat" id="stat-cycle">შენობა №<span id="cycle-val">1</span></span>
@@ -114,6 +116,13 @@
     <p id="copy-note-text"></p>
   </div>
 
+  <!-- Round 8 §8.3: ეგზემპლარების სია — #stat-copies-ზე დაჭერით -->
+  <div id="copy-ledger" class="copy-note ledger" role="dialog" aria-label="ხელნაწერის ეგზემპლარები" hidden>
+    <div class="pin" aria-hidden="true"></div>
+    <p class="ledger-title">„ტიანშანი“ — 3 ეგზემპლარი</p>
+    <ol id="copy-ledger-list"></ol>
+  </div>
+
   <!-- Round 5 §2: „ყველაფრის განულება“ — დადასტურების ფურცელი (იგივე ქაღალდი, რაც ეგზემპლარის ფურცელს აქვს) -->
   <div id="reset-note" class="copy-note reset-note" role="alertdialog" aria-labelledby="reset-note-text" hidden>
     <div class="pin" aria-hidden="true"></div>
@@ -137,11 +146,13 @@
         <p id="chat-role"></p>
         <p id="chat-sub" class="chat-sub" hidden></p>
         <p id="chat-user" class="chat-user" hidden></p>
+        <p id="chat-copy-status" class="chat-copy-status" hidden></p>
       </div>
       <button type="button" class="close" id="chat-close" aria-label="დახურვა">✕</button>
     </header>
     <div class="chat-log" id="chat-log" aria-live="polite"></div>
     <form class="chat-form" id="chat-form" autocomplete="off">
+      <button type="button" id="chat-copy" class="copy-btn" hidden aria-label="" title=""><span class="ico" aria-hidden="true">📄</span></button>
       <textarea id="chat-input" rows="2" placeholder="დაწერეთ…" aria-label="შეტყობინება"></textarea>
       <button type="submit" id="chat-send">გაგზავნა</button>
     </form>

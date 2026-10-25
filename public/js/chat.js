@@ -7,6 +7,7 @@ import { fitText } from './wall.js';
 import { parseSseChunk, tokensFromDone } from './sse.js';
 import { historyForServer } from './history.js';
 import { toward } from './names.js';
+import { buttonMode, statusLines, bestCopyInHand, retrievableFrom, actionText, summaryForServer } from './manuscript.js';
 
 const TYPING = ['…ფიქრობს', '…ტელეფონზეა', '…საუზმობს', '…რეზოლუციას წერს', '…ბზარს უყურებს', '…ყურმილს იღებს'];
 const TYPING_ABSENT = ['…კარს აკაკუნებენ', '…ვიღაც მოდის დერეფანში', '…ხაზი დაკავებულია', '…დაელოდეთ'];
@@ -31,7 +32,13 @@ export function accentFor(id) {
 const rand = (arr) => arr[Math.floor(Math.random() * arr.length)];
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-export function createChat({ byId, api, getConfig, getGameState, onExchange, onOpened, onClosed = null, onTokens, wall, menu, buildFrame, limitModal = null }) {
+/** Round 8 §3.1: ღილაკის წარწერა რეჟიმის მიხედვით. */
+const COPY_LABELS = { hand_over: 'ეგზემპლარის გადაცემა', retrieve: 'ეგზემპლარის გამორთმევა' };
+
+export function createChat({
+  byId, api, getConfig, getGameState, onExchange, onOpened, onClosed = null, onTokens, wall, menu, buildFrame, limitModal = null,
+  getCopies = null, onAction = null,
+}) {
   const panel = document.getElementById('chat');
   const backdrop = document.getElementById('chat-backdrop');
   const log = document.getElementById('chat-log');
@@ -42,6 +49,8 @@ export function createChat({ byId, api, getConfig, getGameState, onExchange, onO
   const form = document.getElementById('chat-form');
   const input = document.getElementById('chat-input');
   const sendBtn = document.getElementById('chat-send');
+  const copyBtn = document.getElementById('chat-copy');
+  const copyStatus = document.getElementById('chat-copy-status');
 
   let current = null;     // { id, portrait, source, exchanges } — მხოლოდ მეხსიერებაში, არასდროს ინახება
   let session = 0;        // ღია ჩატის „ვერსია“ — სტრიმი ძველ ჩატს DOM-ში აღარ წერს
@@ -117,6 +126,24 @@ export function createChat({ byId, api, getConfig, getGameState, onExchange, onO
     userEl.textContent = n ? `საუბრობს: ${n}` : '';
   }
 
+  /**
+   * Round 8 §3.1–3.2: ეგზემპლარის ღილაკი (გადაცემა / გამორთმევა / დამალული) და სათაურის ხაზი.
+   * იძახება ჩატის გახსნისას, პასუხის შემდეგ და ეგზემპლარების ყოველი ცვლილებისას.
+   */
+  function refreshCopies() {
+    const store = getCopies?.();
+    const c = current ? byId[current.id] : null;
+    const mode = store && c ? buttonMode(store, c.id, c.reachable) : null;
+    copyBtn.hidden = !mode;
+    copyBtn.classList.toggle('retrieve', mode === 'retrieve');
+    copyBtn.setAttribute('aria-label', mode ? COPY_LABELS[mode] : '');
+    copyBtn.title = mode ? COPY_LABELS[mode] : '';
+    copyBtn.disabled = Boolean(current && busy.has(current.id));
+    const line = store && c ? statusLines(store, c.id, getGameState().day, byId) : '';
+    copyStatus.hidden = !line;
+    copyStatus.textContent = line;
+  }
+
   function setBadge(portrait, proxy) {
     portrait.querySelector('.proxy-badge')?.remove();
     if (!proxy) return;
@@ -155,7 +182,11 @@ export function createChat({ byId, api, getConfig, getGameState, onExchange, onO
     const row = document.createElement('div');
     row.className = `msg ${m.role === 'user' ? 'user' : 'char'}`;
     if (m.role !== 'user') row.append(whoNode(id, m.spoken_by));
-    if (m.role === 'user') {
+    if (m.role === 'user' && m.action) {
+      // Round 8 §8.1: გადაცემა/გამორთმევა — რემარკა (*…*), ჩვენი ტექსტი, არა მომხმარებლის
+      row.classList.add('action');
+      row.append(bubbleNode(m.content));
+    } else if (m.role === 'user') {
       const bubble = document.createElement('div');
       bubble.className = 'bubble';
       bubble.textContent = m.content; // მომხმარებლის ტექსტი არ იპარსება
@@ -303,6 +334,7 @@ export function createChat({ byId, api, getConfig, getGameState, onExchange, onO
     backdrop.hidden = false;
     setSpeaker(id, currentProxy(id));
     refreshUser();
+    refreshCopies();
     renderLog(id);
     placePanel(rects);
     panel.classList.remove('closing');
@@ -369,12 +401,14 @@ export function createChat({ byId, api, getConfig, getGameState, onExchange, onO
     const b = current && busy.has(current.id);
     sendBtn.disabled = Boolean(b); // ლიმიტის დაბლოკვა — aria-disabled (limitModal.applyInput), რომ დაჭერამ ფანჯარა გახსნას
     panel.classList.toggle('busy', Boolean(b));
+    copyBtn.disabled = Boolean(b);
     limitModal?.applyInput();
   }
 
   // ---------- გაგზავნა + სტრიმინგი ----------
 
-  async function send(text) {
+  /** action — Round 8 §3.3: { type, copyId, integrity } (ეგზემპლარის ღილაკი); შედეგი მხოლოდ done-ზე ცვლის მდგომარეობას. */
+  async function send(text, { action = null } = {}) {
     const id = current?.id;
     if (!id || busy.has(id)) return;
     // ლიმიტი/ბიუჯეტი ამოწურულია → ფანჯარა ისევ იხსნება, გაგზავნა არ ხდება
@@ -391,7 +425,7 @@ export function createChat({ byId, api, getConfig, getGameState, onExchange, onO
     updateBusy();
 
     const msgs = getChat(id);
-    msgs.push({ role: 'user', content: text, ts: Date.now() });
+    msgs.push({ role: 'user', content: text, ts: Date.now(), ...(action ? { action: { type: action.type, copyId: action.copyId } } : {}) });
     saveChat(id, msgs);
     log.append(messageNode(id, msgs[msgs.length - 1]));
 
@@ -412,11 +446,14 @@ export function createChat({ byId, api, getConfig, getGameState, onExchange, onO
       // ბოლო chat.history_window შეტყობინება; `scripted: true` (Round 5 §1) — არასდროს (Round 6 §4: public/js/history.js)
       messages: historyForServer(msgs, cfg.chat.history_window),
       gameState: {
-        day: gs.day, season: gs.season, crackStage: gs.crackStage, lostCopies: gs.lostCopies, cycle: gs.cycle,
+        day: gs.day, season: gs.season, crackStage: gs.crackStage, cycle: gs.cycle,
         paintingFallen: Boolean(gs.paintingFallen),
       },
       lastSpokenBy: currentProxy(id),
       userName: getUserName(), // Round 3 §1
+      // Round 8 §3.3: ეგზემპლარების მდგომარეობა ყოველ მოთხოვნაზე; action — მხოლოდ ღილაკიდან
+      ...(getCopies ? { manuscript: summaryForServer(getCopies()) } : {}),
+      ...(action ? { action } : {}),
     };
 
     let reply = '';
@@ -506,8 +543,11 @@ export function createChat({ byId, api, getConfig, getGameState, onExchange, onO
     // მთვლელი, თარიღი და (საჭიროებისას) ინტერტიტრი — ერთად, პასუხის დასრულებისთანავე (Round 2 §1, §5)
     const tokens = tokensFromDone(done);
     if (tokens) onTokens(tokens);
+    // Round 8 §3.3: ეგზემპლარები იცვლება მხოლოდ სერვერის გადაწყვეტილებით (done), არასდროს წინასწარ
+    if (done.action_result && onAction) onAction(id, done.action_result);
     busy.delete(id);
     updateBusy();
+    if (live()) refreshCopies();
     if (live()) current.exchanges += 1; // დახურვისას დრო მიდის მხოლოდ თუ ამ საუბარში გაცვლა შედგა (Round 3 §2)
     if (done.exhausted && limitModal) limitModal.block('client_limit', done.resets_at ?? null);
     await onExchange(id);
@@ -522,6 +562,18 @@ export function createChat({ byId, api, getConfig, getGameState, onExchange, onO
     if (!text) return;
     input.value = '';
     send(text);
+  });
+  // Round 8 §3.1: ეგზემპლარი — ავტომატურად საუკეთესო ხელში მყოფი (არჩევის/დადასტურების გარეშე)
+  copyBtn.addEventListener('click', () => {
+    if (!current || busy.has(current.id)) return;
+    if (limitModal?.isBlocked()) { limitModal.open(); return; }
+    const c = byId[current.id];
+    const store = getCopies?.();
+    const mode = store ? buttonMode(store, c.id, c.reachable) : null;
+    const copy = mode === 'retrieve' ? retrievableFrom(store, c.id) : mode === 'hand_over' ? bestCopyInHand(store) : null;
+    if (!copy) return;
+    const text = actionText(mode, getUserName(), c.short_name_ka, copy.integrity);
+    send(text, { action: { type: mode, copyId: copy.id, integrity: copy.integrity } });
   });
   input.addEventListener('keydown', (e) => {
     if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); form.requestSubmit(); }
@@ -555,5 +607,5 @@ export function createChat({ byId, api, getConfig, getGameState, onExchange, onO
     await close({ instant: true, silent: true });
   }
 
-  return { open, close, switchTo, refreshUser, forgetAll, isOpen: () => Boolean(current), currentId: () => current?.id || null };
+  return { open, close, switchTo, refreshUser, refreshCopies, forgetAll, isOpen: () => Boolean(current), currentId: () => current?.id || null };
 }

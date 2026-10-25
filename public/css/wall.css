@@ -196,7 +196,7 @@ button { font: inherit; color: inherit; }
 .tree-btn:hover .tooltip, .tree-btn:focus-visible .tooltip, .tree-btn.open .tooltip { opacity: 1; }
 .tree-btn:hover .tree, .tree-btn.open .tree { transform: scale(1.25); transform-origin: 50% 100%; }
 .tree-btn .tree { transition: transform 0.3s ease; }
-#stat-copies { cursor: help; border-bottom: 1px dotted var(--ink-soft); }
+#stat-copies { cursor: pointer; border-bottom: 1px dotted var(--ink-soft); } /* Round 8 §8.2: სიას ხსნის */
 .tooltip {
   position: absolute;
   top: calc(100% + 8px);
@@ -620,6 +620,13 @@ body.collapsing #noticeboard, body.collapsing #others { transition: transform 1.
 .copy-note[hidden] { display: none; }
 .copy-note.show { opacity: 1; transform: translate(-50%, 0) rotate(-1.5deg); }
 .copy-note p { margin: 0; }
+/* Round 8 §8.3: ეგზემპლარების სია — იგივე ფურცელი, #stat-copies-ის ქვეშ (left JS-ით, ეკრანის ფარგლებში) */
+.copy-note.ledger { left: 16px; cursor: default; transform: translate(0, -14px) rotate(-1.5deg); }
+.copy-note.ledger.show { transform: translate(0, 0) rotate(-1.5deg); }
+.copy-note.ledger .ledger-title { margin: 0 0 6px; font-weight: 700; }
+.copy-note.ledger ol { margin: 0; padding: 0; list-style: none; } /* ნომერი („№1“) ხაზშივეა */
+#stat-copies[aria-expanded="true"] .tooltip { opacity: 0; } /* სია ღიაა — იგივე ტექსტი tooltip-ში ზედმეტია */
+.tree-tip .tip-ledger { display: none; }
 
 /* ---------- Round 5 §2: „ყველაფრის განულება“ — პატარა ბმული საშვის ბარათზე + დადასტურების ფურცელი ---------- */
 .reset-link {
@@ -656,6 +663,8 @@ body.collapsing #noticeboard, body.collapsing #others { transition: transform 1.
   .tree { width: 32px; height: 40px; }
   .tree-tip { right: auto; left: 50%; transform: translateX(-60%); }
   .tree-tip .tip-cycle { display: block; font-size: 11px; opacity: 0.8; }
+  /* Round 8 §8.3: ვიწრო ეკრანზე ეგზემპლარების სია ხის tooltip-შია (ცალკე ფურცლის გარეშე) */
+  .tree-tip .tip-ledger { display: block; margin: 2px 0 0; padding: 0; list-style: none; font-size: 11px; opacity: 0.8; }
   .user-chip .uc-label { display: none; }
   .user-chip b { max-width: 9ch; }
   .banner { font-size: 10.5px; padding: 1px 6px; max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

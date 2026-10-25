@@ -204,8 +204,8 @@ html.sheet-lock, html.sheet-lock body { overflow: hidden; }
 }
 .chat-sub[hidden] { display: none; }
 /* Round 3 §9: ვის ელაპარაკება პერსონაჟი — „საუბრობს: ნინო“ */
-.chat-user { margin-top: 3px !important; font-size: 12px !important; color: #1e3a5a !important; }
-.chat-user[hidden] { display: none; }
+.chat-user, .chat-copy-status { margin-top: 3px !important; font-size: 12px !important; color: #1e3a5a !important; }
+.chat-user[hidden], .chat-copy-status[hidden] { display: none; }
 .close {
   flex: none;
   width: 34px; height: 34px;
@@ -322,6 +322,8 @@ s.struck::after {
   border-left: 3px solid var(--sky);
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
 }
+/* Round 8 §8.1: ეგზემპლარის გადაცემა/გამორთმევა — „ქაღალდის ნაგლეჯი“ */
+.msg.user.action .bubble { background: transparent; border: 1px dashed rgba(42, 38, 34, 0.35); }
 .typing { font-style: italic; font-size: 13px; color: var(--ink-soft); padding: 6px 4px; }
 .typing::after { content: ''; animation: dots 1.2s steps(4) infinite; }
 @keyframes dots { 0% { content: ''; } 25% { content: '.'; } 50% { content: '..'; } 75% { content: '...'; } }
@@ -379,6 +381,24 @@ s.struck::after {
   cursor: pointer;
 }
 .chat-form button:disabled { opacity: 0.5; cursor: progress; }
+/* Round 8 §3.1: ეგზემპლარის ღილაკი ტექსტის ველის მარცხნივ — ველის ზომით და სტილით */
+.chat-form .copy-btn {
+  flex: none;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 1px solid rgba(42, 38, 34, 0.35);
+  border-radius: 2px;
+  background: #fffdf6;
+  color: inherit;
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+}
+.chat-form .copy-btn[hidden] { display: none; }
+.chat-form .copy-btn:hover, .chat-form .copy-btn:focus-visible { outline: 2px solid var(--sky); }
+.chat-form .copy-btn.retrieve .ico { text-decoration: underline; }
+.chat.busy .chat-form .copy-btn, .chat-form .copy-btn:disabled { opacity: 0.5; cursor: progress; }
 .chat-foot {
   display: flex;
   justify-content: space-between;
