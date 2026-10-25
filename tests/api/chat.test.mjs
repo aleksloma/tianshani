@@ -49,38 +49,31 @@ test('POST /api/chat: SSE delta-ები და done (usage, remaining, suggest
   assert.ok(r.done.remaining.input < S.cfg.limits.per_client_input_tokens);
   assert.deepEqual(r.done.limits, { input: S.cfg.limits.per_client_input_tokens, output: S.cfg.limits.per_client_output_tokens });
   assert.ok('suggested_redirect' in r.done);
-  if (r.done.suggested_redirect) assert.ok(['tina', 'vaso', 'otari'].includes(r.done.suggested_redirect));
+  // Round 7 §1: ნებისმიერი სხვა პერსონაჟი, რომელსაც პასუხი სახელით ასახელებს — ბოლოს ნახსენები
+  const { detectRedirect } = await import('../../src/redirect.js');
+  const { byId } = await import('../../src/characters.js');
+  assert.equal(r.done.suggested_redirect, detectRedirect({ speaker: byId.director, reply: r.reply, currentId: 'director' }));
+  assert.notEqual(r.done.suggested_redirect, 'director');
   assert.ok(jar.get('tianshani_cid'), 'httpOnly cookie დაყენდა');
 });
 
-test('suggested_redirect (Round 2 §8): ხელნაწერზე 1–2 შეტყობინებაზე არასდროს; მე-3-დან ბრუნდება და redirects_to-დანაა', async () => {
-  const targets = ['kopaleishvili', 'director', 'grisha'];
-  // პირველი/მეორე შეტყობინება ხელნაწერზე → არასდროს (პასუხი შეიძლება ასახელებდეს კიდეც)
-  for (let i = 0; i < 6; i++) {
-    const r1 = await chat(S.base, { characterId: 'otari', messages: [{ role: 'user', content: `მოთხრობა წაიკითხეთ? (${i})` }], gameState: GS });
-    assert.equal(r1.done.suggested_redirect, null, `1: ${r1.reply}`);
-    const r2 = await chat(S.base, {
-      characterId: 'otari',
-      messages: [{ role: 'user', content: 'ხელნაწერი მოგიტანეთ' }, { role: 'assistant', content: 'მოიტა.' }, { role: 'user', content: `წაიკითხეთ? (${i})` }],
-      gameState: GS,
-    });
-    assert.equal(r2.done.suggested_redirect, null, `2: ${r2.reply}`);
+test('suggested_redirect (Round 7 §1): პირველივე შეტყობინებაზე, როცა პასუხი სხვას სახელით ასახელებს; სახელის გარეშე — null', async () => {
+  const { findMentions } = await import('../../src/names.js');
+  // mock „გრიშა სად არის?“ → „…გრიშასთან ჩაიარეთ.“ (ბოლოს ნახსენები) → grisha, ხელნაწერის ხსენების გარეშეც
+  const r1 = await chat(S.base, { characterId: 'otari', messages: userMsg('გრიშა სად არის?'), gameState: GS });
+  assert.ok(r1.reply.endsWith('გრიშასთან ჩაიარეთ.'), r1.reply);
+  assert.equal(r1.done.suggested_redirect, 'grisha');
+  // უხილავიც: ღილაკი წარმომადგენლის ჩატს გახსნის
+  const r2 = await chat(S.base, { characterId: 'tina', messages: userMsg('გივი სად არის?'), gameState: GS });
+  assert.equal(r2.done.suggested_redirect, 'givi', r2.reply);
+  // სახელის გარეშე პასუხი → null (ოთარის mock პასუხებიდან რამდენიმე)
+  let nulls = 0;
+  for (let i = 0; i < 8; i++) {
+    const r = await chat(S.base, { characterId: 'otari', messages: userMsg(`როგორ ხართ? (${i})`), gameState: GS });
+    const named = findMentions(r.reply, undefined, 'otari').filter((m) => m.id !== 'otari');
+    if (!named.length) { nulls++; assert.equal(r.done.suggested_redirect, null, r.reply); } else assert.equal(r.done.suggested_redirect, named.at(-1).id, r.reply);
   }
-  // მესამე შეტყობინება ხელნაწერზე → mock სახელით გადაამისამართებს
-  let hits = 0;
-  for (let i = 0; i < 6; i++) {
-    const r = await chat(S.base, {
-      characterId: 'otari',
-      messages: [
-        { role: 'user', content: 'ხელნაწერი მოგიტანეთ' }, { role: 'assistant', content: 'მოიტა.' },
-        { role: 'user', content: 'წაიკითხეთ?' }, { role: 'assistant', content: 'ჯერ არა.' },
-        { role: 'user', content: `ჩემი მოთხრობა სად არის? (${i})` },
-      ],
-      gameState: GS,
-    });
-    if (r.done.suggested_redirect) { hits++; assert.ok(targets.includes(r.done.suggested_redirect), r.done.suggested_redirect); }
-  }
-  assert.ok(hits >= 4, `hits=${hits}`);
+  assert.ok(nulls >= 1, 'ერთი პასუხი მაინც სახელის გარეშე');
 });
 
 test('უხილავი (გივი): პასუხობს წარმომადგენელი, არასდროს გივი; სხვადასხვა წარმომადგენელი', async () => {

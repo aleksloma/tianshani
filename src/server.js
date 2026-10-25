@@ -281,8 +281,8 @@ export function createApp(cfg) {
       avg_input_per_request: after.avg_input_per_request, // Round 4 §3
       requests: after.used.requests,
       exhausted: after.exhausted,
-      // „→ მივიდე …“ მხოლოდ ხელნაწერზე მე-3 შეტყობინებიდან და მხოლოდ თუ პასუხში მართლა ასახელებს (FIXES_ROUND2 §8)
-      suggested_redirect: detectRedirect({ speaker, reply, currentId: target.id, manuscriptCount: pacing.manuscriptCount }),
+      // Round 7 §1: „→ მივიდე …“ — პასუხი სახელით ასახელებს სხვა პერსონაჟს (ბოლოს ნახსენებს), პირველივე შეტყობინებიდან
+      suggested_redirect: detectRedirect({ speaker, reply, currentId: target.id, userName }),
       spoken_by: speaker.id,
       spoken_by_name: speaker.short_name_ka,
     });

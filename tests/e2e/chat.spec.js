@@ -1,6 +1,9 @@
 // ჩატი: ცენტრში მოსვლა, სტრიმინგი, ისტორია (გადატვირთვა, ცალკე პერსონაჟები), უხილავები, ენა, გადამისამართება, შეცდომები.
 import { test, expect } from '@playwright/test';
-import { openWall, openFrame, openFromMenu, send, storage, pctShown, expectEmptyLog, SHOTS } from './helpers.js';
+import { openWall, openFrame, openFromMenu, send, storage, pctShown, expectEmptyLog, SHOTS, E2E_NAME } from './helpers.js';
+import { detectRedirect } from '../../src/redirect.js';
+import { byId } from '../../src/characters.js';
+import { toward } from '../../public/js/names.js';
 
 test('ჩარჩო → ცენტრში → ჩატი; პასუხი სტრიმით; ისტორია გადატვირთვას უძლებს; Esc აბრუნებს', async ({ page }) => {
   await openWall(page);
@@ -135,19 +138,23 @@ test('არაქართულ შეტყობინებაზე პა
   expect(reply).toMatch(/[A-Za-z]{4,}/);
 });
 
-test('გადამისამართება (Round 2 §8): პირველ გაცვლაზე ღილაკი არ არის; ხელნაწერზე მე-3 შეტყობინების შემდეგ — „→ მივიდე X-სთან“', async ({ page }) => {
+test('გადამისამართება (Round 7 §1): ღილაკი ყოველ პასუხზე, რომელიც სხვას სახელით ასახელებს (ბოლოს ნახსენებს) — სხვაგან არა', async ({ page }) => {
   await openWall(page);
   await openFrame(page, 'director');
-  await send(page, 'მოთხრობა წაიკითხეთ?');
-  await expect(page.locator('#chat-log .redirect')).toHaveCount(0);
-  await send(page, 'ხელნაწერი დაგიტოვეთ, ნახეთ?');
-  await expect(page.locator('#chat-log .redirect')).toHaveCount(0);
-  await send(page, 'მაინც, ჩემი მოთხრობა როდის წაიკითხავთ?');
-  await expect(page.locator('#chat-log .redirect')).toHaveCount(1);
+  for (const q of ['მოთხრობა წაიკითხეთ?', 'ხელნაწერი დაგიტოვეთ, ნახეთ?', 'მაინც, ჩემი მოთხრობა როდის წაიკითხავთ?']) {
+    await send(page, q);
+    const reply = (await storage(page, 'tianshani.chats')).director.at(-1).content;
+    const want = detectRedirect({ speaker: byId.director, reply, currentId: 'director', userName: E2E_NAME });
+    const row = page.locator('#chat-log .msg.char').last();
+    if (want) {
+      await expect(row.locator('.redirect')).toHaveAttribute('data-target', want);
+      await expect(row.locator('.redirect')).toHaveText(`→ მივიდე ${toward(byId[want].short_name_ka)}`);
+    } else await expect(row.locator('.redirect'), reply).toHaveCount(0);
+  }
+  // მესამე პასუხი (mock: ხელნაწერზე მე-3) აუცილებლად ასახელებს ვინმეს
   const btn = page.locator('#chat-log .redirect').last();
+  await expect(btn).toBeVisible();
   const target = await btn.getAttribute('data-target');
-  expect(['tina', 'vaso', 'otari']).toContain(target);
-  await expect(btn).toContainText('→ მივიდე');
   await btn.click();
   await expect(page.locator('.frame.portrait')).toHaveAttribute('data-id', target, { timeout: 5000 });
   await expect(page.locator('#chat')).toBeVisible();

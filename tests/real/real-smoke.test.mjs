@@ -211,6 +211,34 @@ test('რეალური API (Round 6 §4): ვასო — #1 სათა�
   assert.match(log.title_recall[2].reply, /ქვიშის\s+საათ/, `სათაური არ ახსოვს: ${log.title_recall[2].reply}`);
 });
 
+// ---------- Round 7 §1: გადამისამართების ღილაკი — ოთარის სცენა ----------
+
+test('რეალური API (Round 7 §1): ოთარი — „ხელნაწერი წაიკითხეთ?“ → „ოთხი თვეა ველოდები“; ღილაკი = პასუხში ბოლოს ნახსენები სხვა პერსონაჟი', { skip: !KEY && 'Gemini-ს გასაღები არ არის' }, async () => {
+  const { detectRedirect } = await import('../../src/redirect.js');
+  const { byId } = await import('../../src/characters.js');
+  const { findMentions } = await import('../../src/names.js');
+  const { toward } = await import('../../public/js/names.js');
+  const Q = ['ხელნაწერი წაიკითხეთ?', 'ოთხი თვეა ველოდები'];
+  const msgs = [];
+  const jar = cookieJar();
+  log.redirect_otari = [];
+  for (const q of Q) {
+    msgs.push({ role: 'user', content: q });
+    const r = await chat(S.base, { characterId: 'otari', messages: msgs, gameState: GS, userName: 'ნინო' }, { jar });
+    assert.equal(r.status, 200);
+    assert.ok(r.done, r.error || 'no done');
+    const final = r.events.find((e) => typeof e.replace === 'string')?.replace || r.reply;
+    msgs.push({ role: 'assistant', content: final });
+    const sr = r.done.suggested_redirect;
+    log.redirect_otari.push({
+      user: q, reply: final, suggested_redirect: sr, button: sr ? `→ მივიდე ${toward(byId[sr].short_name_ka)}` : null,
+      named: findMentions(final, undefined, 'otari').map((m) => m.id), usage: r.done.usage,
+    });
+    assert.notEqual(sr, 'otari');
+    assert.equal(sr, detectRedirect({ speaker: byId.otari, reply: final, currentId: 'otari', userName: 'ნინო' }), final);
+  }
+});
+
 // ---------- Round 4 §4: უცხოენოვანი პასუხი — ფრაზები ქართული დამწერლობით ----------
 
 test('რეალური API (Round 4 §4): თამარი — რუსული და ინგლისური კითხვა → პასუხი იმ ენაზე, ქართული დამწერლობის სიტყვით, ტრანსლიტერაციის გარეშე', { skip: !KEY && 'Gemini-ს გასაღები არ არის' }, async () => {
@@ -320,16 +348,14 @@ test('რეალური API (Round 2 §8): ბელა — „როგო�
   // ერთი და იგივე ცნობილი ფრაზა ჩატში ორჯერ არ მეორდება
   const seen = new Map();
   for (const t of turns) for (const p of t.usedPhrases) { assert.ok(!seen.has(p), `„${p}“ განმეორდა: #${seen.get(p)} და #${t.n}`); seen.set(p, t.n); }
-  // ამინდი (მე-4): არც გადამისამართება, არც საბაბი
+  // ამინდი (მე-4): არც გადამისამართება, არც საბაბი (Round 7 §1: ღილაკი ახლა სახელის ხსენებაზე ჩნდება — ის მხოლოდ ლოგშია)
   const weather = turns[3];
-  assert.equal(weather.r.done.suggested_redirect, null);
   assert.ok(!EXCUSE.test(weather.r.reply), `ამინდზე საბაბი: ${weather.r.reply}`);
   // „გადამისამართება“ ტექსტში = სხვასთან გაგზავნა (ქმრის ხსენება თავისთავად გადამისამართება არ არის — ის მხოლოდ ლოგშია)
   const SEND_AWAY = /(თან|სთან)\s+(მიდი|მიბრძანდი|შეიხედე|შეიარე|შეუხვიე|დატოვე|გადადი|მიიტანე|წაიღე|ჰკითხე)|მიმართე|(ასთან|სთან|თან)[^.!?\n]{0,25}(მიდი|გადადი|შეიარე)/;
   // Round 6: მხოლოდ მომხმარებლისადმი ნათქვამი (რემარკის გარეთ) — „*(ფანჯარასთან მიდის)*“ პერსონაჟის მოძრაობაა, არა გადამისამართება
   const toUser = (reply) => reply.replace(/\*[^*]*\*?/g, ' ');
   assert.ok(!SEND_AWAY.test(toUser(weather.r.reply)), `ამინდზე გადამისამართება: ${weather.r.reply}`);
-  // გადამისამართება (თუ არის) — არა უადრეს მე-3 პასუხისა; ღილაკი — მხოლოდ ≥3 ხელნაწერის შეტყობინებაზე (მე-5)
+  // გადამისამართება ტექსტში (პრომპტის წესი) — არა უადრეს მე-3 პასუხისა. ღილაკი (Round 7 §1) პრომპტის წესს აღარ ემორჩილება.
   for (const t of turns.slice(0, 2)) assert.ok(!SEND_AWAY.test(toUser(t.r.reply)), `#${t.n}: ადრეული გადამისამართება — ${t.r.reply}`);
-  for (const t of turns.slice(0, 4)) assert.equal(t.r.done.suggested_redirect, null, `#${t.n}`);
 });

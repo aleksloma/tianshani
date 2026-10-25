@@ -7,7 +7,7 @@ import path from 'node:path';
 import { applyExchange, nextCycle, initialState } from '../../public/js/game.js';
 import { periodKey, createRateLimiter, balance } from '../../src/limits.js';
 import { guessLang, mentionsManuscript } from '../../src/lang.js';
-import { detectRedirect, REDIRECT_MIN_MANUSCRIPT } from '../../src/redirect.js';
+import { detectRedirect } from '../../src/redirect.js';
 import { composeMockReply, dative } from '../../src/mock.js';
 import { toGeminiContents } from '../../src/gemini.js';
 import { byId } from '../../src/characters.js';
@@ -83,30 +83,27 @@ test('guessLang / mentionsManuscript', () => {
   assert.ok(!mentionsManuscript('როგორი ამინდია?'));
 });
 
-test('detectRedirect (Round 2): მხოლოდ ≥3 ხელნაწერის შეტყობინების შემდეგ და მხოლოდ თუ პასუხი ასახელებს redirects_to-ს', () => {
+test('detectRedirect (Round 7 §1, ცვლის Round 2 §8-ს): ნებისმიერი სხვა პერსონაჟი სახელით, პირველივე შეტყობინებიდან; ბოლოს ნახსენები', () => {
   const d = byId.director;
-  // ხელნაწერზე 3 შეტყობინებამდე — არასდროს, თუნდაც პასუხი ასახელებდეს
-  for (const m of [0, 1, 2]) {
-    assert.equal(detectRedirect({ speaker: d, reply: 'დატოვე თინასთან, ბანკში ვარ.', currentId: 'director', manuscriptCount: m }), null, String(m));
-  }
-  assert.equal(detectRedirect({ speaker: d, reply: 'დატოვე თინასთან, ბანკში ვარ.', currentId: 'director' }), null, 'ნაგულისხმევი 0');
-  assert.equal(detectRedirect({ speaker: d, reply: 'დატოვე თინასთან, ბანკში ვარ.', currentId: 'director', manuscriptCount: 3 }), 'tina');
-  assert.equal(detectRedirect({ speaker: d, reply: 'ოთარ დავიდოვიჩს მიმართეთ.', currentId: 'director', manuscriptCount: 5 }), 'otari');
-  // შემთხვევითი 50% წესი აღარ არის: სახელის გარეშე — არაფერი
-  assert.equal(detectRedirect({ speaker: d, reply: 'ძალიან კარგი!', currentId: 'director', manuscriptCount: 9 }), null);
-  // სოსოს redirects_to ცარიელია
-  assert.equal(detectRedirect({ speaker: byId.soso, reply: 'თინა', currentId: 'soso', manuscriptCount: 4 }), null);
-  // მიმდინარე ჩატის პერსონაჟზე არ გადავამისამართებთ
-  assert.equal(detectRedirect({ speaker: byId.tina, reply: 'დირექტორი ბანკშია', currentId: 'director', manuscriptCount: 4 }), null);
-  assert.equal(REDIRECT_MIN_MANUSCRIPT, 3);
-  // საკუთარი სახელი და ზოგადი სიტყვები სამიზნედ არ ითვლება
-  assert.equal(detectRedirect({ speaker: byId.bela, reply: 'ბელა ვარ, ადამიანო, წიგნში ასე წერია.', currentId: 'bela', manuscriptCount: 4 }), null);
-  assert.equal(detectRedirect({ speaker: byId.bela, reply: 'ჩემმა ქმარმა წაიღო სახლში.', currentId: 'bela', manuscriptCount: 4 }), 'leri');
-  assert.equal(detectRedirect({ speaker: byId.bela, reply: 'ბატონ ვასოსთან შეიხედე.', currentId: 'bela', manuscriptCount: 3 }), 'vaso');
-  // რამდენიმე სახელი: ის, ვისთანაც აგზავნის (რეალური პასუხები Round 2 smoke-დან)
-  assert.equal(detectRedirect({ speaker: byId.bela, reply: 'ლერიმ წაიღო სახლში, ბიჭო, ხომ გითხარი!\nშუქრის მიმართე ჯობია, ის უფრო ჩქარა კითხულობს.', currentId: 'bela', manuscriptCount: 3 }), 'shukri');
-  assert.equal(detectRedirect({ speaker: byId.bela, reply: 'ლერიმ წაიღო სახლში ის ნაწილი, ბიჭო, და იქნებ ბატონ ვასოს ჰკითხო?', currentId: 'bela', manuscriptCount: 3 }), 'vaso');
-  assert.equal(detectRedirect({ speaker: byId.bela, reply: 'შუქრიმ ყავა დალია.\nდანარჩენი ბატონ ვასოსთან გადავიდა და იმას ჰკითხე.', currentId: 'bela', manuscriptCount: 3 }), 'vaso');
+  // ხელნაწერის მთვლელი აღარ კეტავს ღილაკს
+  assert.equal(detectRedirect({ speaker: d, reply: 'დატოვე თინასთან, ბანკში ვარ.', currentId: 'director' }), 'tina');
+  assert.equal(detectRedirect({ speaker: d, reply: 'ოთარ დავიდოვიჩს მიმართეთ.', currentId: 'director' }), 'otari');
+  // სახელის გარეშე — არაფერი; თანამდებობა სახელი არ არის
+  assert.equal(detectRedirect({ speaker: d, reply: 'ძალიან კარგი!', currentId: 'director' }), null);
+  assert.equal(detectRedirect({ speaker: byId.tina, reply: 'დირექტორი ბანკშია', currentId: 'tina' }), null);
+  // redirects_to-ს გარეთაც (სოსოს redirects_to ცარიელია)
+  assert.equal(detectRedirect({ speaker: byId.soso, reply: 'თინა', currentId: 'soso' }), 'tina');
+  // მიმდინარე ჩატის პერსონაჟზე და მოსაუბრეზე — არასდროს
+  assert.equal(detectRedirect({ speaker: byId.tina, reply: 'ვაჟა ზაზაევიჩი ბანკშია', currentId: 'director' }), null);
+  assert.equal(detectRedirect({ speaker: byId.bela, reply: 'ბელა ვარ, ადამიანო, წიგნში ასე წერია.', currentId: 'bela' }), null);
+  // კუთვნილებითი სახელი: ბელასთვის „ქმარი“ ლერია
+  assert.equal(detectRedirect({ speaker: byId.bela, reply: 'ჩემმა ქმარმა წაიღო სახლში.', currentId: 'bela' }), 'leri');
+  assert.equal(detectRedirect({ speaker: byId.tina, reply: 'ჩემმა ქმარმა წაიღო სახლში.', currentId: 'tina' }), null);
+  assert.equal(detectRedirect({ speaker: byId.bela, reply: 'ბატონ ვასოსთან შეიხედე.', currentId: 'bela' }), 'vaso');
+  // რამდენიმე სახელი: ბოლოს ნახსენები (რეალური პასუხები Round 2 smoke-დან)
+  assert.equal(detectRedirect({ speaker: byId.bela, reply: 'ლერიმ წაიღო სახლში, ბიჭო, ხომ გითხარი!\nშუქრის მიმართე ჯობია, ის უფრო ჩქარა კითხულობს.', currentId: 'bela' }), 'shukri');
+  assert.equal(detectRedirect({ speaker: byId.bela, reply: 'ლერიმ წაიღო სახლში ის ნაწილი, ბიჭო, და იქნებ ბატონ ვასოს ჰკითხო?', currentId: 'bela' }), 'vaso');
+  assert.equal(detectRedirect({ speaker: byId.bela, reply: 'შუქრიმ ყავა დალია.\nდანარჩენი ბატონ ვასოსთან გადავიდა და იმას ჰკითხე.', currentId: 'bela' }), 'vaso');
 });
 
 test('mock: ქართულად ქართულზე, ინგლისურად ინგლისურზე (ქართული ფრაზით), უხილავზე — „არ არის“', () => {

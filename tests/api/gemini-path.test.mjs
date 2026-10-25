@@ -57,15 +57,15 @@ test('არარსებული მოდელი → უახლეს�
   assert.equal(req.contents.at(-1).parts[0].text, 'მოთხრობა წაიკითხეთ?');
   // usage რეალური რიცხვებიდან (thoughts → output)
   assert.deepEqual(r.done.usage, { input: 1234, output: 60 });
-  // Round 2 §8: პირველ შეტყობინებაზე ღილაკი არ ჩნდება, თუნდაც პასუხი თინას ასახელებდეს
-  assert.equal(r.done.suggested_redirect, null);
+  // Round 7 §1: პასუხი თინას ასახელებს → ღილაკი პირველივე შეტყობინებაზე (Round 2 §8-ის ჩამკეტი აღარ არის)
+  assert.equal(r.done.suggested_redirect, 'tina');
   assert.ok(req.config.systemInstruction.includes('# PACING\nMessages in this chat so far: 1. Messages about the manuscript so far: 1.'));
   const st = await (await fetch(`${S.base}/api/state`, { headers: { cookie: jar.header() } })).json();
   assert.deepEqual([st.used.input, st.used.output, st.used.requests], [1234, 60, 1]);
   // Round 2 §3: გლობალური ხარჯი რეალური usage-ით
   assert.ok(Math.abs(S.store.getGlobal(new Date().toISOString().slice(0, 7)).cost_usd - (1234 / 1e6 * 0.75 + 60 / 1e6 * 3.75)) < 1e-12);
   assert.equal(st.global.spent_usd, 0.0012, '/api/state — 4 ციფრამდე დამრგვალებული');
-  // მე-3 შეტყობინება ხელნაწერზე → redirect
+  // მე-3 შეტყობინება ხელნაწერზეც → redirect
   const r3 = await chat(S.base, {
     characterId: 'director',
     messages: [

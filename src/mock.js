@@ -1,7 +1,9 @@
 // MOCK პროვაიდერი: როცა Gemini-ს გასაღები არ არის. პასუხს აწყობს characters.json-ის მონაცემებიდან
 // (sample_dialogues, excuse_repertoire_ka, catchphrases_ka) და სტრიმავს სიტყვა-სიტყვით — იგივე ინტერფეისით, რაც gemini.js.
-import { byId } from './characters.js';
+import { byId, characters } from './characters.js';
 import { ABSENCE_FACTS_KA } from './prompt.js';
+import { findMentions } from './names.js';
+import { toward } from '../public/js/names.js';
 import { guessLang, mentionsManuscript } from './lang.js';
 
 const SEASON_LINES = {
@@ -113,8 +115,20 @@ export function recallTitle(userText, history = []) {
   return null;
 }
 
+/**
+ * Round 7 §1 (ტესტებისთვის): თუ მომხმარებელი სახელით ახსენებს სხვა პერსონაჟს („გრიშა სად არის?“), mock იქ აგზავნის —
+ * „გრიშასთან ჩაიარეთ.“ — ასე ტესტი დეტერმინისტულად იღებს პასუხს, რომელიც სახელს ასახელებს (→ suggested_redirect).
+ */
+export function sendTo({ speaker, invisible, userText }) {
+  const ids = characters.filter((c) => c.id !== speaker.id && c.id !== invisible?.id).map((c) => c.id);
+  const found = findMentions(userText, ids, speaker.id);
+  return found.length ? found[found.length - 1].id : null;
+}
+
 export function composeMockReply({ speaker, invisible, userText, historyLen, gameState, manuscriptCount = 0, userName = '', history = [] }) {
   const parts = composeParts({ speaker, invisible, userText, historyLen, gameState, manuscriptCount });
+  const to = sendTo({ speaker, invisible, userText });
+  if (to) parts.push(`${toward(byId[to].short_name_ka)} ჩაიარეთ.`);
   const title = recallTitle(userText, history);
   if (title) {
     const i = parts.findIndex((p) => p && !/^[*(]/.test(p));

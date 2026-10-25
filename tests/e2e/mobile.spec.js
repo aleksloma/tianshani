@@ -202,6 +202,25 @@ test('Round 6 §2: გრიშას თანამდებობა „ე�
   await expect(page.locator('#chat-role')).toHaveText('სამეურნეო ნაწილის გამგე');
 });
 
+test('Round 7 §1: „→ მივიდე …-სთან“ ტელეფონზე/პლანშეტზე — ღილაკი ეკრანშია, შეხებით სხვა პერსონაჟის ჩატს ხსნის', async ({ page }) => {
+  await openWall(page);
+  const id = (await visibleFrameIds(page))[0];
+  const [ask, target, label] = id === 'grisha' ? ['თინა სად არის?', 'tina', '→ მივიდე თინასთან'] : ['გრიშა სად არის?', 'grisha', '→ მივიდე გრიშასთან'];
+  await page.locator(`#frames .frame[data-id="${id}"]`).tap();
+  await send(page, ask);
+  const btn = page.locator('#chat-log .msg.char .redirect').last();
+  await expect(btn).toHaveText(label);
+  const vp = page.viewportSize();
+  const b = await btn.boundingBox();
+  expect(b.x + b.width).toBeLessThanOrEqual(vp.width);
+  expect(b.y + b.height).toBeLessThanOrEqual(vp.height);
+  await page.waitForTimeout(200);
+  await page.screenshot({ path: `${SHOTS}/R7-01-redirect-button-${tag()}.png` });
+  await btn.tap();
+  await expect(page.locator(`.frame.portrait[data-id="${target}"]`)).toHaveCount(1, { timeout: 5000 });
+  await expect.poll(() => chatStyle(page)).toEqual({ opacity: '1', pe: 'auto', display: 'flex' });
+});
+
 test('Round 5 §2: „ყველაფრის განულება“ ტელეფონზე/პლანშეტზე — ბმული ბარათზე, ფურცელი ეკრანში ეტევა, შეხებით მუშაობს', async ({ page }) => {
   await openWall(page);
   const id = (await visibleFrameIds(page))[0];

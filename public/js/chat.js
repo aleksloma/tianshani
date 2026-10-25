@@ -6,6 +6,7 @@ import { sizeClass } from './layout.js';
 import { fitText } from './wall.js';
 import { parseSseChunk, tokensFromDone } from './sse.js';
 import { historyForServer } from './history.js';
+import { toward } from './names.js';
 
 const TYPING = ['…ფიქრობს', '…ტელეფონზეა', '…საუზმობს', '…რეზოლუციას წერს', '…ბზარს უყურებს', '…ყურმილს იღებს'];
 const TYPING_ABSENT = ['…კარს აკაკუნებენ', '…ვიღაც მოდის დერეფანში', '…ხაზი დაკავებულია', '…დაელოდეთ'];
@@ -15,11 +16,9 @@ const EASE_IN = 'cubic-bezier(.2,.8,.2,1)';
 const EASE_OUT = 'cubic-bezier(.5,0,.3,1)';
 const SILHOUETTE = 'assets/silhouette.svg';
 
-/** „-სთან“: თინა → თინასთან, ოთარი → ოთართან. */
+/** „-სთან“: თინა → თინასთან, ოთარი → ოთართან, გივი → გივისთან (Round 7 §1: public/js/names.js). */
 export function withName(c) {
-  if (c.id === 'two_big_men') return 'ორ დიდ კაცთან';
-  const n = c.short_name_ka;
-  return n.endsWith('ი') ? `${n.slice(0, -1)}თან` : `${n}სთან`;
+  return toward(c.short_name_ka);
 }
 
 /** წარმომადგენლის აქცენტის ფერი (id-დან, სტაბილური). */
