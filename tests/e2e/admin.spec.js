@@ -14,6 +14,10 @@ test('/admin: არასწორი პაროლი → შეცდომ
 
   await page.goto('/admin');
   await expect(page.locator('#login')).toBeVisible();
+  // Round 7 §3: ავტორიზაციამდე გვერდზე მხოლოდ შესვლის ფორმაა — არქივის არც მარკაპი, არც სკრიპტი
+  await expect(page.locator('#app, #budget-card, #client-list, script')).toHaveCount(0);
+  for (const w of ['ბიუჯეტი', 'ექსპორტი', 'ბრაუზერები']) expect(await page.content()).not.toContain(w);
+  await page.screenshot({ path: `${SHOTS}/R7-03-admin-login-only.png`, fullPage: true });
   await page.locator('#pw').fill('wrong');
   await page.locator('#login-form button').click();
   await expect(page.locator('#login-error')).toContainText('პაროლი არასწორია');
@@ -57,7 +61,8 @@ test('/admin: არასწორი პაროლი → შეცდომ
   const st = await (await page.request.get('/api/state', { headers: { 'X-Client-Id': cid } })).json();
   expect(st.used.input).toBe(0);
 
-  // გასვლა
+  // გასვლა → ისევ მხოლოდ ფორმა
   await page.locator('#logout').click();
   await expect(page.locator('#login')).toBeVisible();
+  await expect(page.locator('#app')).toHaveCount(0);
 });

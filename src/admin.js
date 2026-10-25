@@ -1,5 +1,8 @@
 // ადმინ-API: პაროლი → HMAC-ით ხელმოწერილი httpOnly cookie. ყველა /api/admin/* (გარდა login-ისა) მოითხოვს მას.
 import crypto from 'node:crypto';
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import express from 'express';
 import { byId } from './characters.js';
 import { periodKey, createRateLimiter } from './limits.js';
@@ -27,24 +30,57 @@ export function isAdmin(req, secret) {
   return safeEqual(mac, sign(secret, `admin:${exp}`));
 }
 
-export function adminRouter(cfg, store) {
+/**
+ * პაროლის შემოწმება და სესიის cookie (ერთი ლოგიკა JSON API-სთვის და /admin ფორმისთვის).
+ * აბრუნებს null-ს (შესულია) ან { status, error }.
+ */
+function attemptLogin(cfg, secret, limiter, req, res) {
+  if (!limiter.allow(req.ip || 'x')) return { status: 429, error: 'ძალიან ბევრი ცდა. ერთ წუთში სცადეთ.' };
+  const pw = String(req.body?.password ?? '');
+  if (!cfg.admin.password || cfg.admin.password === 'CHANGE_ME') {
+    return { status: 403, error: 'ადმინის პაროლი არ არის დაყენებული (settings.json → admin.password ან env ADMIN_PASSWORD).' };
+  }
+  if (!safeEqual(pw, cfg.admin.password)) return { status: 401, error: 'პაროლი არასწორია. საქმე დახურულია.' };
+  const exp = String(Date.now() + SESSION_MS);
+  res.cookie(COOKIE, `${exp}.${sign(secret, `admin:${exp}`)}`, {
+    httpOnly: true, sameSite: 'strict', maxAge: SESSION_MS, path: '/', secure: req.secure,
+  });
+  return null;
+}
+
+const VIEWS = path.join(path.dirname(fileURLToPath(import.meta.url)), 'views');
+const escHtml = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+
+/**
+ * Round 7 §3: GET <admin.path> — ავტორიზაციამდე მხოლოდ შესვლის ფორმა (admin-login.html: არც არქივის მარკაპი, არც სკრიპტი,
+ * არც ენდპოინტების სახელები); სესიის cookie-თი — არქივი (admin.html). POST <admin.path> — ფორმის შესვლა იმავე მისამართზე.
+ */
+export function adminPages(cfg, store, limiter) {
   const r = express.Router();
-  const loginLimiter = createRateLimiter(10);
+  const adminPath = cfg.admin.path || '/admin';
+  const loginHtml = fs.readFileSync(path.join(VIEWS, 'admin-login.html'), 'utf8').replaceAll('{{ACTION}}', escHtml(adminPath));
+  const appHtml = fs.readFileSync(path.join(VIEWS, 'admin.html'), 'utf8');
+  const send = (res, html, status = 200) => { res.status(status).setHeader('Cache-Control', 'no-store'); res.type('html').send(html); };
+  const login = (res, error = '', status = 200) => send(res, loginHtml.replace('{{ERROR}}', escHtml(error)), status);
+
+  r.get(adminPath, (req, res) => (isAdmin(req, store.secret) ? send(res, appHtml) : login(res)));
+  r.post(adminPath, express.urlencoded({ extended: false, limit: '4kb' }), (req, res) => {
+    const fail = attemptLogin(cfg, store.secret, limiter, req, res);
+    if (fail) return login(res, fail.error, fail.status);
+    res.redirect(303, adminPath);
+  });
+  // არქივის სკრიპტიც მხოლოდ ავტორიზებულს (სტატიკამდე)
+  r.get('/js/admin.js', (req, res, next) => (isAdmin(req, store.secret) ? next() : res.status(404).json({ error: 'ასეთი ოთახი არ არსებობს.' })));
+  return r;
+}
+
+export function adminRouter(cfg, store, loginLimiter = createRateLimiter(10)) {
+  const r = express.Router();
   const { db, secret } = store;
 
   r.post('/login', (req, res) => {
-    if (!loginLimiter.allow(req.ip || 'x')) return res.status(429).json({ error: 'ძალიან ბევრი ცდა. ერთ წუთში სცადეთ.' });
-    const pw = String(req.body?.password ?? '');
-    if (!cfg.admin.password || cfg.admin.password === 'CHANGE_ME') {
-      return res.status(403).json({ error: 'ადმინის პაროლი არ არის დაყენებული (settings.json → admin.password ან env ADMIN_PASSWORD).' });
-    }
-    if (!safeEqual(pw, cfg.admin.password)) {
-      return res.status(401).json({ error: 'პაროლი არასწორია. საქმე დახურულია.' });
-    }
-    const exp = String(Date.now() + SESSION_MS);
-    res.cookie(COOKIE, `${exp}.${sign(secret, `admin:${exp}`)}`, {
-      httpOnly: true, sameSite: 'strict', maxAge: SESSION_MS, path: '/', secure: req.secure,
-    });
+    const fail = attemptLogin(cfg, secret, loginLimiter, req, res);
+    if (fail) return res.status(fail.status).json({ error: fail.error });
     res.json({ ok: true });
   });
 

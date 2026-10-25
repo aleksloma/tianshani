@@ -1,4 +1,4 @@
-// ადმინ-გვერდი: შესვლა, ბრაუზერების სია, საუბრები პერსონაჟებად, ლიმიტის განულება, ექსპორტი.
+// ადმინ-გვერდი: ბრაუზერების სია, საუბრები პერსონაჟებად, ლიმიტის განულება, ექსპორტი (შესვლა — src/views/admin-login.html).
 import { diffWords } from './diff.js';
 
 const $ = (id) => document.getElementById(id);
@@ -9,7 +9,8 @@ let searchTimer = null;
 
 async function api(path, opts = {}) {
   const res = await fetch(path, { credentials: 'same-origin', ...opts, headers: { 'Content-Type': 'application/json', ...(opts.headers || {}) } });
-  if (res.status === 401) { showLogin(); throw new Error('unauthorized'); }
+  // სესია ამოიწურა → გვერდის თავიდან ჩატვირთვა: სერვერი მხოლოდ შესვლის ფორმას აჩვენებს (Round 7 §3)
+  if (res.status === 401) { location.reload(); throw new Error('unauthorized'); }
   return res.json();
 }
 
@@ -23,11 +24,7 @@ function el(tag, attrs = {}, ...children) {
 }
 const when = (iso) => (iso ? new Date(iso).toLocaleString('ka-GE', { dateStyle: 'short', timeStyle: 'short' }) : '—');
 
-function showLogin() { $('app').hidden = true; $('login').hidden = false; $('pw').focus(); }
-
 async function showApp() {
-  $('login').hidden = true;
-  $('app').hidden = false;
   await Promise.all([loadStats(), loadClients(), loadProofread()]);
 }
 
@@ -168,25 +165,13 @@ function renderConversation(g) {
   }));
 }
 
-$('login-form').addEventListener('submit', async (e) => {
-  e.preventDefault();
-  $('login-error').textContent = '';
-  const res = await fetch('/api/admin/login', {
-    method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ password: $('pw').value }),
-  });
-  const j = await res.json().catch(() => ({}));
-  if (!res.ok) { $('login-error').textContent = j.error || 'შეცდომა.'; return; }
-  $('pw').value = '';
-  showApp();
-});
 $('proofread-toggle').addEventListener('click', async () => {
   const panel = $('proofread-panel');
   panel.hidden = !panel.hidden;
   $('proofread-toggle').setAttribute('aria-expanded', String(!panel.hidden));
   if (!panel.hidden) { await loadProofread(); panel.scrollIntoView({ block: 'start', behavior: 'smooth' }); }
 });
-$('logout').addEventListener('click', async () => { await fetch('/api/admin/logout', { method: 'POST', credentials: 'same-origin' }); showLogin(); });
+$('logout').addEventListener('click', async () => { await fetch('/api/admin/logout', { method: 'POST', credentials: 'same-origin' }); location.reload(); });
 $('search').addEventListener('input', () => { clearTimeout(searchTimer); searchTimer = setTimeout(loadClients, 250); });
 $('budget-reset').addEventListener('click', async () => {
   await api('/api/admin/budget/reset', { method: 'POST' });
@@ -202,5 +187,5 @@ $('reset-limit').addEventListener('click', async () => {
   setTimeout(() => { $('reset-limit').textContent = 'ლიმიტის განულება ამ კლიენტისთვის'; }, 2000);
 });
 
-// გვერდის გახსნა: თუ cookie უკვე გვაქვს — პირდაპირ არქივი
-fetch('/api/admin/me', { credentials: 'same-origin' }).then((r) => (r.ok ? showApp() : showLogin())).catch(showLogin);
+// ეს სკრიპტი მხოლოდ ავტორიზებულ არქივის გვერდზე იტვირთება (Round 7 §3) — პირდაპირ მონაცემები
+showApp();

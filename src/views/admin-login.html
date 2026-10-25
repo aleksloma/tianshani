@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="ka">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>საქმე — ადმინი</title>
+  <meta name="robots" content="noindex, nofollow">
+  <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Georgian:wght@400;500;700&family=Noto+Serif+Georgian:wdth,wght@62.5..100,400..900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/admin.css">
+</head>
+<body>
+  <!-- შესვლა (Round 7 §3: ავტორიზაციამდე მხოლოდ ეს ფორმა; არქივის გვერდი — მხოლოდ სესიის cookie-თი) -->
+  <section id="login" class="folder login">
+    <div class="folder-tab">საქმე №1983</div>
+    <h1>დაბეჭდე ტიანშანი — არქივი</h1>
+    <p class="muted">მხოლოდ სამსახურებრივი სარგებლობისთვის.</p>
+    <form id="login-form" method="post" action="{{ACTION}}">
+      <label for="pw">პაროლი</label>
+      <input id="pw" name="password" type="password" autocomplete="current-password" required autofocus>
+      <button type="submit">შესვლა</button>
+      <p id="login-error" class="error" role="alert">{{ERROR}}</p>
+    </form>
+  </section>
+</body>
+</html>

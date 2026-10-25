@@ -208,7 +208,10 @@ test('სტატიკა და 404', async () => {
   assert.ok((await home.text()).includes('დაბეჭდე ტიანშანი'));
   const admin = await fetch(`${S.base}/admin`);
   assert.equal(admin.status, 200);
-  assert.ok((await admin.text()).includes('admin.js'));
+  // Round 7 §3: ავტორიზაციის გარეშე — მხოლოდ შესვლის ფორმა (არქივის სკრიპტი არა)
+  const adminBody = await admin.text();
+  assert.ok(adminBody.includes('name="password"'));
+  assert.ok(!adminBody.includes('admin.js'));
   const js = await fetch(`${S.base}/js/layout.js`);
   assert.equal(js.status, 200);
   const nf = await fetch(`${S.base}/api/nothing`);

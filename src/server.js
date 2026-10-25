@@ -21,7 +21,7 @@ import { shouldProofread, proofread, proofreadMaxTokens } from './proofread.js';
 import { findNonWords } from './georgian.js';
 import { geminiStream, resolveModel, currentModel } from './gemini.js';
 import { log, logExchange } from './logger.js';
-import { adminRouter } from './admin.js';
+import { adminRouter, adminPages } from './admin.js';
 
 export const MSG_API_ERROR = 'ხაზი დაკავებულია. ცოტა ხანში სცადეთ.';
 export const MSG_NO_KEY = 'გამომცემლობას გასაღები დაეკარგა (settings.json → gemini.api_key)';
@@ -79,10 +79,10 @@ export function createApp(cfg) {
   app.use(cookieParser());
   app.use(clientIdMiddleware(store));
 
-  // --- ადმინი ---
-  const adminPath = cfg.admin.path || '/admin';
-  app.get(adminPath, (req, res) => res.sendFile(path.join(ROOT, 'public', 'admin.html')));
-  app.use('/api/admin', adminRouter(cfg, store));
+  // --- ადმინი (Round 7 §3: ავტორიზაციამდე მხოლოდ შესვლის ფორმა; არქივის გვერდი და სკრიპტი — სესიის cookie-თი) ---
+  const loginLimiter = createRateLimiter(10);
+  app.use(adminPages(cfg, store, loginLimiter));
+  app.use('/api/admin', adminRouter(cfg, store, loginLimiter));
 
   // --- მთავარი გვერდი (Round 4 §8): Open Graph-ს სრული მისამართები სჭირდება → {{ORIGIN}} იცვლება ---
   const indexHtml = fs.readFileSync(path.join(publicDir, 'index.html'), 'utf8');
