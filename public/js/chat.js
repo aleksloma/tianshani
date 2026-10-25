@@ -11,6 +11,7 @@ import {
   buttonMode, statusLines, bestCopyInHand, retrievableFrom, actionText, summaryForServer,
   MODE_ATTR, ACTION_ICONS, attachText, actionMessage, attachmentValid,
 } from './manuscript.js';
+import { createViewportSync } from './viewport.js';
 
 const TYPING = ['…ფიქრობს', '…ტელეფონზეა', '…საუზმობს', '…რეზოლუციას წერს', '…ბზარს უყურებს', '…ყურმილს იღებს'];
 const TYPING_ABSENT = ['…კარს აკაკუნებენ', '…ვიღაც მოდის დერეფანში', '…ხაზი დაკავებულია', '…დაელოდეთ'];
@@ -67,6 +68,15 @@ export function createChat({
   let session = 0;        // ღია ჩატის „ვერსია“ — სტრიმი ძველ ჩატს DOM-ში აღარ წერს
   let epoch = 0;          // Round 5 §2: „ყველაფრის განულების“ შემდეგ ძველი სტრიმი ისტორიაში/კალენდარში აღარ წერს
   const busy = new Set(); // პერსონაჟები, ვისთანაც პასუხი მიდის
+  // Round 11 §1.3: ღია sheet ხილულ viewport-ს მიჰყვება (კლავიატურა); პორტრეტი sheet-თან ერთად, ბოლო შეტყობინება და ველი ჩანს
+  const vvSync = createViewportSync({
+    target: panel,
+    onChange: () => {
+      if (!current) return;
+      placePortrait(current.portrait, targetRects());
+      if (document.activeElement === input) scrollDown();
+    },
+  });
 
   // ---------- წარმომადგენელი ----------
 
@@ -295,9 +305,14 @@ export function createChat({
     const ph = Math.round(pw * 1.42);
     return {
       mobile: true,
-      portrait: { x: 12, y: 10 + safeTop(), w: pw, h: ph },
+      portrait: { x: 12, y: sheetTop() + 10 + safeTop(), w: pw, h: ph },
       panel: null,
     };
+  }
+
+  /** Round 11 §1.3: ღია sheet-ის ზედა კიდე (კლავიატურისას iOS ხილულ viewport-ს ქვემოთ წევს — --vvt); სხვა დროს 0. */
+  function sheetTop() {
+    return !panel.hidden && panel.classList.contains('sheet') ? panel.getBoundingClientRect().top : 0;
   }
 
   /** ჩარჩოს „სახლი“: განლაგების მართკუთხედი viewport-ში (მობრუნებამდე) + კუთხე. ყოველ ჯერზე თავიდან ითვლება. */
@@ -339,8 +354,20 @@ export function createChat({
     }
   }
 
-  /** ვიწრო ეკრანზე გვერდი არ სქროლავს, სანამ sheet ღიაა (სქროლის პოზიცია რჩება). */
-  function lockScroll(on) { document.documentElement.classList.toggle('sheet-lock', on); }
+  /**
+   * ვიწრო ეკრანზე გვერდი არ სქროლავს, სანამ sheet ღიაა (სქროლის პოზიცია რჩება).
+   * Round 11 §1.3 (5): კლავიატურისას iOS შეიძლება მთელ გვერდს წევდეს — დახურვისას კედელი იმავე ადგილას ბრუნდება.
+   */
+  let lockedY = null;
+  function lockScroll(on) {
+    const root = document.documentElement;
+    if (on && !root.classList.contains('sheet-lock')) lockedY = window.scrollY;
+    root.classList.toggle('sheet-lock', on);
+    if (!on && lockedY !== null) {
+      if (window.scrollY !== lockedY) window.scrollTo(0, lockedY);
+      lockedY = null;
+    }
+  }
 
   /** სად „მიფრინდეს“ პორტრეტი: კედლის ჩარჩოსთან (თუ არის), თორემ ქვემოთ, პატარავდება. */
   function awayTransform(source, portraitRect) {
@@ -391,6 +418,7 @@ export function createChat({
     placePanel(rects);
     panel.classList.remove('closing');
     panel.hidden = false;
+    vvSync.toggle(rects.mobile); // Round 11 §1.3: მხოლოდ sheet-ის რეჟიმში
 
     // FLIP: საწყისი მდგომარეობა სტილში „ჩაიწერა“ (reflow) → საბოლოო მაშინვე, requestAnimationFrame-ის გარეშე.
     // Round 3 §5: ადრე `shown` მხოლოდ rAF-ში ემატებოდა — ფონურ/დამალულ ფანჯარაში rAF არ ეშვება და პანელი opacity 0-ზე რჩებოდა.
@@ -422,6 +450,7 @@ export function createChat({
     panel.classList.remove('shown');
     if (panel.classList.contains('sheet')) panel.classList.add('closing'); // sheet ქრება, კედელი ჩანს, პორტრეტი სახლში ბრუნდება
     document.body.classList.remove('chat-open');
+    vvSync.stop();
     lockScroll(false);
     if (!instant) {
       const rect = portrait.getBoundingClientRect();
@@ -438,6 +467,7 @@ export function createChat({
     panel.classList.remove('closing');
     backdrop.hidden = true;
     subEl.hidden = true;
+    wall.resume?.(); // Round 11 §1.3: კლავიატურისას გამოტოვებული კედლის გადაწყობა (თუ ზომა მართლა შეიცვალა)
     if (silent || !onClosed) return false;
     return Boolean(await onClosed(id, exchanges));
   }
@@ -672,6 +702,9 @@ export function createChat({
     placePanel(r);
     placePortrait(current.portrait, r);
     lockScroll(r.mobile);
+    vvSync.toggle(r.mobile); // sheet-ის რეჟიმიდან გამოსვლა (მობრუნება) ცვლადებს შლის
+    // Round 11 §1.3 (4): Android (resizes-content) — კლავიატურამ sheet დაამოკლა, ბოლო შეტყობინება და ველი ჩანს
+    if (r.mobile && document.activeElement === input) scrollDown();
   });
 
   /** Round 5 §2: „ყველაფრის განულება“ — ღია ჩატი იხურება (დროის გარეშე), მიმდინარე სტრიმები აღარაფერს ინახავს. */

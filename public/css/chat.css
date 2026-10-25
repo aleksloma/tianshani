@@ -142,6 +142,10 @@
   width: auto;
   height: 100vh;
   height: 100dvh;
+  /* Round 11 §1.3: კლავიატურა (iOS / visualViewport) — sheet ხილულ viewport-ს მიჰყვება (--vvt/--vvh — chat.js); ზემოთ — სათადარიგო */
+  top: var(--vvt, 0px);
+  height: var(--vvh, 100dvh);
+  bottom: auto;
   border-radius: 0;
   box-shadow: none;
   opacity: 1;

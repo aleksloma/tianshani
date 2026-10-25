@@ -103,6 +103,7 @@ export function createWall({ characters, wallCfg, onOpen, painting = { fallen: f
   pn.btn.addEventListener('click', () => drop());
   let cls = 'desktop';
   let visible = new Set(onWall.map((c) => c.id));
+  let renderedFor = { w: 0, h: 0 }; // Round 11: რა ზომაზე გადაეწყო კედელი ბოლოს
 
   /** Round 3 §6: რამდენი ჩარჩო ეკიდოს — ტელეფონზე 6, პლანშეტზე 9, დესკტოპზე ყველა (characters_on_wall). */
   function countFor(c) {
@@ -190,6 +191,7 @@ export function createWall({ characters, wallCfg, onOpen, painting = { fallen: f
   function render() {
     const W = document.documentElement.clientWidth;
     const H = window.innerHeight;
+    renderedFor = { w: window.innerWidth, h: H };
     // ზომის კლასი — window.innerWidth-ით, ზუსტად ისე, როგორც CSS media query-ები ითვლის
     cls = sizeClass(window.innerWidth);
     const shown = onWall.slice(0, countFor(cls));
@@ -236,10 +238,20 @@ export function createWall({ characters, wallCfg, onOpen, painting = { fallen: f
   function setPaintingFallen(v) { fallen = Boolean(v); showPainting(); }
 
   let t = null;
-  window.addEventListener('resize', () => { clearTimeout(t); t = setTimeout(render, 150); });
+  // Round 11 §1.3: ტელეფონზე, სანამ ჩატის sheet ღიაა, კლავიატურა მხოლოდ სიმაღლეს ცვლის — კედელი sheet-ის ქვეშ არ გადაეწყობა
+  // (თორემ ჩარჩოები გადაადგილდებოდა და პორტრეტი დახურვისას სხვა ადგილას დაბრუნდებოდა); სიგანე იცვლება (მობრუნება) — ჩვეულებრივ
+  const keyboardOnly = () => document.documentElement.classList.contains('sheet-lock') && window.innerWidth === renderedFor.w;
+  window.addEventListener('resize', () => {
+    clearTimeout(t);
+    t = setTimeout(() => { if (!keyboardOnly()) render(); }, 150);
+  });
+  /** ჩატის დახურვის შემდეგ: თუ ზომა მართლა შეიცვალა (გამოტოვებული გადაწყობა), კედელი ახლა გადაეწყობა. */
+  function resume() {
+    if (window.innerWidth !== renderedFor.w || window.innerHeight !== renderedFor.h) render();
+  }
 
   return {
-    render, setSeed, setPaintingFallen, dropPainting: drop,
+    render, resume, setSeed, setPaintingFallen, dropPainting: drop,
     // ამ ზომაზე კედელზე არმყოფი (დამალული) ჩარჩო „არ არსებობს“ — ჩატი პორტრეტს ახლიდან აწყობს
     frameNode: (id) => (visible.has(id) ? nodes.get(id) || null : null),
     isOnWall: (id) => visible.has(id),
