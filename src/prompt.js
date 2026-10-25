@@ -495,6 +495,17 @@ export function actionBlock(result, speaker, behaviour = manuscriptBehaviour) {
   return line ? `# ACTION\n${line} ${OWN_WORDS_LINE}` : null;
 }
 
+/** Round 10 §4.3: საბოლოო ინსტრუქციის ბოლო ხაზი — ყველაფერი, რასაც მოდელი წერს, ვიზიტორს სიტყვასიტყვით უჩანს. */
+export const OUTPUT_LINE = (name) => `OUTPUT: everything you write is shown to the visitor verbatim as ${name}'s words. Write only the spoken reply (plus at most one stage direction in *…* when allowed), in the user's language. Never write notes, plans, rule checks, a summary of the situation, or labels such as "Context:", "Speaker:", "Beat 1:".`;
+
+/** Round 10 §3.2 (2): ხელახალი ცდის დამატებითი ბოლო ხაზი (იგივე ინსტრუქციის შემდეგ). */
+export const REJECTED_LINE = 'YOUR PREVIOUS ATTEMPT WAS REJECTED because it contained notes or rule checks instead of speech. Output ONLY the words your character says (plus at most one stage direction in *…* if allowed), in the user\'s language.';
+
+/** buildPrompt-ის ტექსტი (უცვლელი) + OUTPUT ხაზი ბოლოს (# PACING-ის, რემარკის რეჟიმისა და # ACTION-ის შემდეგ). */
+export function finalInstruction(systemInstruction, speaker) {
+  return `${systemInstruction}\n\n${OUTPUT_LINE(speaker.short_name_ka)}`;
+}
+
 export function buildPrompt({ speaker, invisible = null, gameState, cfg, stageMode = null, pacing = null, userName = '', manuscript = null, actionResult = null }) {
   const parts = [
     worldBlock(),

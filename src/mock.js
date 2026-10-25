@@ -249,15 +249,43 @@ function composeParts({ speaker, invisible, userText, historyLen, gameState, man
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-/**
- * იგივე ინტერფეისი, რაც gemini.streamChat: async generator → { delta } ... ბოლოს { usage }.
- */
-export async function* mockStream({ systemInstruction, contents, speaker, invisible, userText, gameState, signal, historyLen: convLen, manuscriptCount = 0, userName = '', manuscript = null, actionResult = null }) {
+// ---------- Round 10 §3.2 / §6: ტესტის ჩამრთველები (gemini.mock_leak, gemini.mock_truncate) ----------
+
+/** წარმოების „გაჟონილი“ პასუხი (FIXES_ROUND10 §1) — mock_leak: "first" | "always". */
+export const MOCK_LEAK_TEXT = 'Context: User says they have no copies left of their manuscript, but will keep it in mind for the future.\nSpeaker: მარკშეიდერი (ბატონი ევგენი).\nRules check:\n- Language: Georgian.\n- User: სანდრო (use „ბატონო სანდრო“ / „თქვენ“).\n- Manuscript message count: this is turn 2 about manuscript. Gate: engage, no redirects yet (REDIRECT GATE: < 3).';
+/** mock_leak: "late" — ნორმალური პასუხის შემდეგ, მეორე ხაზიდან. */
+export const MOCK_LATE_LEAK = 'Rules check:\n- Language: Georgian.';
+/** mock_truncate — max_output_tokens-ზე მოჭრილი ბოლო (სრული წინადადების გარეშე). */
+export const MOCK_TRUNCATED_TAIL = 'ისე, ჯერ ეს ბიძგი გავარკვიოთ, მერე';
+
+const mockUsage = (systemInstruction, contents, text) => ({
+  input: Math.ceil((systemInstruction.length + contents.reduce((n, c) => n + c.content.length, 0)) / 4),
+  output: Math.ceil(text.length / 3),
+});
+
+function replyFor({ contents, speaker, invisible, userText, gameState, historyLen: convLen, manuscriptCount = 0, userName = '', manuscript = null, actionResult = null }) {
   // საუბრის სიგრძე few-shot-ის გარეშე (წინა შეტყობინებების რაოდენობა); ძველი გამოძახებისთვის — contents.length
   const historyLen = Number.isInteger(convLen) ? convLen : contents.length;
   // საუბარი few-shot-ის გარეშე: ბოლო historyLen + 1 (მიმდინარე) ელემენტი — წინა შეტყობინებები, ისევე როგორც მოდელი იღებს
   const history = contents.slice(Math.max(0, contents.length - historyLen - 1), -1);
-  const text = composeMockReply({ speaker, invisible, userText, historyLen, gameState, manuscriptCount, userName, history, manuscript, actionResult });
+  return composeMockReply({ speaker, invisible, userText, historyLen, gameState, manuscriptCount, userName, history, manuscript, actionResult });
+}
+
+/**
+ * იგივე ინტერფეისი, რაც gemini.streamChat: async generator → { delta } ... { finishReason } ... ბოლოს { usage }.
+ * leak / truncate — Round 10-ის ტესტის ჩამრთველები (ჩვეულებრივ null / false — პასუხი იგივეა, რაც ადრე).
+ */
+export async function* mockStream({ systemInstruction, contents, signal, leak = null, truncate = false, ...args }) {
+  let text = replyFor({ contents, ...args });
+  let finishReason = 'STOP';
+  if (leak === 'first' || leak === 'always') {
+    text = MOCK_LEAK_TEXT;
+    // რეალური სტრიმივით usageMetadata თავიდანვე — შეწყვეტილი ცდის ტოკენებიც ითვლება
+    yield { usage: mockUsage(systemInstruction, contents, text) };
+  } else if (leak === 'late') {
+    text = `${text}\n${MOCK_LATE_LEAK}`;
+  }
+  if (truncate) { text = `${text}\n${MOCK_TRUNCATED_TAIL}`; finishReason = 'MAX_TOKENS'; }
   const delay = Number(process.env.MOCK_DELAY_MS ?? 25);
   // სიტყვა + მისი მომდევნო სივრცე ერთ delta-დ
   const words = text.match(/\S+\s*/g) || [text];
@@ -266,6 +294,12 @@ export async function* mockStream({ systemInstruction, contents, speaker, invisi
     yield { delta: w };
     if (delay) await sleep(delay);
   }
-  const inputChars = systemInstruction.length + contents.reduce((n, c) => n + c.content.length, 0);
-  yield { usage: { input: Math.ceil(inputChars / 4), output: Math.ceil(text.length / 3) } };
+  yield { finishReason };
+  yield { usage: mockUsage(systemInstruction, contents, text) };
+}
+
+/** Round 10 §3.2: ხელახალი გენერაცია (არასტრიმინგული, geminiGenerate-ის ფორმით) — სუფთა პასუხი; "always" — ისევ გაჟონილი. */
+export async function mockGenerate({ systemInstruction, contents, leak = null, ...args }) {
+  const text = leak === 'always' ? MOCK_LEAK_TEXT : replyFor({ contents, ...args });
+  return { text, finishReason: 'STOP', usage: mockUsage(systemInstruction, contents, text) };
 }

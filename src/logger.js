@@ -12,6 +12,7 @@ export const log = {
 /** მომხმარებლის შეტყობინება + პასუხი ერთად. ჩატის ისტორია უხილავის id-ზე ინახება, spoken_by — ვინ უპასუხა. */
 export function logExchange(store, cfg, {
   clientId, characterId, spokenBy, userText, reply, usage, gameState, userName = null, original = null, longReply = false, action = null, manuscript = null,
+  metaLeak = null, discardedReply = null,
 }) {
   if (!cfg.logging.store_conversations) return;
   // Round 8 §3.3 (5): action + ეგზემპლარების მდგომარეობა ორივე რიგზე
@@ -24,6 +25,8 @@ export function logExchange(store, cfg, {
       ...common, role: 'assistant', spoken_by: spokenBy, content: reply, lang_guess: guessLang(reply), output_tokens: usage.output,
       proofread_original: changed ? original : null, proofread_changed: changed ? 1 : 0,
       long_reply: longReply ? 1 : 0, // Round 4 §9
+      // Round 10 §3.2: შიდა ჩანაწერი დაიჭირა (1) / უარყოფილი ან მოჭრამდელი ტექსტი
+      meta_leak: metaLeak ? 1 : null, discarded_reply: discardedReply ? String(discardedReply).slice(0, 2000) : null,
     });
   }
 }

@@ -10,6 +10,7 @@ import { loadConfig, ROOT } from './config.js';
 import { byId, publicList, pickProxy, famousRollCall, meta, manuscriptBehaviour } from './characters.js';
 import {
   buildPrompt, sanitizeGameState, annotateForProxy, pickStageMode, cleanUserName, SEASON_KA, sanitizeManuscript, parseAction, decideAction,
+  finalInstruction, REJECTED_LINE,
 } from './prompt.js';
 import { openDb } from './db.js';
 import { balance, createRateLimiter, MSG_LIMIT, MSG_RATE, MSG_TOO_LONG } from './limits.js';
@@ -18,14 +19,21 @@ import {
 } from './budget.js';
 import { detectRedirect } from './redirect.js';
 import { pacingState, countSentences } from './pacing.js';
-import { mockStream } from './mock.js';
+import { mockStream, mockGenerate } from './mock.js';
 import { shouldProofread, proofread, proofreadMaxTokens } from './proofread.js';
 import { findNonWords } from './georgian.js';
-import { geminiStream, resolveModel, currentModel } from './gemini.js';
+import { geminiStream, geminiGenerate, resolveModel, currentModel } from './gemini.js';
 import { log, logExchange } from './logger.js';
 import { adminRouter, adminPages } from './admin.js';
+import { isMetaLeak } from './leak.js';
+import { trimTruncated } from './trim.js';
+import { guessLang } from './lang.js';
+import { thinkingFor, outputCap, visibleCap, describeThinking } from './thinking.js';
 
 export const MSG_API_ERROR = 'ხაზი დაკავებულია. ცოტა ხანში სცადეთ.';
+/** Round 10 §3.2: პირველი ხაზი იკავება, სანამ შემოწმდება — პირველ \n-მდე ან ამდენ სიმბოლომდე (ან სტრიმის ბოლომდე). */
+export const HOLD_CHARS = 120;
+const sumUsage = (a, b) => ({ input: (a.input || 0) + (b.input || 0), output: (a.output || 0) + (b.output || 0) });
 export const MSG_NO_KEY = 'გამომცემლობას გასაღები დაეკარგა (settings.json → gemini.api_key)';
 const CLIENT_COOKIE = 'tianshani_cid';
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -160,6 +168,8 @@ export function createApp(cfg) {
     const clean = messages
       // Round 5 §1: ძველი სკრიპტული პირველი ხაზი (Round 4, `scripted: true`) მოდელს არასდროს ეგზავნება
       .filter((m) => m && m.scripted !== true && typeof m.content === 'string' && ['user', 'assistant'].includes(m.role))
+      // Round 10 §3.3: ბრაუზერში უკვე შენახული „გაჟონილი“ პასუხი (წესები 1–2) მოდელს აღარ ეგზავნება
+      .filter((m) => !(m.role === 'assistant' && isMetaLeak(m.content).leak))
       .map((m) => ({ role: m.role, content: m.content.slice(0, cfg.limits.max_message_chars * 2) }))
       .slice(-cfg.chat.history_window);
     const last = clean[clean.length - 1];
@@ -212,13 +222,22 @@ export function createApp(cfg) {
       ? clean.map((m) => (m.role === 'user' ? { ...m, content: annotateForProxy(m.content, invisible, speaker) } : m))
       : clean;
     const contents = [...fewShot, ...convo];
+    // Round 10 §4.3: ბოლო ხაზი — „OUTPUT: …“ (buildPrompt უცვლელია)
+    const instruction = finalInstruction(systemInstruction, speaker);
+    const promptOnly = estimateTokens(instruction) + contents.reduce((n, m) => n + estimateTokens(m.content), 0);
+    // Round 10 §2.1: „ფიქრი“ ამ პასუხზე (gemini.thinking_policy) და ზღვარი = ხილული + ფიქრის ბიუჯეტი
+    const think = thinkingFor(cfg, {
+      messageCount: pacing.messageCount, historyTokens: promptOnly - estimateTokens(instruction),
+      action: Boolean(actionResult), invisible: Boolean(invisible), userChars: last.content.length,
+    });
+    const visible = visibleCap(cfg);
+    const maxOut = outputCap(cfg, think.budget);
 
     // 3) რეზერვი: ბოლო მოთხოვნამ ლიმიტი არ უნდა გადააჭარბოს (პრომპტი + max_output_tokens უარეს შემთხვევაში;
     //    კორექტურა — დაახლ. +600 შემავალი + პასუხის სიგრძე და 1.5× გამომავალი, Round 3 §4)
-    const maxOut = cfg.gemini.max_output_tokens;
     const pr = !cfg.gemini.mock && cfg.gemini.proofread !== false;
-    const promptTokens = estimateTokens(systemInstruction) + contents.reduce((n, m) => n + estimateTokens(m.content), 0) + (pr ? 600 + maxOut : 0);
-    const reserve = reserveTokens({ promptTokens, maxOutputTokens: pr ? maxOut + proofreadMaxTokens(maxOut) : maxOut });
+    const promptTokens = promptOnly + (pr ? 600 + visible : 0);
+    const reserve = reserveTokens({ promptTokens, maxOutputTokens: pr ? maxOut + proofreadMaxTokens(visible) : maxOut });
     if (wouldOvershoot(gNow, reserve)) {
       log.warn(`[budget] მოთხოვნა უარყოფილია: გამოყენებული ${gNow.tokens_used} + რეზერვი ${reserve} ≥ ${gNow.tokens_limit} ტოკენი`);
       return res.status(429).json(limitBody('global_budget', gNow.resets_at));
@@ -238,23 +257,104 @@ export function createApp(cfg) {
     res.on('close', () => { if (!res.writableEnded) ac.abort(new Error('client closed')); });
 
     let reply = '';
-    let usage = { input: 0, output: 0 };
-    try {
-      const gen = cfg.gemini.mock
-        ? mockStream({ systemInstruction, contents, speaker, invisible, userText: last.content, gameState, signal: ac.signal, historyLen: clean.length - 1, manuscriptCount: pacing.manuscriptCount, userName, manuscript, actionResult })
-        : geminiStream({ cfg, systemInstruction, contents, signal: ac.signal });
-      for await (const ev of gen) {
-        if (ev.delta) { reply += ev.delta; send({ delta: ev.delta }); }
-        if (ev.usage) usage = ev.usage;
+    let usage = { input: 0, output: 0 }; // ბოლო (მიღებული) ცდის ტოკენები
+    let spent = { input: 0, output: 0 };  // Round 10 §3.2 (6): უარყოფილი ცდის ტოკენები — ისიც დაიხარჯა
+    let metaLeak = null;
+    let discarded = null;
+    const expectLang = guessLang(last.content);
+    const mockArgs = {
+      contents, speaker, invisible, userText: last.content, gameState, historyLen: clean.length - 1, manuscriptCount: pacing.manuscriptCount,
+      userName, manuscript, actionResult, leak: cfg.gemini.mock_leak || null,
+    };
+
+    /** Round 10 §3.2 (2–4): ერთი ხელახალი ცდა (არასტრიმინგული) იგივე ინსტრუქციით + „უარყოფილია“ ხაზით. სუფთა ტექსტი ან null. */
+    const regenerate = async (bad, verdict) => {
+      metaLeak = 1;
+      discarded = bad;
+      log.warn(`meta-leak caught (${speaker.id}): ${verdict.reason}`);
+      // შეწყვეტილ ცდას usageMetadata შეიძლება ვერ მოასწრო — მაშინ შეფასება
+      spent = sumUsage(spent, usage.input || usage.output ? usage : { input: promptOnly, output: estimateTokens(bad) });
+      usage = { input: 0, output: 0 };
+      const g = globalStatus(store, cfg);
+      if (wouldOvershoot({ ...g, tokens_used: g.tokens_used + spent.input + spent.output }, reserve)) {
+        log.warn(`[budget] ხელახალი ცდა გამოტოვებულია: გამოყენებული ${g.tokens_used} + ${spent.input + spent.output} + რეზერვი ${reserve} ≥ ${g.tokens_limit}`);
+        return null;
       }
-      if (!reply.trim()) throw new Error('empty reply');
+      const r = cfg.gemini.mock
+        ? await mockGenerate({ ...mockArgs, systemInstruction: `${instruction}\n\n${REJECTED_LINE}` })
+        : await geminiGenerate({
+          cfg, systemInstruction: `${instruction}\n\n${REJECTED_LINE}`, contents, temperature: cfg.gemini.temperature,
+          maxOutputTokens: maxOut, thinkingBudget: think.budget, signal: ac.signal,
+        });
+      usage = r.usage;
+      const again = isMetaLeak(r.text, { expectLang });
+      if (!r.text.trim() || again.leak) {
+        log.warn(`meta-leak caught again (${speaker.id}): ${again.reason || 'empty'} — პასუხი არ გაიგზავნა`);
+        return null;
+      }
+      return r.finishReason === 'MAX_TOKENS' ? trimTruncated(r.text) : r.text;
+    };
+
+    try {
+      const attempt = new AbortController();
+      const signal = AbortSignal.any([ac.signal, attempt.signal]);
+      const gen = cfg.gemini.mock
+        ? mockStream({ ...mockArgs, systemInstruction: instruction, signal, truncate: cfg.gemini.mock_truncate === true })
+        : geminiStream({ cfg, systemInstruction: instruction, contents, signal, thinkingBudget: think.budget, maxOutputTokens: maxOut });
+      // §3.2 (1): პირველი ხაზი იკავება და მოწმდება; სუფთაა → იგზავნება და დანარჩენი პირდაპირ მიდის
+      let held = true;
+      let early = null;
+      let finishReason = null;
+      const check = (final) => {
+        const v = isMetaLeak(reply, { expectLang });
+        if (!v.leak) { held = false; if (reply) send({ delta: reply }); return; }
+        // მხოლოდ „ქართული ასო არ არის“ და ხაზი მოკლეა (მაგ. „Да-да.“) — ვიკავებთ 120 სიმბოლომდე, მერე ისევ ვამოწმებთ
+        if (v.rule === 3 && !final && reply.length < HOLD_CHARS) return;
+        early = v;
+      };
+      for await (const ev of gen) {
+        if (ev.usage) usage = ev.usage;
+        if (ev.finishReason) finishReason = ev.finishReason;
+        if (!ev.delta) continue;
+        reply += ev.delta;
+        if (!held) send({ delta: ev.delta });
+        else if (reply.includes('\n') || reply.length >= HOLD_CHARS) check(false);
+        if (early) break;
+      }
+      if (early) attempt.abort(new Error('meta-leak')); // სტრიმი ჩერდება (არაფერი გაგზავნილა)
+      if (held && !early && !ac.signal.aborted) check(true);
+      if (!early && !reply.trim()) throw new Error('empty reply');
+
+      if (early) {
+        // §3.2 (2): ადრე დაიჭირა — ჯერ არაფერი გაგზავნილა; სუფთა ტექსტი ჩვეულებრივ delta-დ
+        const text = await regenerate(reply, early);
+        if (!text) throw new Error('meta-leak: regeneration failed');
+        reply = text;
+        send({ delta: reply });
+      } else {
+        const late = isMetaLeak(reply, { expectLang });
+        if (late.leak) {
+          // §3.2 (3): ჭდე პირველი ხაზის შემდეგ — ბუშტი სუფთა ტექსტით იცვლება
+          const text = await regenerate(reply, late);
+          if (!text) throw new Error('meta-leak: regeneration failed');
+          reply = text;
+          send({ replace: reply });
+        } else if (finishReason === 'MAX_TOKENS') {
+          // §4.2: max_output_tokens-ზე მოჭრილი — ბოლო სრულ წინადადებამდე
+          const trimmed = trimTruncated(reply);
+          log.warn(`[max-tokens] ${speaker.id}: პასუხი მოიჭრა${trimmed ? ' — ბოლო სრულ წინადადებამდე' : ', სრული წინადადება არ დარჩა'}`);
+          if (!trimmed) { discarded = reply; throw new Error('MAX_TOKENS: nothing complete left'); }
+          if (trimmed !== reply) { discarded = reply; reply = trimmed; send({ replace: reply }); }
+        }
+      }
     } catch (e) {
       clearTimeout(timer);
       log.error(`[chat] ${characterId}: ${e?.message || e}`);
-      // ტოკენები მაინც დაიხარჯა, თუ რამე დაბრუნდა
-      if (usage.input || usage.output) {
-        store.addUsage(clientId, bal.period_key, usage.input, usage.output);
-        store.addGlobal(gNow.period_key, usage.input, usage.output, costUsd(usage.input, usage.output, cfg.budget));
+      // ტოკენები მაინც დაიხარჯა, თუ რამე დაბრუნდა (უარყოფილი ცდისაც)
+      const billed = sumUsage(spent, usage);
+      if (billed.input || billed.output) {
+        store.addUsage(clientId, bal.period_key, billed.input, billed.output);
+        store.addGlobal(gNow.period_key, billed.input, billed.output, costUsd(billed.input, billed.output, cfg.budget));
       }
       send({ error: MSG_API_ERROR });
       return res.end();
@@ -283,6 +383,8 @@ export function createApp(cfg) {
     const sentences = countSentences(reply);
     const longReply = cfg.chat.trim_long_replies !== false && sentences > 3;
     if (longReply) log.warn(`[long-reply] ${speaker.id}: ${sentences} წინადადება`);
+    // Round 10 §3.2 (6): უარყოფილი ცდის ტოკენებიც ითვლება (Google-მა ისიც დაგვიანგარიშა)
+    if (spent.input || spent.output) usage = { ...usage, input: usage.input + spent.input, output: usage.output + spent.output };
 
     store.addUsage(clientId, bal.period_key, usage.input, usage.output);
     // გლობალური მთვლელი — რეალური usageMetadata-დან (mock-ში ყალბი usage-დან); cost_usd — მხოლოდ შეფასება/ისტორია
@@ -291,6 +393,7 @@ export function createApp(cfg) {
       clientId, characterId: target.id, spokenBy: speaker.id, userText: last.content, reply, usage, gameState, userName, original, longReply,
       action: actionResult ? `${actionResult.type}:${actionResult.outcome}` : null,
       manuscript: (req.body.manuscript || action) ? JSON.stringify(manuscript) : null,
+      metaLeak, discardedReply: discarded,
     });
 
     const after = balance(store, cfg, clientId);
@@ -338,6 +441,8 @@ export async function start(cfg = loadConfig()) {
       const host = cfg.server.host === '0.0.0.0' ? 'localhost' : cfg.server.host;
       log.info(`„დაბეჭდე ტიანშანი“ მუშაობს: http://${host}:${addr.port}  (ადმინი: ${cfg.admin.path})`);
       log.info(`LLM: ${cfg.gemini.mock ? 'MOCK რეჟიმი (გასაღები არ არის)' : `Gemini (${cfg.gemini.model})`} · ბაზა: ${cfg.logging.db_path}`);
+      // Round 10 §2.1: რა მოქმედებს (ძველი settings.json-ის max_output_tokens / thinking_budget — მხოლოდ სათადარიგოდ)
+      log.info(`პასუხის ზღვარი: ${visibleCap(cfg)} ხილული ტოკენი (+ ფიქრის ბიუჯეტი) · ფიქრი: ${describeThinking(cfg)}`);
       resolve({ server, store, port: addr.port });
     });
     const shutdown = () => { server.close(); store.close(); process.exit(0); };
