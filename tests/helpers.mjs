@@ -82,4 +82,4 @@ export async function chat(base, body, { jar = null, headers = {} } = {}) {
 }
 
 export const userMsg = (content) => [{ role: 'user', content }];
-export const GS = { season: 'autumn', crackStage: 0, lostCopies: 0, cycle: 1 };
+export const GS = { season: 'autumn', crackStage: 0, cycle: 1 };

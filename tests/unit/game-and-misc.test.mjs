@@ -15,8 +15,8 @@ import { byId } from '../../src/characters.js';
 // Round 1: სეზონებს დღეები მართავს. days_per_exchange > 0 → შეტყობინებებიც ამოძრავებს დროს (ძველი „exchanges_per_season“-ის ექვივალენტი).
 const G = { days_per_season: 90, days_per_exchange: 45, days_per_character_switch: 20, seasons: ['autumn', 'winter', 'spring', 'summer'], crack_stages: 5, copies: 3 };
 
-test('სეზონები days_per_exchange-ით: ყოველ 2 გაცვლაზე (45 დღე) → შემდეგი სეზონი, ბზარი +1, ეგზემპლარი −1, ბოლოს ჩამონგრევა', () => {
-  let s = { ...initialState(1), season: 'autumn', crackStage: 0, lostCopies: 0 };
+test('სეზონები days_per_exchange-ით: ყოველ 2 გაცვლაზე (45 დღე) → შემდეგი სეზონი, ბზარი +1, ბოლოს ჩამონგრევა', () => {
+  let s = { ...initialState(1), season: 'autumn', crackStage: 0 };
   let r = applyExchange(s, G, 'director');
   assert.deepEqual(r.events, []);
   assert.equal(r.state.exchanges, 1);
@@ -26,7 +26,6 @@ test('სეზონები days_per_exchange-ით: ყოველ 2 გ�
   assert.deepEqual(r.events, [{ type: 'season', season: 'winter' }]);
   assert.equal(r.state.season, 'winter');
   assert.equal(r.state.crackStage, 1);
-  assert.equal(r.state.lostCopies, 1);
   assert.equal(r.state.exchanges, 2, 'exchanges სტატისტიკისთვის აღარ ნულდება');
   s = r.state;
   for (const expected of ['spring', 'summer']) {
@@ -35,7 +34,6 @@ test('სეზონები days_per_exchange-ით: ყოველ 2 გ�
     assert.deepEqual(r.events, [{ type: 'season', season: expected }]);
     s = r.state;
   }
-  assert.equal(s.lostCopies, 3);
   assert.equal(s.crackStage, 3);
   s = applyExchange(s, G, 'tina').state;
   r = applyExchange(s, G, 'tina');
@@ -45,7 +43,6 @@ test('სეზონები days_per_exchange-ით: ყოველ 2 გ�
   assert.equal(n.day, 0);
   assert.equal(n.season, 'autumn');
   assert.equal(n.crackStage, 0);
-  assert.equal(n.lostCopies, 0);
   assert.equal(n.paintingFallen, false, 'ახალ შენობაში სურათი ისევ ეკიდება');
 });
 

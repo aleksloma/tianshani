@@ -65,12 +65,12 @@ test('§2 გაცვლა ჩატის შუაში დროს არ
   t = await treeState(page);
   expect(t.season).toBe('winter');
   expect(t.date).toBe('30 ნოემბერი');
-  expect(t.meta).toBe('ბზარი 2/5 · ეგზემპლარი 2/3');
+  expect(t.meta).toBe('ბზარი 2/5 · ეგზემპლარი 3/3'); // Round 8: ხელში მყოფი ეგზემპლარი სეზონზე აღარ იკარგება
   await expect(page.locator('#season-tree')).toHaveAttribute('data-season', 'winter');
   await expect(page.locator('body')).toHaveAttribute('data-season', 'winter');
   await expect(page.locator('#crack-val')).toHaveText('2/5');
-  await expect(page.locator('#copies-val')).toHaveText('2/3');
-  await expect(page.locator('#copies-tip')).toHaveText('ერთი ეგზემპლარი თინას უჯრაში დარჩა — სამი თვეა იქ დევს.'); // Round 4 §2
+  await expect(page.locator('#copies-val')).toHaveText('3/3');
+  await expect(page.locator('#copies-tip')).toHaveText('№1 — თქვენთან · №2 — თქვენთან · №3 — თქვენთან'); // Round 8 §8.2
   const g = await storage(page, 'tianshani.game');
   expect(g).toMatchObject({ day: 90, cycle: 1, exchanges: 3 });
   expect(g.visited).toEqual(['tina', 'vaso']);
@@ -79,7 +79,10 @@ test('§2 გაცვლა ჩატის შუაში დროს არ
   await openFrame(page, 'tina');
   const req = page.waitForRequest((r) => r.url().endsWith('/api/chat'));
   await send(page, 'ცივა?');
-  expect((await req).postDataJSON().gameState).toMatchObject({ day: 90, season: 'winter', crackStage: 1, lostCopies: 1, cycle: 1 });
+  const body = (await req).postDataJSON();
+  expect(body.gameState).toMatchObject({ day: 90, season: 'winter', crackStage: 1, cycle: 1 });
+  expect(body.gameState.lostCopies).toBeUndefined(); // Round 8: ეგზემპლარები — manuscript ველში
+  expect(body.manuscript).toMatchObject({ inHand: 3, lost: 0, total: 3 });
 });
 
 test('§2 სხვა პერსონაჟზე გადასვლა საზღვარზე: ჯერ ინტერტიტრი (ჩატი დახურულია), მერე ახალი ჩატი იხსნება', async ({ page }) => {
@@ -161,7 +164,7 @@ test('§2 ჩამონგრევა დახურვისას (დღ�
   await openFrame(page, 'tina');
   await page.locator('#chat-input').fill('ახალ შენობაში ვართ?');
   await page.locator('#chat-input').press('Enter');
-  expect((await req).postDataJSON().gameState).toEqual({ day: 0, season: 'autumn', crackStage: 0, lostCopies: 0, cycle: 2, paintingFallen: false });
+  expect((await req).postDataJSON().gameState).toEqual({ day: 0, season: 'autumn', crackStage: 0, cycle: 2, paintingFallen: false });
 });
 
 test('ძველი ფორმატის მდგომარეობა (სეზონი დღის გარეშე) მიგრირდება', async ({ page }) => {

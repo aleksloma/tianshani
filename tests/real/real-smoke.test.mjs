@@ -36,7 +36,7 @@ after(async () => {
   if (KEY) { fs.mkdirSync(path.dirname(OUT), { recursive: true }); fs.writeFileSync(OUT, `${JSON.stringify(log, null, 2)}\n`); }
 });
 
-const GS = { day: 44, season: 'autumn', crackStage: 0, lostCopies: 0, cycle: 1 };
+const GS = { day: 44, season: 'autumn', crackStage: 0, cycle: 1 };
 const FIRST_PERSON_READ = /(^|[^ა-ჰ])(წავიკითხავ|წავიკითხე)([^ა-ჰ]|$)/;
 
 test('რეალური API: გამყრელიძე „წაიკითხეთ ჩემი მოთხრობა?“ → წარმომადგენელი მესამე პირში, გამყრელიძე სახელით', { skip: !KEY && 'Gemini-ს გასაღები არ არის' }, async () => {
@@ -237,6 +237,52 @@ test('რეალური API (Round 7 §1): ოთარი — „ხელ�
     assert.notEqual(sr, 'otari');
     assert.equal(sr, detectRedirect({ speaker: byId.otari, reply: final, currentId: 'otari', userName: 'ნინო' }), final);
   }
+});
+
+// ---------- Round 8: ეგზემპლარის გადაცემა / გამორთმევა / უარი ----------
+
+test('რეალური API (Round 8): ვასოს ეგზემპლარი → „როგორაა საქმე?“ → უკან; თამარი უარს ამბობს — ეგზემპლარი ხელში რჩება', { skip: !KEY && 'Gemini-ს გასაღები არ არის' }, async () => {
+  const M = await import('../../public/js/manuscript.js');
+  const { withDefaults } = await import('../../public/js/calendar.js');
+  const { byId } = await import('../../src/characters.js');
+  const G = withDefaults({});
+  // „დავამთავრე / ბოლომდე წავიკითხე“ — მფლობელი არასდროს ამბობს, რომ წაიკითხა (უარყოფის გარეშე)
+  const FINISHED = /(^|[^ა-ჰ])(?<!(ვერ|არ|ვერც|არც) )(დავამთავრე|ბოლომდე წავიკითხე|წავიკითხე ბოლომდე|სულ წავიკითხე)/;
+  log.manuscript = [];
+  const final = (r) => r.events.find((e) => typeof e.replace === 'string')?.replace || r.reply;
+  async function turn(characterId, msgs, store, content, action = null) {
+    msgs.push({ role: 'user', content });
+    const r = await chat(S.base, {
+      characterId, messages: msgs, gameState: GS, userName: 'ნინო', manuscript: M.summaryForServer(store), ...(action ? { action } : {}),
+    });
+    assert.equal(r.status, 200, JSON.stringify(r.json || r.error));
+    assert.ok(r.done, r.error || 'no done');
+    const reply = final(r);
+    msgs.push({ role: 'assistant', content: reply });
+    log.manuscript.push({ character: characterId, user: content, action_result: r.done.action_result || null, reply, finished_claim: FINISHED.test(reply), usage: r.done.usage });
+    return { r, reply };
+  }
+
+  // ვასო: გადაცემა → საუბარი → უკან
+  let store = M.initialCopies(G, 1);
+  const vaso = [];
+  let t = await turn('vaso', vaso, store, M.actionText('hand_over', 'ნინო', byId.vaso.short_name_ka), { type: 'hand_over', copyId: 1, integrity: 'full' });
+  assert.equal(t.r.done.action_result.outcome, 'accepted');
+  store = M.applyHandOver(store, 1, 'vaso', GS.day);
+  t = await turn('vaso', vaso, store, 'როგორაა საქმე?');
+  assert.doesNotMatch(t.reply, FINISHED, t.reply);
+  t = await turn('vaso', vaso, store, M.actionText('retrieve', 'ნინო', byId.vaso.short_name_ka), { type: 'retrieve', copyId: 1, integrity: 'full' });
+  assert.equal(t.r.done.action_result.outcome, 'returned');
+  for (const x of log.manuscript) assert.equal(x.finished_claim, false, x.reply);
+  store = M.applyReturn(store, 1);
+  assert.equal(M.copiesInHand(store), 3);
+
+  // თამარი: უარი — ეგზემპლარი ხელში რჩება
+  const tam = [];
+  t = await turn('tamari', tam, store, M.actionText('hand_over', 'ნინო', byId.tamari.short_name_ka), { type: 'hand_over', copyId: 1, integrity: 'full' });
+  assert.equal(t.r.done.action_result.outcome, 'refused');
+  assert.equal(t.r.done.action_result.reason_ka, 'სად მცალია ნეტავ მაგისთვის — ხელფასები ვერ დამირიგებია. ვინმე სხვას მიეცი.');
+  assert.equal(M.copiesInHand(store), 3, 'უარის შემდეგ კლიენტი არაფერს ცვლის');
 });
 
 // ---------- Round 4 §4: უცხოენოვანი პასუხი — ფრაზები ქართული დამწერლობით ----------

@@ -26,16 +26,17 @@ test('დეფოლტები (Round 3 §2): 1983-09-01, 90 დღე სე
   assert.equal(totalDays(G), 360);
 });
 
-test('დღე → სეზონი/ბზარი/ეგზემპლარები საზღვრებზე', () => {
+test('დღე → სეზონი/ბზარი საზღვრებზე (Round 8: ეგზემპლარები აქედან აღარ ითვლება)', () => {
   const cases = [
-    [0, 'autumn', 0, 0, 0, 90], [89, 'autumn', 0, 0, 89, 1],
-    [90, 'winter', 1, 1, 0, 90], [179, 'winter', 1, 1, 89, 1],
-    [180, 'spring', 2, 2, 0, 90], [269, 'spring', 2, 2, 89, 1],
-    [270, 'summer', 3, 3, 0, 90], [359, 'summer', 3, 3, 89, 1],
+    [0, 'autumn', 0, 0, 90], [89, 'autumn', 0, 89, 1],
+    [90, 'winter', 1, 0, 90], [179, 'winter', 1, 89, 1],
+    [180, 'spring', 2, 0, 90], [269, 'spring', 2, 89, 1],
+    [270, 'summer', 3, 0, 90], [359, 'summer', 3, 89, 1],
   ];
-  for (const [day, season, crack, lost, dis, left] of cases) {
+  for (const [day, season, crack, dis, left] of cases) {
     const d = derive(day, G);
-    assert.deepEqual([d.season, d.crackStage, d.lostCopies, d.dayInSeason, d.daysLeft], [season, crack, lost, dis, left], `day ${day}`);
+    assert.deepEqual([d.season, d.crackStage, d.dayInSeason, d.daysLeft], [season, crack, dis, left], `day ${day}`);
+    assert.equal('lostCopies' in d, false);
   }
   assert.equal(derive(45, G).progress, 0.5);
   assert.equal(clampDay(999, G), 359);
@@ -95,7 +96,7 @@ test('Round 2 რეჟიმი კონფიგით (days_per_exchange: 20
     for (const e of r.events) { if (e.type === 'season') seen.push([i, e.season]); else collapseAt = i; }
     if (i === 1) assert.equal(formatDateKa(dateFor(G20, s.day)), '21 სექტემბერი');
     if (i === 4) assert.equal(s.season, 'autumn');
-    if (i === 5) { assert.equal(s.season, 'winter'); assert.equal(s.crackStage, 1); assert.equal(s.lostCopies, 1); }
+    if (i === 5) { assert.equal(s.season, 'winter'); assert.equal(s.crackStage, 1); }
   }
   assert.deepEqual(seen, [[5, 'winter'], [9, 'spring'], [14, 'summer']]);
   assert.equal(collapseAt, 18);
@@ -121,7 +122,6 @@ test('ძველი რეჟიმი კონფიგით: days_per_char
   assert.equal(s.day, 100);
   assert.equal(s.season, 'winter');
   assert.equal(s.crackStage, 1);
-  assert.equal(s.lostCopies, 1);
   assert.deepEqual(events, [{ type: 'season', season: 'winter' }]);
 });
 
@@ -289,10 +289,10 @@ test('რემარკის რეჟიმი: წარმომადგ�
 test('sanitizeGameState: დღე სიმართლის წყაროა; დღის გარეშე — ძველი ველები', () => {
   const c = { game: G };
   assert.deepEqual(sanitizeGameState({ day: 100, season: 'summer', crackStage: 4 }, c),
-    { day: 100, season: 'winter', crackStage: 1, lostCopies: 1, cycle: 1, paintingFallen: false });
+    { day: 100, season: 'winter', crackStage: 1, cycle: 1, paintingFallen: false });
   assert.deepEqual(sanitizeGameState({ day: 9999 }, c).day, 359);
   assert.deepEqual(sanitizeGameState({ season: 'spring', crackStage: 2, lostCopies: 2 }, c),
-    { day: 180, season: 'spring', crackStage: 2, lostCopies: 2, cycle: 1, paintingFallen: false });
+    { day: 180, season: 'spring', crackStage: 2, cycle: 1, paintingFallen: false });
 });
 
 test('ხე: ფერის ინტერპოლაცია', () => {

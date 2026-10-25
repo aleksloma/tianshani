@@ -112,6 +112,7 @@ test('§4 არარსებული სიტყვები (ვჭედ�
   const walk = (v) => { if (typeof v === 'string') strings.push(v); else if (v && typeof v === 'object') Object.values(v).forEach(walk); };
   walk(JSON.parse(fs.readFileSync(new URL('../../characters.json', import.meta.url), 'utf8')));
   walk(JSON.parse(fs.readFileSync(new URL('../../src/data/voice_extras.json', import.meta.url), 'utf8')));
+  walk(JSON.parse(fs.readFileSync(new URL('../../src/data/manuscript_behaviour.json', import.meta.url), 'utf8'))); // Round 8
   walk(MOCK_STRINGS);
   walk(ABSENCE_FACTS_KA);
   walk(SHAPE_EXAMPLES_EN);

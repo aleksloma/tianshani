@@ -29,7 +29,10 @@ test('ხილული პერსონაჟი: სამყარო + �
   assert.ok(s.includes(byId.director.system_prompt_en));
   assert.ok(s.includes(byId.director.persona_ka.speech_style));
   assert.ok(s.includes('თინა'));                             // redirects_to სახელით
-  assert.ok(s.includes('Current season: winter. The crack in the wall has grown to stage 3 of 5. Copies of the manuscript lost so far: 2'));
+  assert.ok(s.includes('Current season: winter. The crack in the wall has grown to stage 3 of 5.'));
+  // Round 8 §7.1: ეგზემპლარების ხაზი (manuscript-ის გარეშე — ყველა ხელშია)
+  assert.ok(s.includes('The author owns 3 copies of the manuscript: 3 in his hands, 0 handed to colleagues, 0 lost.'));
+  assert.ok(!s.includes('Copies of the manuscript lost so far'));
   assert.ok(s.includes('DO:'), 'voice bible DO/DON\'T');
   assert.ok(!s.includes('SPECIAL SITUATION'));
   assert.equal(fs.length, byId.director.sample_dialogues.length * 2);
@@ -65,11 +68,12 @@ test('ახალი შენობა (ციკლი > 1) ჩნდებ�
 
 test('sanitizeGameState: არასწორი მნიშვნელობები ნორმალიზდება', () => {
   // დღის გარეშე (ძველი კლიენტი): სეზონის პირველი დღე + კლიენტის ველები ნორმალიზებული
+  // Round 8: lostCopies აღარ არსებობს (კლიენტის ძველი ველი იგნორირდება)
   assert.deepEqual(sanitizeGameState({ season: 'monsoon', crackStage: 99, lostCopies: -4, cycle: 'x' }, cfg),
-    { day: 0, season: 'autumn', crackStage: 4, lostCopies: 0, cycle: 1, paintingFallen: false });
-  assert.deepEqual(sanitizeGameState(null, cfg), { day: 0, season: 'autumn', crackStage: 0, lostCopies: 0, cycle: 1, paintingFallen: false });
+    { day: 0, season: 'autumn', crackStage: 4, cycle: 1, paintingFallen: false });
+  assert.deepEqual(sanitizeGameState(null, cfg), { day: 0, season: 'autumn', crackStage: 0, cycle: 1, paintingFallen: false });
   assert.deepEqual(sanitizeGameState({ season: 'summer', crackStage: '3', lostCopies: 3, cycle: 2, paintingFallen: true }, cfg),
-    { day: 270, season: 'summer', crackStage: 3, lostCopies: 3, cycle: 2, paintingFallen: true });
+    { day: 270, season: 'summer', crackStage: 3, cycle: 2, paintingFallen: true });
   assert.equal(sanitizeGameState({ paintingFallen: 'yes' }, cfg).paintingFallen, false);
 });
 
