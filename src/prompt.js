@@ -264,7 +264,8 @@ export function stateBlock(gs, cfg, manuscript = null) {
     '# CURRENT STATE OF THE BUILDING',
     `In-world date: ${formatDateEn(dateFor(cfg.game, gs.day))}, ${gs.season}, day ${d.dayInSeason + 1} of the season.`,
     `Current season: ${gs.season}. The crack in the wall has grown to stage ${gs.crackStage + 1} of ${stages}.`,
-    `The author owns ${m.total} copies of the manuscript: ${m.inHand} in his hands, ${m.total - m.inHand - m.lost} handed to colleagues, ${m.lost} lost.`,
+    // Round 9 §4.2: რაც ავტორმა იცის — გადაუმოწმებელი ჯაჭვით დაკარგული ჯერ „გადაცემულია“
+    `The author owns ${m.total} copies of the manuscript: ${m.inHand} in his hands, ${m.total - m.inHand - (m.knownLost ?? m.lost)} handed to colleagues, ${m.knownLost ?? m.lost} lost.`,
     SEASON_FLAVOR_EN[gs.season] || '',
   ];
   if (gs.paintingFallen) {
@@ -341,6 +342,10 @@ export function pickStageMode({ invisible, historyLen, rnd = Math.random }) {
 // ---------- Round 8: ხელნაწერის ეგზემპლარები ----------
 
 const MANUSCRIPT_SEED_NOBODY = 'ჩემთვის არავის არაფერი მოუცია.';
+/** Round 9 §4.1: მთელი ეგზემპლარის მფლობელი არ ამბობს, რომ გვერდები აკლია. */
+export const WHOLE_COPY_LINE = 'The copy you hold is complete: every page is there. Do not claim pages are missing, torn out or skipped — use any other excuse for not having read it.';
+/** Round 9 §1: მოქმედებას შეიძლება მომხმარებლის სიტყვები მოჰყვეს. */
+export const OWN_WORDS_LINE = "The author's own words, if any, follow the stage direction in his last message — answer them too, inside the same two beats.";
 const quote = (s) => `"${s}"`;
 const nameOf = (id) => byId[id]?.short_name_ka || id;
 
@@ -447,6 +452,8 @@ export function manuscriptBlock(speaker, manuscript, cfg, { action = null, behav
         ? `${nameOf(c.claim.from)} handed it to you on ${day(c.givenDay)}, ${age} days ago (the author gave it to ${nameOf(c.claim.from)} first).`
         : `The author handed it to you on ${day(c.givenDay)}, ${age} days ago.`}`);
       lines.push('You have NOT read it (two pages at most) and you never will; if asked how it is going, use your usual excuses.');
+      // Round 9 §4.1: მთლიანობის მიხედვით
+      lines.push(c.integrity === 'full' ? WHOLE_COPY_LINE : `You hold only ${INTEGRITY_EN[c.integrity] || c.integrity} of it; it is natural to complain that the rest is missing.`);
       const said = c.events.filter((e) => e.actor === me && e.day >= c.givenDay).map((e) => quote(e.text_ka));
       if (said.length) lines.push(`What you tell the author about it, in order (these are facts of this conversation, state them as your own words when relevant): ${said.join(', ')}`);
     } else if ((c.status === 'lost' && c.holder === me) || (c.claim && c.claim.from === me)) {
@@ -480,12 +487,12 @@ export function actionBlock(result, speaker, behaviour = manuscriptBehaviour) {
   const n = result.copyId;
   const what = INTEGRITY_EN[result.integrity] || result.integrity;
   const line = {
-    accepted: `THIS TURN: the author just handed you copy №${n} (${what}). You take it. Reply in character with your attitude to the manuscript; seed phrase: ${quote(B.accept_ka || '')}. Do not promise a date you will keep; do not start reading on the spot.`,
+    accepted: `THIS TURN: the author just handed you copy №${n} (${what}). You take it. Reply in character with your attitude to the manuscript; seed phrase: ${quote(B.accept_ka || '')}. Do not promise a date you will keep; do not start reading on the spot.${result.integrity === 'full' ? ` ${WHOLE_COPY_LINE}` : ''}`,
     refused: `THIS TURN: the author just tried to hand you copy №${n}. You do NOT take it; it stays with him. Reason, seed phrase: ${quote(result.reason_ka || B.refuse_ka || '')}. Say it in character, with one excuse only.`,
     returned: `THIS TURN: the author asks for copy №${n} back. You give it back (what is left of it: ${what}). Seed phrase: ${quote(B.return_ka || '')}. Never claim you finished it.`,
     not_returned: `THIS TURN: the author asks for copy №${n} back. You cannot give it: ${quote(result.reason_ka || '')}. Say this in character; do not invent a different fate for it.`,
   }[result.outcome];
-  return line ? `# ACTION\n${line}` : null;
+  return line ? `# ACTION\n${line} ${OWN_WORDS_LINE}` : null;
 }
 
 export function buildPrompt({ speaker, invisible = null, gameState, cfg, stageMode = null, pacing = null, userName = '', manuscript = null, actionResult = null }) {

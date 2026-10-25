@@ -151,8 +151,14 @@
       <button type="button" class="close" id="chat-close" aria-label="დახურვა">✕</button>
     </header>
     <div class="chat-log" id="chat-log" aria-live="polite"></div>
+    <!-- Round 9 §1: ეგზემპლარის გადაცემა/გამორთმევა ველზეა მიმაგრებული — იგზავნება ჩვეულებრივ, სიტყვით ან მის გარეშე -->
+    <div id="chat-attach" class="chat-attach" hidden>
+      <span class="chat-attach-ico" aria-hidden="true"></span>
+      <span id="chat-attach-text" class="chat-attach-text"></span>
+      <button type="button" id="chat-attach-remove" class="chat-attach-remove" aria-label="მოხსნა">✕</button>
+    </div>
     <form class="chat-form" id="chat-form" autocomplete="off">
-      <button type="button" id="chat-copy" class="copy-btn" hidden aria-label="" title=""><span class="ico" aria-hidden="true">📄</span></button>
+      <button type="button" id="chat-copy" class="copy-btn" hidden aria-label="" title="" aria-pressed="false"><span class="ico" aria-hidden="true"></span></button>
       <textarea id="chat-input" rows="2" placeholder="დაწერეთ…" aria-label="შეტყობინება"></textarea>
       <button type="submit" id="chat-send">გაგზავნა</button>
     </form>

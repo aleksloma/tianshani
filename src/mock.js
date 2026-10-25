@@ -143,6 +143,11 @@ function actionParts({ speaker, actionResult, gameState, h }) {
   return parts;
 }
 
+/** Round 9 §1: მოქმედების შეტყობინებაში რემარკის (*…*) შემდეგ დაწერილი სიტყვები; არ არის → ''. */
+export function actionExtraText(userText) {
+  return String(userText || '').replace(/^\s*\*[^*]*\*/, '').trim();
+}
+
 /** მოსაუბრეს ეგზემპლარი აქვს და ხელნაწერზე ეკითხებიან → მისი ბოლო სიტყვა მასზე (ან პირველი „stalled“ საბაბი). */
 function holderLine(speaker, manuscript) {
   const c = manuscript?.copies.find((x) => x.status === 'held' && x.holder === speaker.id);
@@ -156,6 +161,12 @@ export function composeMockReply({ speaker, invisible, userText, historyLen, gam
   const parts = actionResult
     ? actionParts({ speaker, actionResult, gameState, h })
     : composeParts({ speaker, invisible, userText, historyLen, gameState, manuscriptCount });
+  // Round 9 §1: მოქმედებას მომხმარებლის სიტყვები მოჰყვა (რემარკის შემდეგ) → თესლის შემდეგ ჩვეულებრივი პასუხის ხაზი მათზე
+  const extra = actionResult ? actionExtraText(userText) : '';
+  if (extra) {
+    const reply = composeParts({ speaker, invisible, userText: extra, historyLen, gameState, manuscriptCount })[1];
+    if (reply) parts.splice(2, 0, reply);
+  }
   if (!actionResult && !invisible && isManuscriptMessage(userText) && ['ka', 'unknown'].includes(guessLang(userText))) {
     // ჯაჭვი არ შედგა → T-მ არაფერი იცის; მფლობელი → თავისი ამბავი (ხელნაწერის ხაზის ნაცვლად)
     const failed = manuscript?.copies.some((c) => c.claim && c.claim.to === speaker.id && c.claim.arrived === false);

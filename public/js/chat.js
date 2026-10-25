@@ -7,7 +7,10 @@ import { fitText } from './wall.js';
 import { parseSseChunk, tokensFromDone } from './sse.js';
 import { historyForServer } from './history.js';
 import { toward } from './names.js';
-import { buttonMode, statusLines, bestCopyInHand, retrievableFrom, actionText, summaryForServer } from './manuscript.js';
+import {
+  buttonMode, statusLines, bestCopyInHand, retrievableFrom, actionText, summaryForServer,
+  MODE_ATTR, ACTION_ICONS, attachText, actionMessage, attachmentValid,
+} from './manuscript.js';
 
 const TYPING = ['…ფიქრობს', '…ტელეფონზეა', '…საუზმობს', '…რეზოლუციას წერს', '…ბზარს უყურებს', '…ყურმილს იღებს'];
 const TYPING_ABSENT = ['…კარს აკაკუნებენ', '…ვიღაც მოდის დერეფანში', '…ხაზი დაკავებულია', '…დაელოდეთ'];
@@ -34,6 +37,9 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 /** Round 8 §3.1: ღილაკის წარწერა რეჟიმის მიხედვით. */
 const COPY_LABELS = { hand_over: 'ეგზემპლარის გადაცემა', retrieve: 'ეგზემპლარის გამორთმევა' };
+/** Round 9 §1: ველის placeholder, სანამ მოქმედება მიმაგრებულია. */
+export const ATTACH_PLACEHOLDER = 'მიაყოლეთ სიტყვა, თუ გსურთ…';
+const NORMAL_PLACEHOLDER = 'დაწერეთ…';
 
 export function createChat({
   byId, api, getConfig, getGameState, onExchange, onOpened, onClosed = null, onTokens, wall, menu, buildFrame, limitModal = null,
@@ -51,6 +57,11 @@ export function createChat({
   const sendBtn = document.getElementById('chat-send');
   const copyBtn = document.getElementById('chat-copy');
   const copyStatus = document.getElementById('chat-copy-status');
+  const attachRow = document.getElementById('chat-attach');
+  const attachIco = attachRow.querySelector('.chat-attach-ico');
+  const attachTextEl = document.getElementById('chat-attach-text');
+  const attachRemove = document.getElementById('chat-attach-remove');
+  let attached = null;    // Round 9 §1: { type, copyId, integrity } — ველზე მიმაგრებული მოქმედება (ერთდროულად ერთი)
 
   let current = null;     // { id, portrait, source, exchanges } — მხოლოდ მეხსიერებაში, არასდროს ინახება
   let session = 0;        // ღია ჩატის „ვერსია“ — სტრიმი ძველ ჩატს DOM-ში აღარ წერს
@@ -133,15 +144,55 @@ export function createChat({
   function refreshCopies() {
     const store = getCopies?.();
     const c = current ? byId[current.id] : null;
-    const mode = store && c ? buttonMode(store, c.id, c.reachable) : null;
+    // მიმაგრებისას რეჟიმი ფიქსირდება (ღილაკი მისი მოხსნისთვისაა)
+    const mode = attached ? attached.type : (store && c ? buttonMode(store, c.id, c.reachable) : null);
     copyBtn.hidden = !mode;
-    copyBtn.classList.toggle('retrieve', mode === 'retrieve');
+    // Round 9 §2: რეჟიმს ხატულა და data-mode ატარებს
+    if (mode && copyBtn.dataset.mode !== MODE_ATTR[mode]) copyBtn.querySelector('.ico').innerHTML = ACTION_ICONS[MODE_ATTR[mode]];
+    if (mode) copyBtn.dataset.mode = MODE_ATTR[mode]; else delete copyBtn.dataset.mode;
     copyBtn.setAttribute('aria-label', mode ? COPY_LABELS[mode] : '');
     copyBtn.title = mode ? COPY_LABELS[mode] : '';
     copyBtn.disabled = Boolean(current && busy.has(current.id));
     const line = store && c ? statusLines(store, c.id, getGameState().day, byId) : '';
     copyStatus.hidden = !line;
     copyStatus.textContent = line;
+  }
+
+  // ---------- Round 9 §1: მიმაგრება ----------
+
+  /** placeholder: მიმაგრებისას — „მიაყოლეთ სიტყვა…“ (თუ ლიმიტის ფანჯარა ველს არ კეტავს); სხვა დროს — ჩვეულებრივი. */
+  function applyPlaceholder() {
+    if (limitModal?.isBlocked()) return; // limitModal.applyInput უკვე დააყენა
+    input.setAttribute('placeholder', attached ? ATTACH_PLACEHOLDER : NORMAL_PLACEHOLDER);
+  }
+
+  /** ღილაკის მიმდინარე რეჟიმის მოქმედება → ფურცელი ველის თავზე. */
+  function attach() {
+    const c = current ? byId[current.id] : null;
+    const store = getCopies?.();
+    const mode = c && store ? buttonMode(store, c.id, c.reachable) : null;
+    const copy = mode === 'retrieve' ? retrievableFrom(store, c.id) : mode === 'hand_over' ? bestCopyInHand(store) : null;
+    if (!copy) return;
+    attached = { type: mode, copyId: copy.id, integrity: copy.integrity };
+    attachIco.innerHTML = ACTION_ICONS[MODE_ATTR[mode]];
+    attachTextEl.textContent = attachText(mode, copy.id, copy.integrity);
+    attachRow.hidden = false;
+    copyBtn.classList.add('armed');
+    copyBtn.setAttribute('aria-pressed', 'true');
+    applyPlaceholder();
+    refreshCopies();
+  }
+
+  function detach() {
+    if (!attached) return;
+    attached = null;
+    attachRow.hidden = true;
+    attachTextEl.textContent = '';
+    attachIco.replaceChildren();
+    copyBtn.classList.remove('armed');
+    copyBtn.setAttribute('aria-pressed', 'false');
+    applyPlaceholder();
+    refreshCopies();
   }
 
   function setBadge(portrait, proxy) {
@@ -334,6 +385,7 @@ export function createChat({
     backdrop.hidden = false;
     setSpeaker(id, currentProxy(id));
     refreshUser();
+    detach();
     refreshCopies();
     renderLog(id);
     placePanel(rects);
@@ -363,6 +415,7 @@ export function createChat({
   async function close({ instant = false, silent = false } = {}) {
     if (!current) return false;
     const { portrait, source, id, exchanges } = current;
+    detach(); // Round 9 §1: დახურვა/გადასვლა მიმაგრებას ხსნის
     current = null;
     session += 1;
     menu.close();
@@ -402,7 +455,9 @@ export function createChat({
     sendBtn.disabled = Boolean(b); // ლიმიტის დაბლოკვა — aria-disabled (limitModal.applyInput), რომ დაჭერამ ფანჯარა გახსნას
     panel.classList.toggle('busy', Boolean(b));
     copyBtn.disabled = Boolean(b);
+    attachRemove.disabled = Boolean(b);
     limitModal?.applyInput();
+    applyPlaceholder(); // applyInput ჩვეულებრივ placeholder-ს აბრუნებს — მიმაგრებისას ჩვენი რჩება
   }
 
   // ---------- გაგზავნა + სტრიმინგი ----------
@@ -559,21 +614,36 @@ export function createChat({
     e.preventDefault();
     if (limitModal?.isBlocked()) { limitModal.open(); return; } // გაგზავნის მცდელობა → ფანჯარა ისევ
     const text = input.value.trim();
+    // Round 9 §1: მიმაგრებული მოქმედება — რემარკა + (თუ დაწერა) მომხმარებლის სიტყვები, ერთ შეტყობინებად. ერთადერთი გზა.
+    if (attached && current) {
+      if (busy.has(current.id)) return; // პასუხი ჯერ მიდის — მიმაგრება და ტექსტი რჩება
+      const att = attached;
+      const c = byId[current.id];
+      const valid = attachmentValid(getCopies?.(), att, c.id, c.reachable);
+      detach();
+      if (valid) {
+        input.value = '';
+        const stage = actionText(att.type, getUserName(), c.short_name_ka, att.integrity);
+        send(actionMessage(stage, text), { action: { type: att.type, copyId: att.copyId, integrity: att.integrity } });
+        return;
+      }
+      // აღარ მოქმედებს — ჩუმად მოიხსნა; დაწერილი ტექსტი ჩვეულებრივ იგზავნება
+    }
     if (!text) return;
     input.value = '';
     send(text);
   });
-  // Round 8 §3.1: ეგზემპლარი — ავტომატურად საუკეთესო ხელში მყოფი (არჩევის/დადასტურების გარეშე)
+  // Round 9 §1: ღილაკი მოქმედებას ველზე ამაგრებს (ეგზემპლარი — ავტომატურად საუკეთესო); ხელახლა დაჭერა — მოხსნის
   copyBtn.addEventListener('click', () => {
     if (!current || busy.has(current.id)) return;
     if (limitModal?.isBlocked()) { limitModal.open(); return; }
-    const c = byId[current.id];
-    const store = getCopies?.();
-    const mode = store ? buttonMode(store, c.id, c.reachable) : null;
-    const copy = mode === 'retrieve' ? retrievableFrom(store, c.id) : mode === 'hand_over' ? bestCopyInHand(store) : null;
-    if (!copy) return;
-    const text = actionText(mode, getUserName(), c.short_name_ka, copy.integrity);
-    send(text, { action: { type: mode, copyId: copy.id, integrity: copy.integrity } });
+    if (attached) detach(); else attach();
+    input.focus({ preventScroll: true });
+  });
+  attachRemove.addEventListener('click', () => {
+    if (!current || busy.has(current.id)) return;
+    detach();
+    input.focus({ preventScroll: true });
   });
   input.addEventListener('keydown', (e) => {
     if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); form.requestSubmit(); }
@@ -590,7 +660,10 @@ export function createChat({
     menu.toggle(e.currentTarget, { variant: 'chat', exclude: current?.id });
   });
   document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && current && !menu.isOpen()) close();
+    if (e.key !== 'Escape' || !current || menu.isOpen()) return;
+    // Round 9 §1: მიმაგრება და ცარიელი ველი → ჯერ მიმაგრება იხსნება, ჩატი ღია რჩება
+    if (attached && !input.value.trim()) { detach(); return; }
+    close();
   });
   // ფანჯრის ზომის ცვლილებაზე პორტრეტი ცენტრში რჩება; სახლი დახურვისას თავიდან ითვლება
   window.addEventListener('resize', () => {

@@ -390,15 +390,51 @@ s.struck::after {
   border: 1px solid rgba(42, 38, 34, 0.35);
   border-radius: 2px;
   background: #fffdf6;
-  color: inherit;
+  color: var(--ink); /* Round 9 §2: ხატულა — ხაზოვანი SVG, ველის ტექსტის ფერით */
   font-size: 20px;
   line-height: 1;
   cursor: pointer;
 }
 .chat-form .copy-btn[hidden] { display: none; }
+.chat-form .copy-btn .ico svg, .chat-attach-ico svg { display: block; margin: auto; }
 .chat-form .copy-btn:hover, .chat-form .copy-btn:focus-visible { outline: 2px solid var(--sky); }
-.chat-form .copy-btn.retrieve .ico { text-decoration: underline; }
+.chat-form .copy-btn.armed { outline: 2px solid var(--sky); outline-offset: -2px; } /* Round 9 §1: მიმაგრებულია */
 .chat.busy .chat-form .copy-btn, .chat-form .copy-btn:disabled { opacity: 0.5; cursor: progress; }
+/* Round 9 §1: მიმაგრების ფურცელი — იგივე „ქაღალდის ნაგლეჯი“, რაც ლოგის მოქმედების რიგს აქვს */
+.chat-attach {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 14px 0 46px;
+  padding: 4px 8px;
+  background: transparent;
+  border: 1px dashed rgba(42, 38, 34, 0.35);
+  border-radius: 2px;
+  font-family: var(--font-title);
+  font-stretch: 80%;
+  font-style: italic;
+  font-size: 12.5px;
+  color: #7a6a58;
+}
+.chat-attach[hidden] { display: none; }
+.chat.sheet .chat-attach { margin: 0 14px; }
+.chat-attach-ico { flex: none; color: var(--ink); }
+.chat-attach-text { flex: 1 1 auto; min-width: 0; }
+.chat-attach-remove {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  margin-left: auto;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--ink-soft);
+  font: inherit;
+  font-style: normal;
+  line-height: 20px;
+  cursor: pointer;
+}
+.chat-attach-remove:disabled { opacity: 0.5; cursor: progress; }
 .chat-foot {
   display: flex;
   justify-content: space-between;

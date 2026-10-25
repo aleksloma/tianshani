@@ -101,9 +101,12 @@ export function saveCopies(store) {
 // ---------- მოთხოვნები ----------
 
 export const copiesInHand = (store) => store.copies.filter((c) => c.status === 'in_hand').length;
+/** ნამდვილად დაკარგული (ტესტები, სერვერი). */
 export const lostCount = (store) => store.copies.filter((c) => c.status === 'lost').length;
-/** რამდენი ეგზემპლარი არსებობს ჯერ (თავზე „2/3“). */
-export const existingCount = (store) => store.copies.length - lostCount(store);
+/** Round 9 §4.2: რაც ავტორმა იცის — დაკარგული, რომლის „გადავეცი“ ჯერ არ გადამოწმებულა, ჯერ არსებობს. */
+export const knownLostCount = (store) => store.copies.filter((c) => c.status === 'lost' && !(c.claim && !c.claim.verified)).length;
+/** რამდენი ეგზემპლარი არსებობს ავტორის ცოდნით (თავზე „2/3“). */
+export const existingCount = (store) => store.copies.length - knownLostCount(store);
 export const copyHeldBy = (store, id) => store.copies.find((c) => c.status === 'held' && c.holder === id) || null;
 
 /** ხელში არსებულიდან საუკეთესო: ყველაზე მთელი, შემდეგ ყველაზე პატარა ნომერი. */
@@ -267,7 +270,7 @@ export function summaryForServer(store) {
   const inHand = copiesInHand(store);
   const lost = lostCount(store);
   return {
-    inHand, lost, total,
+    inHand, lost, knownLost: knownLostCount(store), total,
     copies: store.copies.map((c) => ({
       id: c.id, status: c.status, holder: c.holder, givenDay: c.givenDay, integrity: c.integrity,
       claim: c.claim, lossVerified: c.lossVerified, events: c.events.slice(-6),
@@ -287,6 +290,40 @@ export function actionText(type, author, shortName, integrity = 'full') {
   if (type === 'retrieve') return `*${who} ${to} ეგზემპლარს უკან სთხოვს.*`;
   if (INTEGRITY_ACC_KA[integrity]) return `*${who} ${to} ხელნაწერის ეგზემპლარის ${INTEGRITY_ACC_KA[integrity]} აწვდის.*`;
   return `*${who} ${to} ხელნაწერის ეგზემპლარს აწვდის.*`;
+}
+
+// ---------- Round 9: მოქმედება ჩატის ველზე „მიმაგრებულია“ (§1) და ორი ხატულა (§2) ----------
+
+/** ღილაკის `data-mode`: გადაცემა → give, გამორთმევა → take. */
+export const MODE_ATTR = { hand_over: 'give', retrieve: 'take' };
+
+const SVG_OPEN = '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">';
+const SHEET = '<path d="M5 3h8l4 4v6"/><path d="M13 3v4h4"/><path d="M5 3v18h7"/>';
+/** ფურცელი მოკეცილი კუთხით; ისარი გადის (give) ან შემოდის (take). */
+export const ACTION_ICONS = {
+  give: `${SVG_OPEN}${SHEET}<path d="M14 17h7"/><path d="M18 14l3 3-3 3"/></svg>`,
+  take: `${SVG_OPEN}${SHEET}<path d="M21 17h-7"/><path d="M17 14l-3 3 3 3"/></svg>`,
+};
+
+/** მიმაგრების ფურცელი: „ეგზემპლარი №2 — გადაცემა“, „ეგზემპლარის ნახევარი №2 — გადაცემა“, „ეგზემპლარი №2 — გამორთმევა“. */
+export function attachText(type, copyId, integrity = 'full') {
+  if (type === 'retrieve') return `ეგზემპლარი №${copyId} — გამორთმევა`;
+  if (integrity !== 'full' && INTEGRITY_KA[integrity]) return `ეგზემპლარის ${INTEGRITY_KA[integrity]} №${copyId} — გადაცემა`;
+  return `ეგზემპლარი №${copyId} — გადაცემა`;
+}
+
+/** შეტყობინება: რემარკა და, თუ მომხმარებელმა რამე დაწერა, ახალ ხაზზე — მისი სიტყვები. */
+export function actionMessage(stage, typed = '') {
+  const t = String(typed || '').trim();
+  return t ? `${stage}\n${t}` : stage;
+}
+
+/** გაგზავნისას: მიმაგრება ისევ მართებულია? (ეგზემპლარი ისევ ხელშია / ისევ ამ პერსონაჟთან შეიძლება მოთხოვნა) */
+export function attachmentValid(store, att, characterId, reachable) {
+  if (!att || !store) return false;
+  if (buttonMode(store, characterId, reachable) !== att.type) return false;
+  if (att.type === 'hand_over') return store.copies.some((c) => c.id === att.copyId && c.status === 'in_hand');
+  return retrievableFrom(store, characterId)?.id === att.copyId;
 }
 
 const part = (integrity) => (integrity !== 'full' && INTEGRITY_KA[integrity] ? ` (${INTEGRITY_KA[integrity]})` : '');
