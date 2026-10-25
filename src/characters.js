@@ -22,6 +22,12 @@ export const manuscriptBehaviour = (() => {
     return JSON.parse(fs.readFileSync(path.join(ROOT, 'src', 'data', 'manuscript_behaviour.json'), 'utf8')).characters || {};
   } catch { return {}; }
 })();
+// Round 10 §5: პერსონაჟის „საკუთარი თემა“ (მარკშეიდერი — შენობის მდგომარეობა) — { id: { every_n_replies, intro_en, variants, keywords_ka } }
+const PREOCCUPATIONS = (() => {
+  try {
+    return JSON.parse(fs.readFileSync(path.join(ROOT, 'src', 'data', 'preoccupations.json'), 'utf8')) || {};
+  } catch { return {}; }
+})();
 export const DEFAULT_TRIGGER = 'rarely; only if it fits';
 
 /** ფრაზის „როდის“ — ფაილიდან; თუ არ არის, „იშვიათად, მხოლოდ თუ ჯდება“. */
@@ -99,6 +105,7 @@ function build() {
     reachable: c.appears === 'on_screen',
     voice_extras: VOICE_EXTRAS[c.id] || null,
     catchphrase_triggers: CATCHPHRASE_TRIGGERS[c.id] || {},
+    preoccupation: PREOCCUPATIONS[c.id] || null,
     image: fs.existsSync(path.join(ROOT, 'public', 'assets', 'characters', `${c.id}.jpg`))
       ? `assets/characters/${c.id}.jpg` : null,
   }));

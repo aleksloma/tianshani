@@ -1,5 +1,6 @@
 // დიალოგის ტემპი (FIXES_ROUND2 §8): ისტორიიდან სერვერზე ითვლება, რამდენი შეტყობინება იყო, რამდენი — ხელნაწერზე,
 // და რომელი ცნობილი ფრაზები უკვე გამოიყენა პერსონაჟმა. ეს ხაზი პრომპტში ჯდება, რომ მოდელმა რეპერტუარი ნელა დახარჯოს.
+import { hash32, mulberry32 } from '../public/js/manuscript.js';
 
 /** ხელნაწერზე საუბრის ქართული საკვანძო ძირები (+ ინგლისური/რუსული, რომ სხვა ენაზეც ითვლებოდეს). */
 export const MANUSCRIPT_KEYWORDS = [
@@ -46,13 +47,60 @@ export function pacingState(history, speaker) {
   for (let i = own.length - 1, k = 0; i >= 0; i--, k++) {
     if (cores.some((c) => own[i].content.includes(c))) { since = k; break; }
   }
+  // Round 10 §5: რამდენი პასუხის წინ ახსენა საკუთარი თემა (შენობა) და რომელი ვარიანტით. ვარიანტების ძირებიც ითვლება —
+  // თორემ კარზე/ჩარჩოზე ნათქვამი (ზედა სიაში არ არის) მთვლელს არ ანულებდა და თემა მომდევნო პასუხშივე მეორდებოდა (რეალური smoke)
+  const pre = speaker?.preoccupation;
+  const topicKeys = [...new Set([...(pre?.keywords_ka || []), ...(pre?.variants || []).flatMap((v) => v.keywords_ka || [])])];
+  let topicSince = Infinity;
+  let lastTopicVariant = null;
+  for (let i = own.length - 1, k = 0; topicKeys.length && i >= 0; i--, k++) {
+    if (topicKeys.some((w) => own[i].content.includes(w))) {
+      topicSince = k;
+      lastTopicVariant = topicVariantOf(own[i].content, pre);
+      break;
+    }
+  }
   return {
     messageCount: users.length,
     manuscriptCount: users.filter((m) => isManuscriptMessage(m.content)).length,
     usedCatchphrases: usedOf(speaker?.catchphrases_ka),
     usedExcuses: usedOf(speaker?.excuse_repertoire_ka), // Round 4 §9: საბაბიც არ მეორდება
     repliesSinceCatchphrase: since,
+    repliesSinceTopic: topicSince,
+    lastTopicVariant,
   };
+}
+
+/** Round 10 §5: რომელ ვარიანტს ეხებოდა ნახსენები — ყველაზე მეტი ძირის დამთხვევით; თანაბარზე პირველი (ბზარი). */
+function topicVariantOf(text, pre) {
+  let best = null;
+  let bestHits = 0;
+  (pre?.variants || []).forEach((v, i) => {
+    const hits = (v.keywords_ka || []).filter((w) => text.includes(w)).length;
+    if (hits > bestHits) { best = i; bestHits = hits; }
+  });
+  return best;
+}
+
+/**
+ * Round 10 §5: საკუთარი თემა ამ პასუხში — მხოლოდ ყოველ ~N-ე პასუხში (2–3 ათიდან); ვარიანტი წონით, დეტერმინისტული
+ * თესლით, წინა ნახსენების ვარიანტის გარდა. სხვა პასუხებში — null (pool-ში არ ემატება).
+ */
+export function preoccupationLine(speaker, pacing) {
+  const pre = speaker?.preoccupation;
+  if (!pre?.variants?.length || !pacing) return null;
+  if (!((pacing.repliesSinceTopic ?? Infinity) >= (pre.every_n_replies || 4) - 1)) return null;
+  const all = pre.variants.map((v, i) => ({ v, i }));
+  const rest = all.filter(({ i }) => i !== pacing.lastTopicVariant);
+  const candidates = rest.length ? rest : all;
+  const total = candidates.reduce((s, { v }) => s + (v.weight || 1), 0);
+  let r = mulberry32(hash32(`${speaker.id}|${pacing.messageCount}`))() * total;
+  let pick = candidates[candidates.length - 1].v;
+  for (const { v } of candidates) {
+    r -= v.weight || 1;
+    if (r < 0) { pick = v; break; }
+  }
+  return `YOUR OWN SUBJECT for beat 2 in THIS reply (your own words; not a catchphrase, not limited by the catchphrase rule): ${pre.intro_en} This time: ${pick.en}.`;
 }
 
 /** Round 6 §3: ამ პასუხში ცნობილი ფრაზა დასაშვებია? — მხოლოდ თუ ბოლო ორ პასუხში არ ყოფილა (≈ ყოველ მესამეში მაქსიმუმ ერთი). */
@@ -104,7 +152,9 @@ export function touchPool(speaker, pacing) {
   const n = WORLD_TOUCHES_KA.length;
   const start = (pacing?.messageCount || 0) % n;
   const world = [0, 1, 2].map((i) => WORLD_TOUCHES_KA[(start + i) % n]);
+  const own = preoccupationLine(speaker, pacing);
   return [
+    ...(own ? [own] : []),
     ...phrases.map((p) => `„${phraseCore(p)}“ — use only when: ${trigger(p)}`),
     ...(activity ? [`what you are busy with: ${activity}`] : []),
     ...world,
