@@ -8,6 +8,11 @@ import { composeMockReply, sendTo } from '../../src/mock.js';
 import { toward } from '../../public/js/names.js';
 import { loadConfig, MSG_OLD_BUDGET_KEY } from '../../src/config.js';
 import { tempSettings } from '../helpers.mjs';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import Database from 'better-sqlite3';
+import { openDb } from '../../src/db.js';
 
 const GS0 = { season: 'autumn', crackStage: 0, lostCopies: 0, cycle: 1, day: 0 };
 
@@ -106,4 +111,52 @@ test('§2 ძველი budget.global_monthly_usd settings-ში ან env-�
   });
   withSettings({}, { GLOBAL_MONTHLY_USD: '50' }, () => assert.throws(() => loadConfig(), /GLOBAL_MONTHLY_TOKENS/));
   assert.match(MSG_OLD_BUDGET_KEY, /global_monthly_usd აღარ გამოიყენება/);
+});
+
+// ---------- §4 ----------
+
+/** ძველი (Round 3-მდე) ბაზა: clients/messages სახელის სვეტების გარეშე (ან ერთ-ერთით). */
+function oldDb({ clientName = false, messageName = false } = {}) {
+  const file = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'tianshani-mig-')), 'old.db');
+  const db = new Database(file);
+  db.exec(`CREATE TABLE clients (client_id TEXT PRIMARY KEY, first_seen TEXT NOT NULL, last_seen TEXT NOT NULL, user_agent TEXT, ip_hash TEXT${clientName ? ', user_name TEXT' : ''});
+    CREATE TABLE messages (id INTEGER PRIMARY KEY AUTOINCREMENT, client_id TEXT NOT NULL, character_id TEXT NOT NULL, spoken_by TEXT, role TEXT NOT NULL,
+      content TEXT NOT NULL, lang_guess TEXT, input_tokens INTEGER DEFAULT 0, output_tokens INTEGER DEFAULT 0, season TEXT, cycle INTEGER, created_at TEXT NOT NULL${messageName ? ', user_name TEXT' : ''});`);
+  const now = '2026-10-01T10:00:00.000Z';
+  db.prepare(`INSERT INTO clients (client_id, first_seen, last_seen${clientName ? ', user_name' : ''}) VALUES ('a', ?, ?${clientName ? ", 'ნინო'" : ''}), ('b', ?, ?${clientName ? ', NULL' : ''})`).run(now, now, now, now);
+  const ins = db.prepare(`INSERT INTO messages (client_id, character_id, role, content, created_at${messageName ? ', user_name' : ''}) VALUES (?, 'tina', ?, ?, ?${messageName ? ', ?' : ''})`);
+  for (const [cid, role, name] of [['a', 'user', 'ანა'], ['a', 'assistant', 'ანა'], ['a', 'user', 'ნინო'], ['b', 'user', null]]) {
+    ins.run(...[cid, role, 'x', now, ...(messageName ? [name] : [])]);
+  }
+  db.close();
+  return file;
+}
+const cols = (store, t) => store.db.prepare(`PRAGMA table_info(${t})`).all().map((c) => c.name);
+
+test('§4 მიგრაცია: ბაზა სახელის სვეტების გარეშე → სვეტები ემატება, ცნობილი სახელი არ არის → null', () => {
+  const store = openDb(oldDb());
+  try {
+    assert.ok(cols(store, 'clients').includes('user_name') && cols(store, 'messages').includes('user_name'));
+    assert.deepEqual(store.db.prepare('SELECT DISTINCT user_name FROM messages').all(), [{ user_name: null }]);
+    assert.deepEqual(store.db.prepare('SELECT DISTINCT user_name FROM clients').all(), [{ user_name: null }]);
+  } finally { store.close(); }
+});
+
+test('§4 მიგრაცია: messages.user_name-ის გარეშე → ივსება კლიენტის ბოლო სახელით (ან null)', () => {
+  const store = openDb(oldDb({ clientName: true }));
+  try {
+    assert.deepEqual(store.db.prepare('SELECT client_id, user_name FROM messages ORDER BY id').all().map((r) => [r.client_id, r.user_name]),
+      [['a', 'ნინო'], ['a', 'ნინო'], ['a', 'ნინო'], ['b', null]]);
+  } finally { store.close(); }
+});
+
+test('§4 მიგრაცია: clients.user_name-ის გარეშე → ივსება შეტყობინებებში ბოლოს ნახსენები სახელით; nameHistory — სახელები რიგით', () => {
+  const file = oldDb({ messageName: true });
+  let store = openDb(file);
+  try {
+    assert.deepEqual(store.db.prepare('SELECT client_id, user_name FROM clients ORDER BY client_id').all(), [{ client_id: 'a', user_name: 'ნინო' }, { client_id: 'b', user_name: null }]);
+    assert.deepEqual(store.nameHistory('a').map((n) => [n.user_name, n.messages]), [['ანა', 1], ['ნინო', 1]]);
+  } finally { store.close(); }
+  store = openDb(file); // მეორედ — არაფერი იცვლება
+  try { assert.equal(store.db.prepare("SELECT user_name FROM clients WHERE client_id = 'a'").get().user_name, 'ნინო'); } finally { store.close(); }
 });

@@ -57,12 +57,20 @@ export function openDb(dbPath) {
   const db = new Database(dbPath);
   db.pragma('journal_mode = WAL');
   db.exec(SCHEMA);
-  // Round 3: ახალი სვეტები არსებულ ბაზაზეც (ALTER TABLE მხოლოდ თუ ჯერ არ არის)
+  // Round 3: ახალი სვეტები არსებულ ბაზაზეც (ALTER TABLE მხოლოდ თუ ჯერ არ არის); აბრუნებს true-ს, თუ ახლა დაემატა
   const addColumn = (table, col, type) => {
-    if (!db.prepare(`PRAGMA table_info(${table})`).all().some((c) => c.name === col)) db.exec(`ALTER TABLE ${table} ADD COLUMN ${col} ${type}`);
+    if (db.prepare(`PRAGMA table_info(${table})`).all().some((c) => c.name === col)) return false;
+    db.exec(`ALTER TABLE ${table} ADD COLUMN ${col} ${type}`);
+    return true;
   };
-  addColumn('clients', 'user_name', 'TEXT');               // §1 — ბოლოს მითითებული სახელი
-  addColumn('messages', 'user_name', 'TEXT');              // §1
+  const newClientName = addColumn('clients', 'user_name', 'TEXT');   // §1 — ბოლოს მითითებული სახელი
+  const newMessageName = addColumn('messages', 'user_name', 'TEXT'); // §1 — სახელი შეტყობინების მომენტში
+  // Round 7 §4: ძველ ბაზაზე სახელის შევსება — კლიენტს ბოლო ცნობილი სახელი (შეტყობინებებიდან), შეტყობინებებს კლიენტისა, ან null
+  if (newClientName && !newMessageName) {
+    db.exec(`UPDATE clients SET user_name = (SELECT m.user_name FROM messages m
+      WHERE m.client_id = clients.client_id AND m.user_name IS NOT NULL ORDER BY m.id DESC LIMIT 1)`);
+  }
+  if (newMessageName) db.exec('UPDATE messages SET user_name = (SELECT c.user_name FROM clients c WHERE c.client_id = messages.client_id)');
   addColumn('messages', 'proofread_original', 'TEXT');     // §4 — პასუხი კორექტურამდე (თუ შეიცვალა)
   addColumn('messages', 'proofread_changed', 'INTEGER NOT NULL DEFAULT 0');
   addColumn('messages', 'long_reply', 'INTEGER NOT NULL DEFAULT 0');          // Round 4 §9 — > 3 წინადადება
@@ -85,6 +93,8 @@ export function openDb(dbPath) {
       INSERT INTO messages (client_id, character_id, spoken_by, role, content, lang_guess, input_tokens, output_tokens, season, cycle, created_at, user_name, proofread_original, proofread_changed, long_reply)
       VALUES (@client_id, @character_id, @spoken_by, @role, @content, @lang_guess, @input_tokens, @output_tokens, @season, @cycle, @created_at, @user_name, @proofread_original, @proofread_changed, @long_reply)`),
     setClientName: db.prepare('UPDATE clients SET user_name = ? WHERE client_id = ?'),
+    nameHistory: db.prepare(`SELECT user_name, MIN(created_at) AS first_at, MAX(created_at) AS last_at, COUNT(*) AS messages
+      FROM messages WHERE client_id = ? AND role = 'user' AND user_name IS NOT NULL GROUP BY user_name ORDER BY MIN(id)`),
     getUsage: db.prepare('SELECT * FROM usage WHERE client_id = ? AND period_key = ?'),
     addUsage: db.prepare(`
       INSERT INTO usage (client_id, period_key, input_tokens, output_tokens, requests, first_seen, last_seen)
@@ -115,7 +125,10 @@ export function openDb(dbPath) {
         user_name: null, proofread_original: null, proofread_changed: 0, long_reply: 0, ...m,
       });
     },
+    // ცარიელი სახელი შენახულს არ შლის (მომხმარებელმა სახელი შეიძლება ჯერ არ მიუთითა)
     setClientName(clientId, name) { if (name) stmts.setClientName.run(name, clientId); },
+    /** Round 7 §4: ამ ბრაუზერის სახელები დროის მიხედვით (რიგით, ვინ როდის ეწერა). */
+    nameHistory(clientId) { return stmts.nameHistory.all(clientId); },
     getUsage(clientId, periodKey) {
       return stmts.getUsage.get(clientId, periodKey) || { input_tokens: 0, output_tokens: 0, requests: 0 };
     },

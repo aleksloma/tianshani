@@ -107,8 +107,11 @@ async function loadClients() {
   if (!data.clients.length) { list.replaceChildren(el('li', { class: 'muted', text: 'ჯერ ცარიელია.' })); return; }
   list.replaceChildren(...data.clients.map((c) => {
     const pct = c.limit_pct;
+    // Round 7 §4: პროფილი — ჯერ სახელი („— უსახელო“, თუ არ მიუთითებია), მერე ბრაუზერის მოკლე ID
     const b = el('button', { type: 'button', 'data-id': c.client_id, 'aria-current': String(c.client_id === selected) },
-      el('span', { class: 'cid' }, c.user_name ? el('b', { class: 'uname', text: `${c.user_name} · ` }) : null, c.client_id),
+      el('span', { class: 'who' },
+        el('b', { class: c.user_name ? 'uname' : 'uname none', text: c.user_name || '— უსახელო' }), ' ',
+        el('span', { class: 'cid', title: c.client_id, text: c.client_id.slice(0, 8) })),
       el('span', { class: 'cmeta', text: `ბოლოს: ${when(c.last_seen)} · შეტყობინება: ${c.messages} · პერსონაჟი: ${c.characters}` }),
       el('span', { class: 'cmeta', text: `ტოკენი (${data.period_key}): ${fmt.format(c.input_tokens)} შემ. / ${fmt.format(c.output_tokens)} გამ. · ლიმიტის ${pct}%` }),
       el('span', { class: 'cmeta cost', text: `ხარჯი: ${usd(c.cost_usd)} (სულ ${usd(c.total_cost_usd)})` }),
@@ -126,8 +129,14 @@ async function openClient(id) {
   $('detail-body').hidden = false;
   $('detail-tab').textContent = `საქმე ${id.slice(0, 8)}`;
   const c = data.client || {};
-  $('detail-title').textContent = c.user_name ? `${c.user_name} — ${id}` : id;
+  $('detail-title').textContent = `${c.user_name || '— უსახელო'} — ${id}`;
   $('detail-meta').textContent = `პირველად: ${when(c.first_seen)} · ბოლოს: ${when(c.last_seen)} · ${c.user_agent || ''}`;
+  // Round 7 §4: სახელი თუ შეიცვალა — წინა სახელები თარიღებით
+  const prev = (data.names || []).filter((n) => n.user_name !== c.user_name);
+  const day = (iso) => (iso ? new Date(iso).toLocaleDateString('ka-GE') : '—');
+  const span = (n) => (day(n.first_at) === day(n.last_at) ? day(n.first_at) : `${day(n.first_at)} – ${day(n.last_at)}`);
+  $('detail-names').hidden = prev.length === 0;
+  $('detail-names').textContent = prev.length ? `ადრე: ${prev.map((n) => `${n.user_name} (${span(n)})`).join(', ')}` : '';
   $('export-one').href = `/api/admin/export?client=${encodeURIComponent(id)}`;
 
   const tabs = $('char-tabs');

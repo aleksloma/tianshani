@@ -135,6 +135,7 @@ button:focus-visible, .btn:focus-visible, input:focus-visible { outline: 2px sol
 .badge { padding: 0 6px; border: 1px solid rgba(42, 38, 34, 0.35); border-radius: 8px; }
 s.struck { text-decoration-color: var(--red); text-decoration-thickness: 2px; }
 .uname { color: var(--blue); }
+.uname.none { color: var(--ink-soft); }
 
 /* Round 3 §4: შესწორებული პასუხები — ორიგინალი | შესწორებული */
 .proofread-panel { margin-bottom: 18px; }

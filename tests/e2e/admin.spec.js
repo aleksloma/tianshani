@@ -1,6 +1,6 @@
 // ადმინ-გვერდი: პაროლი, ბრაუზერების სია, საუბრები პერსონაჟებად, ლიმიტის განულება.
 import { test, expect } from '@playwright/test';
-import { openWall, openFrame, openFromMenu, send, SHOTS } from './helpers.js';
+import { openWall, openFrame, openFromMenu, send, e2eStore, SHOTS } from './helpers.js';
 
 test('/admin: არასწორი პაროლი → შეცდომა; სწორი → სტატისტიკა, კლიენტი, საუბრები პერსონაჟებად', async ({ page }) => {
   // ჯერ რამე საუბარი ამ ბრაუზერიდან
@@ -11,6 +11,8 @@ test('/admin: არასწორი პაროლი → შეცდომ
   await openFromMenu(page, 'kopaleishvili');
   await send(page, 'კოპალეიშვილი სად არის?');
   const cid = await page.evaluate(() => JSON.parse(localStorage.getItem('tianshani.client_id')));
+  // Round 7 §4: ადრე ამ ბრაუზერიდან სხვა სახელით დაწერილი შეტყობინება (სახელი შეიცვალა) — პროფილში „ადრე: …“
+  e2eStore().logMessage({ client_id: cid, character_id: 'otari', role: 'user', content: 'ძველი სახელით', user_name: 'ანა' });
 
   await page.goto('/admin');
   await expect(page.locator('#login')).toBeVisible();
@@ -31,10 +33,20 @@ test('/admin: არასწორი პაროლი → შეცდომ
 
   const item = page.locator(`#client-list button[data-id="${cid}"]`);
   await expect(item).toBeVisible();
-  await expect(item).toContainText('შეტყობინება: 2');
+  await expect(item).toContainText('შეტყობინება: 3');
+  // Round 7 §4: რიგში ჯერ სახელი, მერე ბრაუზერის მოკლე ID; უსახელო ბრაუზერი — „— უსახელო“
+  await expect(item.locator('.who .uname')).toHaveText('ნინო');
+  await expect(item.locator('.who .cid')).toHaveText(cid.slice(0, 8));
+  expect(await item.locator('.who').evaluate((el) => el.firstElementChild.classList.contains('uname'))).toBe(true);
+  const unnamed = page.locator('#client-list .uname.none');
+  if (await unnamed.count()) await expect(unnamed.first()).toHaveText('— უსახელო');
+  await page.locator('aside.clients').screenshot({ path: `${SHOTS}/R7-04-admin-clients-names.png` });
   await item.click();
   await expect(page.locator('#detail-title')).toHaveText(`ნინო — ${cid}`); // Round 3 §1: სახელი კლიენტის გვერდით
-  await expect(item.locator('.uname')).toHaveText('ნინო · ');
+  await expect(page.locator('#detail-meta')).toContainText('პირველად:');
+  await expect(page.locator('#detail-names')).toBeVisible();
+  await expect(page.locator('#detail-names')).toHaveText(/^ადრე: ანა \(\S+\)$/);
+  await page.locator('#detail').screenshot({ path: `${SHOTS}/R7-04-admin-profile.png` });
   await expect(page.locator('#conversation .cmsg.user strong').first()).toHaveText('მომხმარებელი (ნინო)');
   const tabs = page.locator('#char-tabs button');
   await expect(tabs).toHaveCount(2);

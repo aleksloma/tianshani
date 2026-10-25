@@ -188,7 +188,8 @@ export function adminRouter(cfg, store, loginLimiter = createRateLimiter(10)) {
       });
     }
     const client = db.prepare('SELECT * FROM clients WHERE client_id = ?').get(req.params.id) || null;
-    res.json({ client, characters: [...groups.values()].sort((a, b) => b.messages.length - a.messages.length) });
+    // Round 7 §4: პროფილი = client_id + სახელი; names — ყველა სახელი, რითაც ეს ბრაუზერი წერდა (თარიღებით)
+    res.json({ client, names: store.nameHistory(req.params.id), characters: [...groups.values()].sort((a, b) => b.messages.length - a.messages.length) });
   });
 
   r.post('/clients/:id/reset-limit', (req, res) => {

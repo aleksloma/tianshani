@@ -1,7 +1,7 @@
 // FIXES_ROUND7 API: §3 ადმინ-გვერდი ავტორიზაციამდე — მხოლოდ შესვლის ფორმა; §4 ლოგები მომხმარებლის პროფილით.
 import test, { before, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { startTestServer, cookieJar } from '../helpers.mjs';
+import { startTestServer, cookieJar, chat, userMsg, GS } from '../helpers.mjs';
 
 let S;
 before(async () => { S = await startTestServer(); });
@@ -73,4 +73,59 @@ test('§3 ფორმით შესვლა იმავე მისამ�
   const out = await fetch(`${S.base}/api/admin/logout`, { method: 'POST' });
   jar.store(out);
   assert.ok(!(await (await get('/admin', jar)).text()).includes('ბიუჯეტი'));
+});
+
+// ---------- §4 ----------
+
+test('§4 ერთი ბრაუზერი, ორი სახელი: clients.user_name — ბოლო; ყოველ რიგს თავისი დროის სახელი; ადმინის სია, პროფილი და ექსპორტი', async () => {
+  const jar = cookieJar();
+  const r1 = await chat(S.base, { characterId: 'tina', messages: userMsg('გამარჯობა'), gameState: GS, userName: 'ნინო' }, { jar });
+  assert.equal(r1.status, 200);
+  const cid = jar.get('tianshani_cid');
+  const seen1 = S.store.db.prepare('SELECT last_seen FROM clients WHERE client_id = ?').get(cid).last_seen;
+  await new Promise((r) => setTimeout(r, 15));
+  const r2 = await chat(S.base, { characterId: 'vaso', messages: userMsg('როგორ ხართ?'), gameState: GS, userName: 'ანა' }, { jar });
+  assert.equal(r2.status, 200);
+  const client = S.store.db.prepare('SELECT user_name, last_seen FROM clients WHERE client_id = ?').get(cid);
+  assert.equal(client.user_name, 'ანა');
+  assert.ok(client.last_seen > seen1, 'last_seen განახლდა');
+  const rows = S.store.db.prepare('SELECT role, character_id, user_name FROM messages WHERE client_id = ? ORDER BY id').all(cid);
+  assert.deepEqual(rows, [
+    { role: 'user', character_id: 'tina', user_name: 'ნინო' }, { role: 'assistant', character_id: 'tina', user_name: 'ნინო' },
+    { role: 'user', character_id: 'vaso', user_name: 'ანა' }, { role: 'assistant', character_id: 'vaso', user_name: 'ანა' },
+  ]);
+
+  const admin = await adminJar();
+  const list = await (await get('/api/admin/clients', admin)).json();
+  assert.equal(list.clients.find((c) => c.client_id === cid).user_name, 'ანა');
+  // ძებნა სახელით (ძველითაც — შეტყობინების რიგებში ინახება)
+  for (const q of ['ანა', cid.slice(0, 8)]) {
+    const found = await (await get(`/api/admin/clients?q=${encodeURIComponent(q)}`, admin)).json();
+    assert.ok(found.clients.some((c) => c.client_id === cid), q);
+  }
+  const detail = await (await get(`/api/admin/clients/${cid}/messages`, admin)).json();
+  assert.equal(detail.client.user_name, 'ანა');
+  assert.deepEqual(detail.names.map((n) => [n.user_name, n.messages]), [['ნინო', 1], ['ანა', 1]]);
+  assert.ok(detail.names.every((n) => n.first_at && n.last_at));
+  const exp = await (await get(`/api/admin/export?client=${cid}`, admin)).json();
+  assert.equal(exp.messages.length, 4);
+  assert.ok(exp.messages.every((m) => Object.hasOwn(m, 'user_name') && m.client_id === cid));
+  assert.deepEqual(exp.messages.map((m) => m.user_name), ['ნინო', 'ნინო', 'ანა', 'ანა']);
+  assert.equal(exp.clients[0].user_name, 'ანა');
+});
+
+test('§4 სახელის გარეშე მოთხოვნა შენახულ სახელს არ შლის; სკრიპტული (Round 5) შეტყობინება ბაზაში არასდროს ხვდება', async () => {
+  const jar = cookieJar();
+  await chat(S.base, { characterId: 'tina', messages: userMsg('გამარჯობა'), gameState: GS, userName: 'ნინო' }, { jar });
+  const cid = jar.get('tianshani_cid');
+  const r = await chat(S.base, {
+    characterId: 'tina',
+    messages: [{ role: 'assistant', content: 'სკრიპტული-ხაზი-R7', scripted: true }, { role: 'user', content: 'ისევ მე ვარ' }],
+    gameState: GS,
+  }, { jar });
+  assert.equal(r.status, 200);
+  assert.equal(S.store.db.prepare('SELECT user_name FROM clients WHERE client_id = ?').get(cid).user_name, 'ნინო');
+  const last = S.store.db.prepare("SELECT user_name FROM messages WHERE client_id = ? AND role = 'user' ORDER BY id DESC LIMIT 1").get(cid);
+  assert.equal(last.user_name, null, 'შეტყობინების მომენტში სახელი არ იყო');
+  assert.equal(S.store.db.prepare("SELECT COUNT(*) AS n FROM messages WHERE content LIKE '%სკრიპტული-ხაზი-R7%'").get().n, 0);
 });
