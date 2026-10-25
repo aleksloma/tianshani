@@ -29,6 +29,7 @@ import { isMetaLeak } from './leak.js';
 import { trimTruncated } from './trim.js';
 import { guessLang } from './lang.js';
 import { thinkingFor, outputCap, visibleCap, describeThinking } from './thinking.js';
+import { canonicalHttps } from './https.js';
 
 export const MSG_API_ERROR = 'ხაზი დაკავებულია. ცოტა ხანში სცადეთ.';
 /** Round 10 §3.2: პირველი ხაზი იკავება, სანამ შემოწმდება — პირველ \n-მდე ან ამდენ სიმბოლომდე (ან სტრიმის ბოლომდე). */
@@ -85,6 +86,8 @@ export function createApp(cfg) {
 
   app.disable('x-powered-by');
   app.set('trust proxy', 1); // ჰოსტინგზე (Render/Railway/Fly) req.ip და req.secure სწორად
+  // Round 11 §2: პირველი middleware — http → https, HSTS, www → apex (მხოლოდ https:// public_url-ით)
+  app.use(canonicalHttps(cfg));
   app.use(express.json({ limit: '256kb' }));
   app.use(cookieParser());
   app.use(clientIdMiddleware(store));
@@ -117,7 +120,11 @@ export function createApp(cfg) {
     },
   }));
 
-  app.get('/api/health', (req, res) => res.json({ ok: true, provider, model: cfg.gemini.mock ? 'mock' : (currentModel() || cfg.gemini.model) }));
+  app.get('/api/health', (req, res) => res.json({
+    ok: true, provider, model: cfg.gemini.mock ? 'mock' : (currentModel() || cfg.gemini.model),
+    // Round 11 §2: დიაგნოსტიკა — რას ხედავს Node პროქსის მიღმა (deploy-ის შემდეგ შესამოწმებლად)
+    secure: req.secure, proto: req.headers['x-forwarded-proto'] ?? null,
+  }));
 
   app.get('/api/characters', (req, res) => {
     res.json({
