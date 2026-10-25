@@ -166,9 +166,10 @@ test.describe('Round 9 — დესკტოპი 1280×800', () => {
     await page.unroute('**/api/chat');
     // ჩავარდნა: სერვერი 500
     await page.route('**/api/chat', (route) => route.fulfill({ status: 500, json: { error: 'ხაზი დაკავებულია. ცოტა ხანში სცადეთ.' } }));
-    const before = await copies(page);
     await page.keyboard.press('Escape');
     await openFrame(page, 'vaso');
+    // Round 10: მდგომარეობა — დახურვის შემდეგ (დახურვა დროს წევს და გაცემული ეგზემპლარი შეიძლება „დაიკარგოს“ — ეს ჩავარდნას არ ეხება)
+    const before = await copies(page);
     await page.locator('#chat-copy').click();
     await page.locator('#chat-input').fill('აი, წაიკითხეთ');
     await page.locator('#chat-input').press('Enter');

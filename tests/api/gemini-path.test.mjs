@@ -45,7 +45,7 @@ test('არარსებული მოდელი → უახლეს�
   const req = calls.at(-1);
   assert.equal(req.model, 'gemini-3.5-flash');
   assert.equal(req.config.temperature, 0.8); // Round 2 §8
-  assert.equal(req.config.maxOutputTokens, 180); // Round 4 §9
+  assert.equal(req.config.maxOutputTokens, 256); // Round 4 §9: 180 → Round 10 §2.1: visible_output_tokens 256 (ფიქრის ბიუჯეტი 0)
   assert.deepEqual(req.config.thinkingConfig, { thinkingBudget: 0 });
   assert.ok(req.config.abortSignal);
   assert.ok(req.config.systemInstruction.includes('# WORLD'));

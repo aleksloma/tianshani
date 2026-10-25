@@ -409,3 +409,102 @@ test('რეალური API (Round 2 §8): ბელა — „როგო�
   // გადამისამართება ტექსტში (პრომპტის წესი) — არა უადრეს მე-3 პასუხისა. ღილაკი (Round 7 §1) პრომპტის წესს აღარ ემორჩილება.
   for (const t of turns.slice(0, 2)) assert.ok(!SEND_AWAY.test(toUser(t.r.reply)), `#${t.n}: ადრეული გადამისამართება — ${t.r.reply}`);
 });
+
+// ---------- Round 10: შიდა ჩანაწერი არასდროს ჩანს; მარკშეიდერის შენობა; რუსული/ინგლისური — ცრუ დაჭერის გარეშე ----------
+
+/** SSE სტრიმი დროით: პირველი ხილული delta (მს), ყველა ივენთი, საბოლოო ტექსტი (replace-ის ჩათვლით). */
+async function timedChat(base, body, jar) {
+  const t0 = performance.now();
+  const res = await fetch(`${base}/api/chat`, { method: 'POST', headers: { 'Content-Type': 'application/json', ...(jar ? { cookie: jar.header() } : {}) }, body: JSON.stringify(body) });
+  jar?.store(res);
+  const reader = res.body.getReader();
+  const dec = new TextDecoder();
+  let buf = '';
+  let first = null;
+  const events = [];
+  for (;;) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    buf += dec.decode(value, { stream: true });
+    let i;
+    while ((i = buf.indexOf('\n\n')) >= 0) {
+      const ev = JSON.parse(buf.slice(0, i).replace(/^data:\s*/, ''));
+      buf = buf.slice(i + 2);
+      if (ev.delta && first === null) first = Math.round(performance.now() - t0);
+      events.push(ev);
+    }
+  }
+  let reply = '';
+  for (const e of events) { if (e.delta) reply += e.delta; if (typeof e.replace === 'string') reply = e.replace; }
+  return { events, first, reply, done: events.find((e) => e.done) || null, error: events.find((e) => e.error)?.error || null };
+}
+const LEAK_VISIBLE = /Context:|Speaker:|Rules check|REDIRECT GATE|FOR THIS REPLY|TOUCH POOL|Beat 1:|Manuscript message count/;
+const median = (a) => { const s = a.filter((x) => x !== null).sort((x, y) => x - y); return s.length ? s[Math.floor((s.length - 1) / 2)] : null; };
+const leakRows = (jar) => S.store.db.prepare("SELECT meta_leak, discarded_reply FROM messages WHERE client_id = ? AND role = 'assistant'").all(jar.get('tianshani_cid'));
+
+test('რეალური API (Round 10 §2/§6): წარმოების სიტუაცია ×15 — შიდა ჩანაწერი კლიენტამდე არასდროს აღწევს', { skip: !KEY && 'Gemini-ს გასაღები არ არის' }, async () => {
+  const msgs = [
+    { role: 'user', content: 'გამარჯობა, ბატონო ევგენი. ჩემი მოთხრობის ხელნაწერი მოგიტანეთ — ხომ ვერ წაიკითხავთ?' },
+    { role: 'assistant', content: 'ხელნაწერი? ჯერ ეს ბიძგი გავარკვიოთ, ბატონო სანდრო.\nთუ ეგზემპლარი გაქვთ, დამიტოვეთ, მერე ვნახავ.' },
+    { role: 'user', content: 'სამწუხაროდ ეგზემპლარები აღარ დამრჩა, მაგრამ გავითვალისწინებ.' },
+  ];
+  const jar = cookieJar();
+  const rows = [];
+  for (let i = 0; i < 15; i++) {
+    const r = await timedChat(S.base, { characterId: 'marksheideri', messages: msgs, gameState: GS, userName: 'სანდრო' }, jar);
+    assert.ok(r.done, r.error || 'no done');
+    const visible = r.events.filter((e) => e.delta || typeof e.replace === 'string').map((e) => e.delta || e.replace).join('\n');
+    assert.doesNotMatch(visible, LEAK_VISIBLE, `#${i + 1}: ${visible}`);
+    rows.push({ n: i + 1, first_delta_ms: r.first, reply: r.reply, replaced: r.events.some((e) => typeof e.replace === 'string') });
+  }
+  const caught = leakRows(jar).filter((x) => x.meta_leak === 1);
+  log.round10_repro = { runs: rows.length, caught: caught.length, caught_texts: caught.map((x) => x.discarded_reply), median_first_delta_ms: median(rows.map((x) => x.first_delta_ms)), rows };
+});
+
+test('რეალური API (Round 10 §5): მარკშეიდერი — ორი 10-პასუხიანი საუბარი, შენობის თემა 2–4-ჯერ თითოში, ერთი მაინც — არა ბზარი', { skip: !KEY && 'Gemini-ს გასაღები არ არის' }, async () => {
+  const pre = JSON.parse(fs.readFileSync(path.join(ROOT, 'src', 'data', 'preoccupations.json'), 'utf8')).marksheideri;
+  const nonCrack = pre.variants.slice(1).flatMap((v) => v.keywords_ka || []);
+  const RUNS = [
+    ['გამარჯობა, ბატონო ევგენი! როგორ ბრძანდებით?', 'ჩემი მოთხრობის ხელნაწერი მოგიტანეთ, წაიკითხავთ?', 'ამინდი როგორ მოგწონთ ამ დღეებში?', 'ხელნაწერზე რას იტყვით, როდის შემოვიარო?', 'ჭადრაკს თამაშობთ?', 'დირექტორი დღეს მოვა?', 'სადილზე ბუფეტში ჩადიხართ?', 'მაინც, ხელნაწერი ვის დავუტოვო?', 'ოჯახი გყავთ, ბატონო ევგენი?', 'კარგით, ხვალ შემოვივლი.'],
+    ['დილა მშვიდობისა, ბატონო ევგენი.', 'რას საქმიანობთ დღეს?', 'მოთხრობა დავწერე, ტიანშანზეა, ხომ არ წაიკითხავთ?', 'ფეხბურთი გიყვართ?', 'ხელნაწერი თინასთან დავტოვო?', 'შვებულებაში როდის მიდიხართ?', 'ლიფტი ისევ არ მუშაობს?', 'მოთხრობის სათაური მოგწონთ?', 'ჩაი ხომ არ გნებავთ?', 'ნახვამდის, ბატონო ევგენი.'],
+  ];
+  log.round10_building = [];
+  for (const [k, qs] of RUNS.entries()) {
+    const jar = cookieJar();
+    const msgs = [];
+    const turns = [];
+    for (const q of qs) {
+      msgs.push({ role: 'user', content: q });
+      const r = await timedChat(S.base, { characterId: 'marksheideri', messages: msgs, gameState: GS, userName: 'სანდრო' }, jar);
+      assert.ok(r.done, r.error || 'no done');
+      msgs.push({ role: 'assistant', content: r.reply });
+      const building = pre.keywords_ka.some((w) => r.reply.includes(w));
+      turns.push({ q, reply: r.reply, building, non_crack: building && nonCrack.some((w) => r.reply.includes(w)), first_delta_ms: r.first });
+    }
+    const n = turns.filter((t) => t.building).length;
+    log.round10_building.push({ run: k + 1, building_replies: n, non_crack: turns.filter((t) => t.non_crack).length, turns, caught: leakRows(jar).filter((x) => x.meta_leak === 1).length });
+  }
+  for (const r of log.round10_building) assert.ok(r.building_replies >= 2 && r.building_replies <= 4, `run ${r.run}: ${r.building_replies} / 10`);
+  assert.ok(log.round10_building.some((r) => r.non_crack >= 1), 'არა-ბზარის ვარიანტი არცერთ საუბარში');
+});
+
+test('რეალური API (Round 10 §7.4): რუსული და ინგლისური საუბარი (3 პასუხი თითო) — ცრუ დაჭერა და ხელახალი ცდა არ არის', { skip: !KEY && 'Gemini-ს გასაღები არ არის' }, async () => {
+  log.round10_foreign = [];
+  for (const [lang, qs] of [
+    ['ru', ['Здравствуйте, Евгений! Как дела?', 'Я принёс рукопись своей повести. Прочитаете?', 'А когда директор будет на месте?']],
+    ['en', ['Good morning, Evgeni! How are you?', 'I brought the manuscript of my novella. Will you read it?', 'When will the director be in?']],
+  ]) {
+    const jar = cookieJar();
+    const msgs = [];
+    for (const q of qs) {
+      msgs.push({ role: 'user', content: q });
+      const r = await timedChat(S.base, { characterId: 'marksheideri', messages: msgs, gameState: GS, userName: 'Sandro' }, jar);
+      assert.ok(r.done, r.error || 'no done');
+      msgs.push({ role: 'assistant', content: r.reply });
+      log.round10_foreign.push({ lang, user: q, reply: r.reply, first_delta_ms: r.first, replaced: r.events.some((e) => typeof e.replace === 'string') });
+    }
+    const rows = leakRows(jar);
+    assert.equal(rows.length, 3);
+    assert.deepEqual(rows.map((x) => x.meta_leak), [null, null, null], `${lang}: ცრუ დაჭერა`);
+  }
+});
