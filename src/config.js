@@ -5,6 +5,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
+import { normalizeThinkingPolicy } from './thinking.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 export const ROOT = path.resolve(__dirname, '..');
@@ -110,6 +111,11 @@ export function loadConfig(overrides = {}) {
     delete cfg.game.seasons_per_lost_copy;
     warnings.push('seasons_per_lost_copy is no longer used');
   }
+  // Round 10 §2.1: ახალი გასაღებები (ძველ, წარმოების settings.json-ში არ არის → მაგალითიდან მოდის);
+  // ძველი max_output_tokens / thinking_budget მხოლოდ მაშინ, როცა ახალი არ არის
+  const vis = Number(cfg.gemini.visible_output_tokens ?? cfg.gemini.max_output_tokens);
+  cfg.gemini.visible_output_tokens = Number.isFinite(vis) && vis > 0 ? vis : 256;
+  cfg.gemini.thinking_policy = normalizeThinkingPolicy(cfg.gemini.thinking_policy);
   const port = Number(cfg.server.port);
   cfg.server.port = Number.isInteger(port) && port >= 0 ? port : 3000; // 0 = თავისუფალი პორტი (ტესტები)
   cfg.logging.db_path = path.isAbsolute(cfg.logging.db_path) ? cfg.logging.db_path : path.join(ROOT, cfg.logging.db_path);

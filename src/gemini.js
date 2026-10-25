@@ -1,5 +1,7 @@
 // Google Gemini (@google/genai): მოდელის შემოწმება ListModels-ით, სტრიმინგი, usageMetadata.
 import { GoogleGenAI } from '@google/genai';
+import { outputCap } from './thinking.js';
+import { log } from './logger.js';
 
 let client = null;
 let resolvedModel = null;
@@ -72,18 +74,43 @@ export function toGeminiContents(messages) {
 }
 
 /**
- * სტრიმინგი: async generator → { delta } ... ბოლოს { usage: {input, output} }.
- * thinking_budget: 0 — მოკლე, სწრაფი პასუხებისთვის; თუ მოდელი არ იღებს — მეორედ ვცდით მის გარეშე.
+ * Round 10 §4.1: ტექსტი მხოლოდ candidates[0].content.parts-იდან, `thought: true` ნაწილების გარეშე (chunk.text-ს არ ვენდობით).
+ * ნაწილები თუ საერთოდ არ არის (ძველი/ყალბი პასუხი) — .text. აბრუნებს { text, thought } (thought — იყო თუ არა „ფიქრის“ ნაწილი).
  */
-export async function* geminiStream({ cfg, systemInstruction, contents, signal }) {
+export function visibleText(res) {
+  const parts = res?.candidates?.[0]?.content?.parts;
+  if (!Array.isArray(parts)) return { text: typeof res?.text === 'string' ? res.text : '', thought: false };
+  let text = '';
+  let thought = false;
+  for (const p of parts) {
+    if (p?.thought === true) { thought = true; continue; }
+    if (typeof p?.text === 'string') text += p.text;
+  }
+  return { text, thought };
+}
+
+const usageOf = (u) => ({
+  input: u?.promptTokenCount ?? 0,
+  // „ფიქრის“ ტოკენებიც გამომავალად ითვლება (ასე ითვლის ბილინგიც)
+  output: (u?.candidatesTokenCount ?? 0) + (u?.thoughtsTokenCount ?? 0),
+  // Round 3 §7: იმპლიციტური ქეშიდან მოსული ტოკენები (promptTokenCount-ში უკვე შედის) — მხოლოდ გასაზომად
+  cached: u?.cachedContentTokenCount ?? 0,
+});
+
+/**
+ * სტრიმინგი: async generator → { delta } ... ({ usage } — ყოველ ნაწილზე, სადაც მოდის) ... { finishReason } ... ბოლოს { usage }.
+ * thinkingBudget / maxOutputTokens — ამ პასუხისთვის (Round 10 §2.1); არ არის → კონფიგიდან (thinking_budget; ხილული ზღვარი + ბიუჯეტი).
+ * თუ მოდელი thinkingConfig-ს არ იღებს — მეორედ ვცდით მის გარეშე.
+ */
+export async function* geminiStream({ cfg, systemInstruction, contents, signal, thinkingBudget, maxOutputTokens }) {
   const model = await resolveModel(cfg);
+  const tb = thinkingBudget === undefined ? cfg.gemini.thinking_budget : thinkingBudget;
   const baseConfig = {
     systemInstruction,
     temperature: cfg.gemini.temperature,
-    maxOutputTokens: cfg.gemini.max_output_tokens,
+    maxOutputTokens: maxOutputTokens ?? outputCap(cfg, tb),
     abortSignal: signal,
   };
-  const tb = cfg.gemini.thinking_budget;
   const withThinking = tb === null || tb === undefined ? baseConfig : { ...baseConfig, thinkingConfig: { thinkingBudget: tb } };
 
   let stream;
@@ -96,30 +123,30 @@ export async function* geminiStream({ cfg, systemInstruction, contents, signal }
   }
 
   let usage = null;
+  let finishReason = null;
+  let warned = false;
   for await (const chunk of stream) {
-    const text = chunk.text;
+    const { text, thought } = visibleText(chunk);
+    if (thought && !warned) { warned = true; log.warn('[gemini] პასუხში „ფიქრის“ ნაწილი (thought: true) — არ ჩანს'); }
     if (text) yield { delta: text };
-    if (chunk.usageMetadata) usage = chunk.usageMetadata;
+    // შუა სტრიმშიც (Round 10 §3.2: შეწყვეტილი ცდის ტოკენებიც ითვლება)
+    if (chunk.usageMetadata) { usage = chunk.usageMetadata; yield { usage: usageOf(usage) }; }
+    const fr = chunk.candidates?.[0]?.finishReason;
+    if (fr) finishReason = fr;
   }
-  yield {
-    usage: {
-      input: usage?.promptTokenCount ?? 0,
-      // „ფიქრის“ ტოკენებიც გამომავალად ითვლება (ასე ითვლის ბილინგიც)
-      output: (usage?.candidatesTokenCount ?? 0) + (usage?.thoughtsTokenCount ?? 0),
-      // Round 3 §7: იმპლიციტური ქეშიდან მოსული ტოკენები (promptTokenCount-ში უკვე შედის) — მხოლოდ გასაზომად
-      cached: usage?.cachedContentTokenCount ?? 0,
-    },
-  };
+  if (finishReason) yield { finishReason };
+  yield { usage: usageOf(usage) };
 }
 
 /**
  * არასტრიმინგული გამოძახება (Round 3 §4 — კორექტურა): აბრუნებს { text, finishReason, usage }.
- * thinking_budget იგივე წესით, რაც სტრიმინგში (მოდელი თუ არ იღებს — მეორე ცდა მის გარეშე).
+ * thinking_budget იგივე წესით, რაც სტრიმინგში (მოდელი თუ არ იღებს — მეორე ცდა მის გარეშე); thinkingBudget — ამ გამოძახებისთვის
+ * (Round 10: ხელახალი გენერაცია), არ არის → gemini.thinking_budget (კორექტურა).
  */
-export async function geminiGenerate({ cfg, systemInstruction, contents, temperature = 0, maxOutputTokens, signal }) {
+export async function geminiGenerate({ cfg, systemInstruction, contents, temperature = 0, maxOutputTokens, signal, thinkingBudget }) {
   const model = await resolveModel(cfg);
   const base = { systemInstruction, temperature, maxOutputTokens, abortSignal: signal };
-  const tb = cfg.gemini.thinking_budget;
+  const tb = thinkingBudget === undefined ? cfg.gemini.thinking_budget : thinkingBudget;
   const config = tb === null || tb === undefined ? base : { ...base, thinkingConfig: { thinkingBudget: tb } };
   let res;
   try {
@@ -130,8 +157,10 @@ export async function geminiGenerate({ cfg, systemInstruction, contents, tempera
     } else throw e;
   }
   const u = res?.usageMetadata || {};
+  const { text, thought } = visibleText(res);
+  if (thought) log.warn('[gemini] პასუხში „ფიქრის“ ნაწილი (thought: true) — არ ჩანს');
   return {
-    text: typeof res?.text === 'string' ? res.text : '',
+    text,
     finishReason: res?.candidates?.[0]?.finishReason || null,
     usage: { input: u.promptTokenCount ?? 0, output: (u.candidatesTokenCount ?? 0) + (u.thoughtsTokenCount ?? 0) },
   };

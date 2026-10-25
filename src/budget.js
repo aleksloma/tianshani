@@ -1,6 +1,8 @@
 // გლობალური თვიური ლიმიტი (Round 7 §2, ცვლის FIXES_ROUND2 §3-ის დოლარებს): ყველა მომხმარებლის ჯამური ტოკენები
 // (შემავალი + გამომავალი), კალენდარული თვე (UTC). ფასები კონფიგში მხოლოდ ადმინის დოლარის შეფასებისთვისაა — არაფერს კეტავს.
 
+import { visibleCap } from './thinking.js';
+
 export const MSG_BUDGET = 'ბიუჯეტში გარღვევა გვაქვს, თვის ბოლომდე დავიცადოთ.';
 
 /** ხარჯის შეფასება USD: input/1e6 × price_in + output/1e6 × price_out (მხოლოდ საჩვენებლად). */
@@ -44,9 +46,9 @@ export function globalStatus(store, cfg, now = new Date()) {
   const used = (g.input_tokens | 0) + (g.output_tokens | 0);
   const percent = enabled ? (used / limit) * 100 : 0;
   const warnAt = Number(cfg.budget?.warn_at_percent) || 80;
-  // მინიმალური რეზერვი: ერთი სრული პასუხი (max_output_tokens). თუ ესეც აღარ ეტევა, არც ერთი მოთხოვნა არ გავა —
-  // ლიმიტი ფაქტობრივად ამოწურულია და მოდალი ყველას ჩატვირთვისთანავე უნდა გამოუჩნდეს.
-  const minReserve = Number(cfg.gemini?.max_output_tokens) || 0;
+  // მინიმალური რეზერვი: ერთი სრული პასუხი (ხილული ზღვარი — Round 10: visible_output_tokens). თუ ესეც აღარ ეტევა, არც ერთი
+  // მოთხოვნა არ გავა — ლიმიტი ფაქტობრივად ამოწურულია და მოდალი ყველას ჩატვირთვისთანავე უნდა გამოუჩნდეს.
+  const minReserve = visibleCap(cfg);
   return {
     period_key: key,
     enabled,
