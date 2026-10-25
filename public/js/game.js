@@ -89,10 +89,15 @@ export function nextCycle(state, cfgRaw) {
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-/** შავი ინტერტიტრი ფილმის სტილში. */
-export async function showIntertitle(text, ms = 1500) {
+/**
+ * ინტერტიტრი ფილმის სტილში. ჩამონგრევა — შავი ფენა; Round 9 §3: სეზონი (`{ season }`) — სიტყვა პირდაპირ კედელზე,
+ * სეზონის ფერით, ჩაბნელების გარეშე (კლასები `overlay` + `season-<name>` მხოლოდ ჩვენების დროს).
+ */
+export async function showIntertitle(text, ms = 1500, { season = null } = {}) {
   const el = document.getElementById('intertitle');
+  const extra = season ? ['overlay', `season-${season}`] : [];
   el.querySelector('p').textContent = text;
+  el.classList.add(...extra);
   el.hidden = false;
   el.classList.remove('out');
   void el.offsetWidth; // reflow → fade-in
@@ -102,7 +107,7 @@ export async function showIntertitle(text, ms = 1500) {
   el.classList.add('out');
   await sleep(350);
   el.hidden = true;
-  el.classList.remove('out');
+  el.classList.remove('out', ...extra);
 }
 
 /** ბათქაშის ნამსხვრევები. */

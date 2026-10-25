@@ -490,6 +490,15 @@ body.collapsing .painting { transition: transform 1.4s cubic-bezier(.55,0,1,.45)
   animation: flicker 0.18s steps(2) infinite;
 }
 @keyframes flicker { 50% { opacity: 0.93; } }
+/* Round 9 §3: სეზონის ინტერტიტრი — ჩაბნელების გარეშე, სიტყვა კედელზე სეზონის ფერით (ჩამონგრევა — შავი, როგორც იყო) */
+#intertitle.overlay { background: transparent; pointer-events: none; }
+#intertitle.overlay p {
+  text-shadow: 0 2px 6px rgba(0,0,0,0.55), 0 0 2px rgba(0,0,0,0.6);
+}
+#intertitle.season-winter p { color: #f6f3ea; }   /* თეთრი */
+#intertitle.season-spring p { color: #9ccc65; }   /* ღია მწვანე */
+#intertitle.season-summer p { color: #2e7d32; }   /* მწვანე */
+#intertitle.season-autumn p { color: #e3b22b; }   /* ყვითელი */
 
 /* ---------- ჩამონგრევა ---------- */
 body.shaking #wall, body.shaking #topbar { animation: shake 0.11s linear infinite; }

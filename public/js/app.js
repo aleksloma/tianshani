@@ -190,7 +190,7 @@ async function main() {
   async function playEvents(events, notes = []) {
     for (const ev of events) {
       if (ev.type === 'season') {
-        const p = showIntertitle(`${SEASON_KA[ev.season]}.`, 1500);
+        const p = showIntertitle(`${SEASON_KA[ev.season]}.`, 1500, { season: ev.season }); // Round 9 §3: კედელზე, სეზონის ფერით
         setTimeout(() => { renderStatus(); background.set(game.crackStage); }, 300); // ფონი და ხე შავი ეკრანის მიღმა იცვლება
         await p;
       } else if (ev.type === 'collapse') {
